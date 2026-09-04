@@ -1,0 +1,63 @@
+/* MediStore Pro — Frontend Design System Tokens with High Contrast Cards */
+:root {
+  /* Color Palette Tokens */
+  --color-surface-bg: #f4f5f7;          /* Soft neutral light-gray canvas */
+  --color-card-bg: #ffffff;             /* Pure white primary card surface */
+  --color-card-secondary-bg: #f8fafc;   /* Slightly shaded secondary inner card */
+  --color-card-tertiary-bg: #f1f5f9;    /* Shaded contrast container */
+  --color-border: #e2e8f0;              /* Crisp 1px gray border */
+  --color-border-subtle: #f1f5f9;       /* Subtle inner border */
+  
+  --color-primary: #111827;             /* High-contrast charcoal/black */
+  --color-primary-hover: #1f2937;       /* Dark hover */
+  
+  --color-text-main: #0f172a;           /* Dark slate text */
+  --color-text-secondary: #475569;      /* Muted secondary text */
+  --color-text-muted: #64748b;          /* Subtext / Labels */
+  
+  /* Status Palette */
+  --status-success-bg: #ecfdf5;
+  --status-success-text: #047857;
+  
+  --status-warning-bg: #fffbe0;
+  --status-warning-text: #b45309;
+  --status-warning-border: #fde68a;
+  
+  --status-danger-bg: #fef2f2;
+  --status-danger-text: #ef4444;
+  
+  /* Domain Pill Colors */
+  --badge-otc-bg: #f1f5f9;
+  --badge-otc-text: #334155;
+  
+  --badge-narcotic-bg: #fef2f2;
+  --badge-narcotic-text: #b91c1c;
+  
+  --badge-supplement-bg: #eff6ff;
+  --badge-supplement-text: #1d4ed8;
+
+  /* Typography Stack */
+  --font-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+  
+  /* Font Sizes */
+  --text-page-title: 20px;
+  --text-section-title: 14px;
+  --text-body: 12px;
+  --text-subtext: 11px;
+  --text-badge: 10px;
+  
+  /* Radii Scale */
+  --radius-card: 16px;
+  --radius-control: 12px;
+  --radius-badge: 9999px;
+  
+  /* Layout Dimensions */
+  --sidebar-width: 240px;
+  --header-height: 56px;
+  --cart-sidebar-width: 384px;
+
+  /* Elevation Shadows */
+  --shadow-subtle: 0 1px 3px 0 rgba(15, 23, 42, 0.05), 0 1px 2px -1px rgba(15, 23, 42, 0.05);
+  --shadow-card: 0 4px 6px -1px rgba(15, 23, 42, 0.06), 0 2px 4px -2px rgba(15, 23, 42, 0.04);
+}

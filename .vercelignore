@@ -1,0 +1,13 @@
+# Tests & benchmarks
+test/
+*.test.js
+test-results/
+
+# Temporary / Scratch files
+scratch/
+
+# Git & Logs
+.git
+.gitignore
+npm-debug.log*
+yarn-debug.log*

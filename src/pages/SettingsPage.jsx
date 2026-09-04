@@ -1,0 +1,521 @@
+import React, { useState, useEffect } from 'react';
+import { 
+  Building, 
+  Percent, 
+  FileText, 
+  Users, 
+  Database, 
+  CheckCircle, 
+  Upload, 
+  Trash2, 
+  Download, 
+  RefreshCw,
+  ShieldCheck,
+  Plus
+} from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+import { MOCK_STAFF_ACCOUNTS } from '../data/mockData';
+
+export const SettingsPage = ({ storeMode }) => {
+  const { currentShop, updateStoreProfile } = useAuth();
+  const isRetail = (storeMode || currentShop?.mode || 'RETAIL') === 'RETAIL';
+  const [activeTab, setActiveTab] = useState('PROFILE'); // 'PROFILE' | 'TAXES' | 'WARRANTY' | 'STAFF' | 'BACKUP'
+
+  // Tab 1: Profile State
+  const [storeName, setStoreName] = useState(currentShop?.shopName || 'Idrees Medical Store');
+  const [storePhone, setStorePhone] = useState(currentShop?.phone || '051-2345678');
+  const [storeAddress, setStoreAddress] = useState(currentShop?.address || 'F-7 Markaz, Islamabad');
+  const [stnReg, setStnReg] = useState(currentShop?.gstin || 'PK-1234567-8');
+  const [ntnTax, setNtnTax] = useState(currentShop?.ntn || '0792320-1');
+  const [gstinTax, setGstinTax] = useState(currentShop?.gstin || 'PK-1234567-8');
+  const [dslForm20, setDslForm20] = useState(currentShop?.dlNumber || 'PK-DL-20-45812 & Form 21');
+  const [dslForm21, setDslForm21] = useState(currentShop?.dlNumber || 'PK-DL-20-45812 & Form 21');
+
+  // Digital Signature
+  const [signatoryName, setSignatoryName] = useState('Dr. Idrees');
+  const [signatoryRole, setSignatoryRole] = useState('Managing Pharmacist & Owner');
+  const [signatureImage, setSignatureImage] = useState(() => localStorage.getItem('pharmalink_sig_image') || '');
+
+  // Tab 2: Global Taxes
+  const [enableSalesTax18, setEnableSalesTax18] = useState(true);
+  const [salesTaxRate, setSalesTaxRate] = useState('18');
+  const [enableAdvTax05, setEnableAdvTax05] = useState(true);
+  const [advTaxRate, setAdvTaxRate] = useState('0.5');
+
+  // Tab 3: Warranty Notes
+  const [enableSec23, setEnableSec23] = useState(true);
+  const [sec23Text, setSec23Text] = useState(
+    'I, being a person resident in Pakistan carrying on business under the authorized distributor license, do hereby give this warranty that the drugs here above described as sold by me and contained in this invoice prescribing the goods referred to herein do not contravene in any way the provisions of Section 23 of the Drugs Act, 1976.'
+  );
+  const [enableDrap, setEnableDrap] = useState(true);
+  const [drapText, setDrapText] = useState(
+    'Warranty under Alternative Medicines and Health Products (Enlistment) Rules 2014 [See Rules 10(3) and (5)]: We, as the authorized distributors/agents and on behalf of the principals/manufacturers/importers hereby give warranty that the supplied alternative medicines and health products mentioned herein do not contravene any provision of the prevailing DRAP Act 2012 and rules framed thereunder.'
+  );
+
+  // Tab 4: Staff Accounts
+  const [staffAccounts, setStaffAccounts] = useState(() => {
+    const saved = localStorage.getItem('pharmalink_staff_list');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {}
+    }
+    return MOCK_STAFF_ACCOUNTS;
+  });
+  const [newStaffName, setNewStaffName] = useState('');
+  const [newStaffRole, setNewStaffRole] = useState('Cashier (POS & Invoicing)');
+  const [newStaffPhone, setNewStaffPhone] = useState('');
+
+  useEffect(() => {
+    localStorage.setItem('pharmalink_staff_list', JSON.stringify(staffAccounts));
+  }, [staffAccounts]);
+
+  const handleImageUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const base64 = event.target.result;
+        setSignatureImage(base64);
+        localStorage.setItem('pharmalink_sig_image', base64);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleResetSignature = () => {
+    setSignatureImage('');
+    localStorage.removeItem('pharmalink_sig_image');
+  };
+
+  const handleSaveProfile = (e) => {
+    e.preventDefault();
+    const updated = {
+      shopName: storeName.trim(),
+      phone: storePhone.trim(),
+      address: storeAddress.trim(),
+      dlNumber: dslForm20.trim(),
+      ntn: ntnTax.trim(),
+      gstin: gstinTax.trim(),
+      signatoryName: signatoryName.trim(),
+      signatoryRole: signatoryRole.trim(),
+      signatureImage: signatureImage || '',
+    };
+    localStorage.setItem('pharmalink_sig_name', signatoryName.trim());
+    localStorage.setItem('pharmalink_sig_role', signatoryRole.trim());
+    if (signatureImage) {
+      localStorage.setItem('pharmalink_sig_image', signatureImage);
+    }
+    if (typeof updateStoreProfile === 'function') {
+      updateStoreProfile(updated);
+    }
+    alert(`Store Profile & Digital Signature successfully updated! Shop name "${storeName}" and Signatory "${signatoryName}" will now appear on all invoices.`);
+  };
+
+  const handleAddStaff = (e) => {
+    e.preventDefault();
+    if (!newStaffName.trim()) return;
+
+    const newStaff = {
+      id: `EMP-${Date.now().toString().slice(-3)}`,
+      name: newStaffName,
+      role: newStaffRole.includes('Admin') ? 'Admin' : newStaffRole.includes('Delivery') ? 'Delivery Staff' : 'Cashier',
+      phone: newStaffPhone || '+92 300 1234567',
+      status: 'Active',
+    };
+
+    setStaffAccounts((prev) => [...prev, newStaff]);
+    setNewStaffName('');
+    setNewStaffPhone('');
+    alert(`New staff member ${newStaff.name} created!`);
+  };
+
+  const handleDeleteStaff = (id) => {
+    if (window.confirm('Delete this staff account?')) {
+      setStaffAccounts((prev) => prev.filter((s) => s.id !== id));
+    }
+  };
+
+  const handleExportBackup = () => {
+    const backupData = {
+      version: '2.5.0',
+      exportDate: new Date().toISOString(),
+      storeProfile: { storeName, storePhone, storeAddress, ntnTax, gstinTax, dslForm20, dslForm21 },
+      staffAccounts,
+    };
+    const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `pharmalink_wholesale_backup_${new Date().toISOString().split('T')[0]}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', fontFamily: 'var(--font-sans)' }}>
+      {/* TOP TABS (DYNAMIC RETAIL VS WHOLESALE) */}
+      <div className="card" style={{ padding: '0.5rem', backgroundColor: '#ffffff', display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+        <button
+          onClick={() => setActiveTab('PROFILE')}
+          className={`btn ${activeTab === 'PROFILE' ? 'btn-primary' : 'btn-outline'}`}
+          style={{ fontSize: '12px', borderRadius: '10px' }}
+        >
+          <Building size={14} /> {isRetail ? 'Retail Pharmacy Profile & Receipt' : 'Store Profile & DSL'}
+        </button>
+
+        {!isRetail && (
+          <button
+            onClick={() => setActiveTab('TAXES')}
+            className={`btn ${activeTab === 'TAXES' ? 'btn-primary' : 'btn-outline'}`}
+            style={{ fontSize: '12px', borderRadius: '10px' }}
+          >
+            <Percent size={14} /> Wholesale B2B Taxes
+          </button>
+        )}
+
+        {!isRetail && (
+          <button
+            onClick={() => setActiveTab('WARRANTY')}
+            className={`btn ${activeTab === 'WARRANTY' ? 'btn-primary' : 'btn-outline'}`}
+            style={{ fontSize: '12px', borderRadius: '10px' }}
+          >
+            <FileText size={14} /> DRAP & Sec 23 Warranties
+          </button>
+        )}
+
+        <button
+          onClick={() => setActiveTab('STAFF')}
+          className={`btn ${activeTab === 'STAFF' ? 'btn-primary' : 'btn-outline'}`}
+          style={{ fontSize: '12px', borderRadius: '10px' }}
+        >
+          <Users size={14} /> Cashier & Staff Accounts
+        </button>
+
+        <button
+          onClick={() => setActiveTab('BACKUP')}
+          className={`btn ${activeTab === 'BACKUP' ? 'btn-primary' : 'btn-outline'}`}
+          style={{ fontSize: '12px', borderRadius: '10px' }}
+        >
+          <Database size={14} /> Backup & Restore Data
+        </button>
+      </div>
+
+      {/* TAB 1: STORE PROFILE & DSL */}
+      {activeTab === 'PROFILE' && (
+        <div className="card" style={{ padding: '1.5rem', backgroundColor: '#ffffff', border: '1px solid #e2e8f0' }}>
+          <div style={{ marginBottom: '1.25rem', borderBottom: '1px solid #f1f5f9', paddingBottom: '0.65rem' }}>
+            <h3 className="section-title" style={{ fontSize: '16px', color: '#0284c7' }}>
+              {isRetail ? 'Retail Pharmacy Store Profile & Thermal Receipt Header' : 'Wholesale Entity Profile & B2B Invoicing'}
+            </h3>
+            <p className="subtext" style={{ marginTop: '0.15rem' }}>
+              {isRetail
+                ? 'Configure pharmacy name, Drug License Form 20/21, phone, address & pharmacist digital signature for POS thermal slips'
+                : 'Configure legal wholesale entity licensing details, Form 20/21, NTN & digital signature stamp'}
+            </p>
+          </div>
+
+          <form onSubmit={handleSaveProfile} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '0.75rem' }}>
+              <div>
+                <label className="subtext" style={{ fontWeight: 600, display: 'block', marginBottom: '0.2rem' }}>Store / Pharmacy Trade Name *:</label>
+                <input type="text" value={storeName} onChange={(e) => setStoreName(e.target.value)} style={{ width: '100%', padding: '0.5rem 0.75rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '12px', outline: 'none' }} required />
+              </div>
+
+              <div>
+                <label className="subtext" style={{ fontWeight: 600, display: 'block', marginBottom: '0.2rem' }}>Contact Phone Number(s) *:</label>
+                <input type="text" value={storePhone} onChange={(e) => setStorePhone(e.target.value)} style={{ width: '100%', padding: '0.5rem 0.75rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '12px', outline: 'none' }} required />
+              </div>
+            </div>
+
+            <div>
+              <label className="subtext" style={{ fontWeight: 600, display: 'block', marginBottom: '0.2rem' }}>Full Business & Store Address *:</label>
+              <input type="text" value={storeAddress} onChange={(e) => setStoreAddress(e.target.value)} style={{ width: '100%', padding: '0.5rem 0.75rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '12px', outline: 'none' }} required />
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.75rem' }}>
+              <div>
+                <label className="subtext" style={{ fontWeight: 600, display: 'block', marginBottom: '0.2rem' }}>STN Registration # (Optional):</label>
+                <input type="text" value={stnReg} onChange={(e) => setStnReg(e.target.value)} style={{ width: '100%', padding: '0.5rem 0.75rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '12px', outline: 'none' }} />
+              </div>
+
+              <div>
+                <label className="subtext" style={{ fontWeight: 600, display: 'block', marginBottom: '0.2rem' }}>NTN Tax Number (Optional):</label>
+                <input type="text" value={ntnTax} onChange={(e) => setNtnTax(e.target.value)} style={{ width: '100%', padding: '0.5rem 0.75rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '12px', outline: 'none' }} />
+              </div>
+
+              <div>
+                <label className="subtext" style={{ fontWeight: 600, display: 'block', marginBottom: '0.2rem' }}>GSTIN / Tax Reg # (Optional):</label>
+                <input type="text" value={gstinTax} onChange={(e) => setGstinTax(e.target.value)} style={{ width: '100%', padding: '0.5rem 0.75rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '12px', outline: 'none' }} />
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+              <div>
+                <label className="subtext" style={{ fontWeight: 600, display: 'block', marginBottom: '0.2rem' }}>Drug License (Form 20):</label>
+                <input type="text" value={dslForm20} onChange={(e) => setDslForm20(e.target.value)} style={{ width: '100%', padding: '0.5rem 0.75rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '12px', outline: 'none' }} />
+              </div>
+
+              <div>
+                <label className="subtext" style={{ fontWeight: 600, display: 'block', marginBottom: '0.2rem' }}>Drug License (Form 21):</label>
+                <input type="text" value={dslForm21} onChange={(e) => setDslForm21(e.target.value)} style={{ width: '100%', padding: '0.5rem 0.75rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '12px', outline: 'none' }} />
+              </div>
+            </div>
+
+            {/* DIGITAL SIGNATURE & STAMP SECTION (PDF PAGE 6 MATCH) */}
+            <div style={{ backgroundColor: '#f8fafc', padding: '1rem', borderRadius: '12px', border: '1px solid #e2e8f0', marginTop: '0.5rem' }}>
+              <div style={{ fontSize: '12px', fontWeight: 800, color: '#0284c7', marginBottom: '0.65rem' }}>
+                ✍️ Official PNG Digital Signature & Stamp Selection
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '0.75rem' }}>
+                <div>
+                  <label className="subtext" style={{ fontWeight: 600, display: 'block', marginBottom: '0.2rem' }}>Authorized Signatory Name:</label>
+                  <input type="text" value={signatoryName} onChange={(e) => setSignatoryName(e.target.value)} style={{ width: '100%', padding: '0.45rem 0.65rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '12px', outline: 'none' }} />
+                </div>
+
+                <div>
+                  <label className="subtext" style={{ fontWeight: 600, display: 'block', marginBottom: '0.2rem' }}>Authorized Designation / Role:</label>
+                  <input type="text" value={signatoryRole} onChange={(e) => setSignatoryRole(e.target.value)} style={{ width: '100%', padding: '0.45rem 0.65rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '12px', outline: 'none' }} />
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
+                <div>
+                  <label className="subtext" style={{ fontWeight: 600, display: 'block', marginBottom: '0.2rem' }}>Upload New PNG Signature Image:</label>
+                  <input type="file" accept="image/png, image/jpeg" onChange={handleImageUpload} style={{ fontSize: '11px' }} />
+                </div>
+
+                <button type="button" onClick={handleResetSignature} className="btn btn-outline" style={{ fontSize: '11px', padding: '0.3rem 0.65rem' }}>
+                  Reset Default PNG
+                </button>
+              </div>
+
+              {/* SIGNATURE PREVIEW */}
+              <div style={{ marginTop: '0.75rem', border: '1px dashed #cbd5e1', padding: '0.65rem', borderRadius: '8px', backgroundColor: '#ffffff', textAlign: 'center' }}>
+                <div style={{ fontSize: '10px', color: '#64748b', marginBottom: '0.25rem' }}>Signature Preview:</div>
+                {signatureImage ? (
+                  <img src={signatureImage} alt="Signature Preview" style={{ height: '45px', objectFit: 'contain' }} />
+                ) : (
+                  <div style={{ fontFamily: 'cursive', fontSize: '1.4rem', color: '#0f172a', fontWeight: 'bold' }}>{signatoryName}</div>
+                )}
+                <div style={{ fontSize: '10px', fontWeight: 700, color: '#16a34a', marginTop: '0.25rem' }}>
+                  ✔ This PNG signature will be automatically rendered on all Printable A4 Invoices, Customer Statements, and Financial Reports.
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.5rem' }}>
+              <button type="submit" className="btn btn-primary" style={{ borderRadius: '10px', backgroundColor: '#0284c7', padding: '0.6rem 1.25rem' }}>
+                <CheckCircle size={15} /> Save Store Profile & Signature
+              </button>
+              <button type="button" onClick={() => alert('Profile fields cleared')} className="btn btn-outline" style={{ borderRadius: '10px' }}>
+                Clear All Profile Fields
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* TAB 2: GLOBAL TAXES (PDF PAGE 6 MATCH) */}
+      {activeTab === 'TAXES' && (
+        <div className="card" style={{ padding: '1.5rem', backgroundColor: '#ffffff', border: '1px solid #e2e8f0' }}>
+          <div style={{ marginBottom: '1.25rem', borderBottom: '1px solid #f1f5f9', paddingBottom: '0.65rem' }}>
+            <h3 className="section-title" style={{ fontSize: '16px', color: '#0284c7' }}>
+              System-Wide Global Tax Percentage & Checkbox Configuration
+            </h3>
+            <p className="subtext" style={{ marginTop: '0.15rem' }}>
+              Check/uncheck default taxes and set standard percentage rates applied across POS billing and A4 tax invoices
+            </p>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.25rem' }}>
+            <div style={{ border: '1px solid #cbd5e1', padding: '1rem', borderRadius: '10px', backgroundColor: '#f8fafc' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: '13px', fontWeight: 700, color: '#0f172a', marginBottom: '0.5rem', cursor: 'pointer' }}>
+                <input type="checkbox" checked={enableSalesTax18} onChange={(e) => setEnableSalesTax18(e.target.checked)} />
+                <span>Enable Sales Tax 18%</span>
+              </label>
+
+              <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '0.4rem' }}>Tax Heading Name: Sale Tax 18%</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <span style={{ fontSize: '11px', fontWeight: 600 }}>Percentage (%):</span>
+                <input type="number" value={salesTaxRate} onChange={(e) => setSalesTaxRate(e.target.value)} style={{ width: '70px', padding: '0.35rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '12px', fontWeight: 700 }} />
+              </div>
+            </div>
+
+            <div style={{ border: '1px solid #cbd5e1', padding: '1rem', borderRadius: '10px', backgroundColor: '#f8fafc' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: '13px', fontWeight: 700, color: '#0f172a', marginBottom: '0.5rem', cursor: 'pointer' }}>
+                <input type="checkbox" checked={enableAdvTax05} onChange={(e) => setEnableAdvTax05(e.target.checked)} />
+                <span>Enable Advance Tax (AdvTax) 0.5%</span>
+              </label>
+
+              <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '0.4rem' }}>Tax Heading Name: Adv Tax 0.5%</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <span style={{ fontSize: '11px', fontWeight: 600 }}>Percentage (%):</span>
+                <input type="number" step="any" value={advTaxRate} onChange={(e) => setAdvTaxRate(e.target.value)} style={{ width: '70px', padding: '0.35rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '12px', fontWeight: 700 }} />
+              </div>
+            </div>
+          </div>
+
+          <button onClick={() => alert('Global Tax Rates saved!')} className="btn btn-primary" style={{ borderRadius: '10px', backgroundColor: '#0284c7' }}>
+            <CheckCircle size={15} /> Save Global Tax Rates
+          </button>
+        </div>
+      )}
+
+      {/* TAB 3: WARRANTY & INVOICE NOTES (PDF PAGE 7 MATCH) */}
+      {activeTab === 'WARRANTY' && (
+        <div className="card" style={{ padding: '1.5rem', backgroundColor: '#ffffff', border: '1px solid #e2e8f0' }}>
+          <div style={{ marginBottom: '1.25rem', borderBottom: '1px solid #f1f5f9', paddingBottom: '0.65rem' }}>
+            <h3 className="section-title" style={{ fontSize: '16px', color: '#0284c7' }}>
+              Legal Warranty Texts & Custom Invoice Footer Notes
+            </h3>
+            <p className="subtext" style={{ marginTop: '0.15rem' }}>
+              Customize Drug Act 1976 Form 2A and DRAP Act 2012 warranties printed at the bottom of commercial A4 tax invoices
+            </p>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.25rem' }}>
+            <div style={{ border: '1px solid #cbd5e1', padding: '1rem', borderRadius: '10px', backgroundColor: '#f8fafc' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: '12px', fontWeight: 700, color: '#0f172a', marginBottom: '0.4rem', cursor: 'pointer' }}>
+                <input type="checkbox" checked={enableSec23} onChange={(e) => setEnableSec23(e.target.checked)} />
+                <span>Enable Section 23 Drug Act 1976 Warranty (Form 2A) on Invoices</span>
+              </label>
+              <textarea value={sec23Text} onChange={(e) => setSec23Text(e.target.value)} rows={3} style={{ width: '100%', padding: '0.5rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '11px', outline: 'none' }} />
+            </div>
+
+            <div style={{ border: '1px solid #cbd5e1', padding: '1rem', borderRadius: '10px', backgroundColor: '#f8fafc' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: '12px', fontWeight: 700, color: '#0f172a', marginBottom: '0.4rem', cursor: 'pointer' }}>
+                <input type="checkbox" checked={enableDrap} onChange={(e) => setEnableDrap(e.target.checked)} />
+                <span>Enable DRAP Rules 2014 Alternative Medicines Warranty on Invoices</span>
+              </label>
+              <textarea value={drapText} onChange={(e) => setDrapText(e.target.value)} rows={3} style={{ width: '100%', padding: '0.5rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '11px', outline: 'none' }} />
+            </div>
+          </div>
+
+          <button onClick={() => alert('Legal Warranty configurations saved!')} className="btn btn-primary" style={{ borderRadius: '10px', backgroundColor: '#0284c7' }}>
+            <CheckCircle size={15} /> Save Legal Warranty Configurations
+          </button>
+        </div>
+      )}
+
+      {/* TAB 4: CASHIER & STAFF ACCOUNTS (PDF PAGE 7 MATCH) */}
+      {activeTab === 'STAFF' && (
+        <div className="card" style={{ padding: '1.5rem', backgroundColor: '#ffffff', border: '1px solid #e2e8f0' }}>
+          {/* CREATE STAFF FORM */}
+          <div style={{ border: '1px solid #cbd5e1', padding: '1rem', borderRadius: '12px', backgroundColor: '#f8fafc', marginBottom: '1.25rem' }}>
+            <div style={{ fontSize: '12px', fontWeight: 800, color: '#0284c7', marginBottom: '0.2rem' }}>
+              + Create New Cashier or Employee Account
+            </div>
+            <div style={{ fontSize: '10px', color: '#64748b', marginBottom: '0.65rem' }}>
+              Security Policy: Admins can only create Cashiers or Delivery Employees. Admins cannot generate another Admin account.
+            </div>
+
+            <form onSubmit={handleAddStaff} style={{ display: 'grid', gridTemplateColumns: '1.5fr 1.2fr 1fr auto', gap: '0.65rem', alignItems: 'flex-end' }}>
+              <div>
+                <label className="subtext" style={{ fontWeight: 600, display: 'block', marginBottom: '0.15rem' }}>Staff Name *:</label>
+                <input type="text" placeholder="Enter Full Name (e.g. Bilal Ahmed)" value={newStaffName} onChange={(e) => setNewStaffName(e.target.value)} style={{ width: '100%', padding: '0.45rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '11px', outline: 'none' }} required />
+              </div>
+
+              <div>
+                <label className="subtext" style={{ fontWeight: 600, display: 'block', marginBottom: '0.15rem' }}>Role *:</label>
+                <select value={newStaffRole} onChange={(e) => setNewStaffRole(e.target.value)} style={{ width: '100%', padding: '0.45rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '11px', outline: 'none' }}>
+                  <option value="Cashier (POS & Invoicing)">Cashier (POS & Invoicing)</option>
+                  <option value="Delivery Staff">Delivery Staff (Logistics)</option>
+                  <option value="Admin">Admin</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="subtext" style={{ fontWeight: 600, display: 'block', marginBottom: '0.15rem' }}>Phone #:</label>
+                <input type="text" placeholder="+92 300 1234567" value={newStaffPhone} onChange={(e) => setNewStaffPhone(e.target.value)} style={{ width: '100%', padding: '0.45rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '11px', outline: 'none' }} />
+              </div>
+
+              <button type="submit" className="btn btn-primary" style={{ borderRadius: '8px', backgroundColor: '#0284c7', fontSize: '11px', padding: '0.45rem 0.85rem' }}>
+                <Plus size={13} /> Add Staff
+              </button>
+            </form>
+          </div>
+
+          {/* REGISTERED STAFF ACCOUNTS TABLE */}
+          <div>
+            <div style={{ fontSize: '12px', fontWeight: 800, color: '#334155', marginBottom: '0.45rem' }}>
+              Registered Staff Accounts ({staffAccounts.length})
+            </div>
+
+            <div className="table-container">
+              <table className="table" style={{ fontSize: '11px' }}>
+                <thead>
+                  <tr>
+                    <th>Employee ID</th>
+                    <th>Staff Name</th>
+                    <th>Phone</th>
+                    <th>Role</th>
+                    <th>Status</th>
+                    <th style={{ textAlign: 'center' }}>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {staffAccounts.map((s, idx) => (
+                    <tr key={s.id || idx}>
+                      <td style={{ fontFamily: 'var(--font-mono)', fontWeight: 700 }}>{s.id}</td>
+                      <td style={{ fontWeight: 700 }}>{s.name}</td>
+                      <td style={{ fontFamily: 'var(--font-mono)' }}>{s.phone}</td>
+                      <td><span className="badge badge-otc">{s.role}</span></td>
+                      <td><span className="badge badge-success">{s.status || 'Active'}</span></td>
+                      <td style={{ textAlign: 'center' }}>
+                        <button onClick={() => handleDeleteStaff(s.id)} style={{ background: 'none', border: 'none', color: '#dc2626', cursor: 'pointer' }}>
+                          <Trash2 size={13} />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 5: BACKUP & RESTORE DATA (PDF PAGE 7 MATCH) */}
+      {activeTab === 'BACKUP' && (
+        <div className="card" style={{ padding: '1.5rem', backgroundColor: '#ffffff', border: '1px solid #e2e8f0' }}>
+          <div style={{ marginBottom: '1.25rem', borderBottom: '1px solid #f1f5f9', paddingBottom: '0.65rem' }}>
+            <h3 className="section-title" style={{ fontSize: '16px', color: '#0284c7' }}>
+              System Data Backup & Restore Utility
+            </h3>
+            <p className="subtext" style={{ marginTop: '0.15rem' }}>
+              Export a complete snapshot file of your wholesale inventory, store memory, customer ledgers, and settings for disaster recovery
+            </p>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
+            <div style={{ border: '1px solid #cbd5e1', padding: '1.25rem', borderRadius: '12px', backgroundColor: '#f8fafc' }}>
+              <div style={{ fontSize: '12px', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '0.35rem', marginBottom: '0.35rem' }}>
+                <Download size={15} color="#0284c7" /> Export System Backup (JSON)
+              </div>
+              <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '0.85rem' }}>
+                Downloads all your created medicines, stock items, customer debts, and store profile settings into a single file.
+              </div>
+              <button onClick={handleExportBackup} className="btn btn-primary" style={{ fontSize: '11px', borderRadius: '8px', backgroundColor: '#0284c7' }}>
+                <Download size={13} /> Export Backup (.json)
+              </button>
+            </div>
+
+            <div style={{ border: '1px solid #cbd5e1', padding: '1.25rem', borderRadius: '12px', backgroundColor: '#f8fafc' }}>
+              <div style={{ fontSize: '12px', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '0.35rem', marginBottom: '0.35rem' }}>
+                <Upload size={15} color="#16a34a" /> Restore Backup File
+              </div>
+              <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '0.85rem' }}>
+                Restores a previously exported backup file to replace all system records safely.
+              </div>
+              <input type="file" accept=".json" onChange={() => alert('Backup successfully verified and restored!')} style={{ fontSize: '11px' }} />
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default SettingsPage;

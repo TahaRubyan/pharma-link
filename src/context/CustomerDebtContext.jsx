@@ -1,0 +1,164 @@
+import React, { createContext, useContext, useState, useEffect } from 'react';
+
+const CustomerDebtContext = createContext();
+
+const MOCK_DEBT_CUSTOMERS = [];
+
+export const CustomerDebtProvider = ({ children }) => {
+  const [debtCustomers, setDebtCustomers] = useState(() => {
+    const saved = localStorage.getItem('pharmalink_debt_customers');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {}
+    }
+    return MOCK_DEBT_CUSTOMERS;
+  });
+
+  useEffect(() => {
+    localStorage.setItem('pharmalink_debt_customers', JSON.stringify(debtCustomers));
+  }, [debtCustomers]);
+
+  // Register a new customer for credit/debt khata
+  const addDebtCustomer = (customerData) => {
+    const newCustomer = {
+      id: `CUST-DEBT-${Date.now().toString().slice(-4)}`,
+      name: customerData.name.trim(),
+      phone: customerData.phone.trim(),
+      address: customerData.address ? customerData.address.trim() : 'Local Area',
+      cnic: customerData.cnic ? customerData.cnic.trim() : '-',
+      creditLimit: Number(customerData.creditLimit || 30000),
+      currentBalance: 0,
+      activeTransactions: [],
+      settledCyclesHistory: [],
+    };
+    setDebtCustomers((prev) => [newCustomer, ...prev]);
+    return newCustomer;
+  };
+
+  // Record a credit sale to customer debt
+  const recordCreditSale = (customerId, saleData) => {
+    let updatedCustomer = null;
+    setDebtCustomers((prev) =>
+      prev.map((c) => {
+        if (c.id === customerId) {
+          const transaction = {
+            invoiceNo: saleData.invoiceNo || `INV-RET-${Date.now().toString().slice(-6)}`,
+            date: saleData.date || new Date().toISOString().split('T')[0],
+            time: saleData.time || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            items: [...saleData.items],
+            grossTotal: Number(saleData.grossTotal || saleData.subtotal || 0),
+            discount: Number(saleData.discount || 0),
+            netTotal: Number(saleData.netTotal || 0),
+            status: 'UNPAID',
+          };
+          const newBal = c.currentBalance + transaction.netTotal;
+          updatedCustomer = {
+            ...c,
+            currentBalance: newBal,
+            activeTransactions: [...c.activeTransactions, transaction],
+          };
+          return updatedCustomer;
+        }
+        return c;
+      })
+    );
+    return updatedCustomer;
+  };
+
+  // Settle Customer Debt (Full or Partial Settlement)
+  const settleCustomerDebt = (customerId, paymentAmount, paymentMode = 'Cash', notes = '') => {
+    let settlementResult = null;
+    setDebtCustomers((prev) =>
+      prev.map((c) => {
+        if (c.id === customerId) {
+          const paid = Number(paymentAmount);
+          const newBalance = Math.max(0, c.currentBalance - paid);
+          const isFull = newBalance === 0;
+
+          const settledCycle = {
+            cycleId: `CYCLE-${Date.now().toString().slice(-6)}`,
+            settledDate: new Date().toISOString().split('T')[0],
+            settledTime: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            customerName: c.name,
+            customerPhone: c.phone,
+            previousBalance: c.currentBalance,
+            settledAmount: paid,
+            remainingBalance: newBalance,
+            paymentMode,
+            notes: notes || (isFull ? 'Full Balance Settlement' : 'Partial Payment on Account'),
+            invoicesCount: c.activeTransactions.length,
+            settledItems: c.activeTransactions.flatMap((t) => t.items || []),
+            settledInvoices: c.activeTransactions.map((t) => t.invoiceNo),
+          };
+
+          settlementResult = settledCycle;
+
+          return {
+            ...c,
+            currentBalance: newBalance,
+            // If full settlement, clear active transactions; if partial, retain active items with adjusted balance
+            activeTransactions: isFull ? [] : c.activeTransactions,
+            settledCyclesHistory: [settledCycle, ...c.settledCyclesHistory],
+          };
+        }
+        return c;
+      })
+    );
+    return settlementResult;
+  };
+
+  // Generate WhatsApp Share URL & Text for Instant Credit Slip
+  const generateWhatsAppCreditSlip = (customer, saleData, shopName = 'Idrees Medical Store') => {
+    const phoneClean = customer.phone.replace(/[^0-9]/g, '');
+    const internationalPhone = phoneClean.startsWith('0')
+      ? '92' + phoneClean.slice(1)
+      : phoneClean.startsWith('92')
+      ? phoneClean
+      : '92' + phoneClean;
+
+    const itemsText = (saleData.items || [])
+      .map((item, idx) => `${idx + 1}. ${item.name || item.brandName} (${item.qty} ${item.unitSelection || 'Tab'}) - Rs. ${Number(item.total || (item.qty * (item.price || item.boxPrice || 10))).toFixed(2)}`)
+      .join('\n');
+
+    const message = `*${shopName.toUpperCase()} — CREDIT PURCHASE SLIP*\n` +
+      `-----------------------------------------\n` +
+      `*Customer:* ${customer.name}\n` +
+      `*Invoice #:* ${saleData.invoiceNo}\n` +
+      `*Date:* ${saleData.date} ${saleData.time || ''}\n` +
+      `-----------------------------------------\n` +
+      `*PURCHASED ITEMS:*\n${itemsText}\n` +
+      `-----------------------------------------\n` +
+      `*Bill Amount Added to Debt:* Rs. ${Number(saleData.netTotal).toFixed(2)}\n` +
+      `*Total Outstanding Khata Balance:* Rs. ${(customer.currentBalance + Number(saleData.netTotal)).toFixed(2)}\n` +
+      `-----------------------------------------\n` +
+      `Thank you for shopping with ${shopName}. Please clear at month-end.`;
+
+    const encoded = encodeURIComponent(message);
+    return `https://api.whatsapp.com/send?phone=${internationalPhone}&text=${encoded}`;
+  };
+
+  return (
+    <CustomerDebtContext.Provider
+      value={{
+        debtCustomers,
+        addDebtCustomer,
+        recordCreditSale,
+        settleCustomerDebt,
+        generateWhatsAppCreditSlip,
+      }}
+    >
+      {children}
+    </CustomerDebtContext.Provider>
+  );
+};
+
+export const useCustomerDebt = () => {
+  const context = useContext(CustomerDebtContext);
+  if (!context) {
+    throw new Error('useCustomerDebt must be used within a CustomerDebtProvider');
+  }
+  return context;
+};
+
+export default CustomerDebtContext;
