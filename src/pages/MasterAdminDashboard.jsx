@@ -12,7 +12,8 @@ import {
   Calendar,
   Filter,
   RefreshCw,
-  UserPlus
+  UserPlus,
+  LogOut
 } from 'lucide-react';
 import { useAuth, formatDateDDMMYYYY, parseDDMMYYYYToDate } from '../context/AuthContext';
 import NewClientOnboardModal from '../components/modals/NewClientOnboardModal';
@@ -24,7 +25,8 @@ export const MasterAdminDashboard = () => {
     tenantsList, 
     clientPaymentLogs, 
     inspectTenant, 
-    loginAsClientUser 
+    loginAsClientUser,
+    logout
   } = useAuth();
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -93,13 +95,45 @@ export const MasterAdminDashboard = () => {
           </p>
         </div>
 
-        <div style={{ display: 'flex', gap: '0.5rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
           <button
             onClick={() => setIsOnboardModalOpen(true)}
             className="btn btn-primary"
             style={{ borderRadius: '12px', fontSize: '12px', padding: '0.65rem 1.25rem', backgroundColor: '#111827' }}
           >
             <Plus size={16} /> Onboard New Client Shop
+          </button>
+
+          {/* Dedicated Super Admin Logout Button */}
+          <button
+            onClick={logout}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.4rem',
+              borderRadius: '12px',
+              fontSize: '12px',
+              fontWeight: 700,
+              padding: '0.65rem 1.15rem',
+              backgroundColor: '#fef2f2',
+              color: '#b91c1c',
+              border: '1px solid #fca5a5',
+              cursor: 'pointer',
+              boxShadow: '0 1px 2px rgba(220, 38, 38, 0.05)',
+              transition: 'all 0.15s ease'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = '#fee2e2';
+              e.currentTarget.style.borderColor = '#f87171';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = '#fef2f2';
+              e.currentTarget.style.borderColor = '#fca5a5';
+            }}
+            title="Sign out of Super Admin command center and return to login"
+          >
+            <LogOut size={15} color="#b91c1c" />
+            <span>Log Out</span>
           </button>
         </div>
       </div>
