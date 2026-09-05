@@ -139,17 +139,85 @@ export const SettingsPage = ({ storeMode }) => {
   const handleExportBackup = () => {
     const backupData = {
       version: '2.5.0',
-      exportDate: new Date().toISOString(),
-      storeProfile: { storeName, storePhone, storeAddress, ntnTax, gstinTax, dslForm20, dslForm21 },
+      exportedAt: new Date().toISOString(),
+      storeProfile: { storeName, storePhone, storeAddress, ntnTax, gstinTax, dslForm20, dslForm21, signatoryName, signatoryRole, signatureImage },
       staffAccounts,
+      medicines: JSON.parse(localStorage.getItem('pharmalink_pk_medicines') || '[]'),
+      batches: JSON.parse(localStorage.getItem('pharmalink_pk_batches') || '[]'),
+      invoices: JSON.parse(localStorage.getItem('pharmalink_pk_invoices') || '[]'),
+      debtCustomers: JSON.parse(localStorage.getItem('pharmalink_debt_customers') || '[]'),
+      suppliers: JSON.parse(localStorage.getItem('pharmalink_pk_suppliers') || '[]'),
+      purchaseOrders: JSON.parse(localStorage.getItem('pharmalink_pk_purchase_orders') || '[]'),
+      patients: JSON.parse(localStorage.getItem('pharmalink_pk_patients') || '[]'),
+      vendorReturns: JSON.parse(localStorage.getItem('pharmalink_pk_vendor_returns') || '[]'),
     };
     const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
+    const safeStoreName = (storeName || 'pharmalink').toLowerCase().replace(/[^a-z0-9]/g, '_');
+    const dateStr = new Date().toISOString().split('T')[0];
     a.href = url;
-    a.download = `pharmalink_wholesale_backup_${new Date().toISOString().split('T')[0]}.json`;
+    a.download = `pharmalink_backup_${safeStoreName}_${dateStr}.json`;
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  const handleRestoreFile = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const imported = JSON.parse(event.target.result);
+        if (!imported) throw new Error('File is empty.');
+
+        if (Array.isArray(imported.medicines)) localStorage.setItem('pharmalink_pk_medicines', JSON.stringify(imported.medicines));
+        if (Array.isArray(imported.batches)) localStorage.setItem('pharmalink_pk_batches', JSON.stringify(imported.batches));
+        if (Array.isArray(imported.invoices)) localStorage.setItem('pharmalink_pk_invoices', JSON.stringify(imported.invoices));
+        if (Array.isArray(imported.debtCustomers)) localStorage.setItem('pharmalink_debt_customers', JSON.stringify(imported.debtCustomers));
+        if (Array.isArray(imported.suppliers)) localStorage.setItem('pharmalink_pk_suppliers', JSON.stringify(imported.suppliers));
+        if (Array.isArray(imported.purchaseOrders)) localStorage.setItem('pharmalink_pk_purchase_orders', JSON.stringify(imported.purchaseOrders));
+        if (Array.isArray(imported.patients)) localStorage.setItem('pharmalink_pk_patients', JSON.stringify(imported.patients));
+        if (Array.isArray(imported.vendorReturns)) localStorage.setItem('pharmalink_pk_vendor_returns', JSON.stringify(imported.vendorReturns));
+        if (Array.isArray(imported.staffAccounts)) localStorage.setItem('pharmalink_staff_list', JSON.stringify(imported.staffAccounts));
+        
+        if (imported.storeProfile) {
+          const sp = imported.storeProfile;
+          if (sp.signatureImage) localStorage.setItem('pharmalink_sig_image', sp.signatureImage);
+          if (sp.signatoryName) localStorage.setItem('pharmalink_sig_name', sp.signatoryName);
+          if (sp.signatoryRole) localStorage.setItem('pharmalink_sig_role', sp.signatoryRole);
+          if (typeof updateStoreProfile === 'function') {
+            updateStoreProfile(sp);
+          }
+        }
+
+        alert('System Backup successfully verified and restored! The application will now reload to apply all restored data.');
+        window.location.reload();
+      } catch (err) {
+        alert('Failed to restore backup: ' + err.message);
+      }
+      e.target.value = null;
+    };
+    reader.readAsText(file);
+  };
+
+  const handlePurgeTransactionsOnly = () => {
+    if (window.confirm('⚠️ PURGE TEST TRANSACTIONS:\\n\\nThis will clear all test invoices, test customer khata debts, and sample patient files, but KEEP your medicine inventory intact.\\n\\nReady to begin fresh production sales?')) {
+      localStorage.setItem('pharmalink_pk_invoices', JSON.stringify([]));
+      localStorage.setItem('pharmalink_debt_customers', JSON.stringify([]));
+      localStorage.setItem('pharmalink_pk_patients', JSON.stringify([]));
+      alert('Test transactions, debts, and patient files purged! System is ready for Day 1 production sales.');
+      window.location.reload();
+    }
+  };
+
+  const handleFactoryReset = () => {
+    if (window.confirm('⚠️ FULL FACTORY RESET:\\n\\nThis will completely wipe all local data (medicines, batches, invoices, debts, settings) back to an absolute clean slate.\\n\\nAre you sure you want to proceed?')) {
+      localStorage.clear();
+      alert('All local data cleared. System reset to factory clean slate.');
+      window.location.reload();
+    }
   };
 
   return (
@@ -492,24 +560,52 @@ export const SettingsPage = ({ storeMode }) => {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
             <div style={{ border: '1px solid #cbd5e1', padding: '1.25rem', borderRadius: '12px', backgroundColor: '#f8fafc' }}>
               <div style={{ fontSize: '12px', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '0.35rem', marginBottom: '0.35rem' }}>
-                <Download size={15} color="#0284c7" /> Export System Backup (JSON)
+                <Download size={15} color="#0284c7" /> Export Complete System Backup (JSON)
               </div>
               <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '0.85rem' }}>
-                Downloads all your created medicines, stock items, customer debts, and store profile settings into a single file.
+                Exports all medicines, batches, sales invoices, customer debt khata, suppliers, patients, staff, and store profile into a secure JSON backup file.
               </div>
-              <button onClick={handleExportBackup} className="btn btn-primary" style={{ fontSize: '11px', borderRadius: '8px', backgroundColor: '#0284c7' }}>
+              <button onClick={handleExportBackup} className="btn btn-primary" style={{ fontSize: '11px', borderRadius: '8px', backgroundColor: '#0284c7', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
                 <Download size={13} /> Export Backup (.json)
               </button>
             </div>
 
             <div style={{ border: '1px solid #cbd5e1', padding: '1.25rem', borderRadius: '12px', backgroundColor: '#f8fafc' }}>
               <div style={{ fontSize: '12px', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '0.35rem', marginBottom: '0.35rem' }}>
-                <Upload size={15} color="#16a34a" /> Restore Backup File
+                <Upload size={15} color="#16a34a" /> Restore Complete System Backup
               </div>
               <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '0.85rem' }}>
-                Restores a previously exported backup file to replace all system records safely.
+                Restores a previously exported backup file to restore all store records, inventory, and customer ledgers safely.
               </div>
-              <input type="file" accept=".json" onChange={() => alert('Backup successfully verified and restored!')} style={{ fontSize: '11px' }} />
+              <input type="file" accept=".json" onChange={handleRestoreFile} style={{ fontSize: '11px' }} />
+            </div>
+          </div>
+
+          {/* PRODUCTION ONBOARDING & DATA RESET */}
+          <div style={{ border: '1px solid #fecaca', backgroundColor: '#fff5f5', borderRadius: '14px', padding: '1.25rem' }}>
+            <div style={{ fontSize: '13px', fontWeight: 800, color: '#991b1b', display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.35rem' }}>
+              <RefreshCw size={15} color="#dc2626" /> Client Production Onboarding & Data Purge
+            </div>
+            <p style={{ fontSize: '11.5px', color: '#7f1d1d', margin: '0 0 1rem 0' }}>
+              Use these tools to transition from demo mode into live client operation. You can safely purge demo sales transactions while keeping your catalog, or perform a complete clean-slate reset.
+            </p>
+
+            <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+              <button
+                onClick={handlePurgeTransactionsOnly}
+                className="btn btn-outline"
+                style={{ backgroundColor: '#ffffff', color: '#b91c1c', border: '1px solid #f87171', fontSize: '11px', borderRadius: '8px', padding: '0.45rem 0.85rem', fontWeight: 700 }}
+              >
+                Purge Test Transactions (Keep Inventory)
+              </button>
+
+              <button
+                onClick={handleFactoryReset}
+                className="btn btn-outline"
+                style={{ backgroundColor: '#dc2626', color: '#ffffff', border: 'none', fontSize: '11px', borderRadius: '8px', padding: '0.45rem 0.85rem', fontWeight: 700 }}
+              >
+                Factory Reset (Blank Slate)
+              </button>
             </div>
           </div>
         </div>

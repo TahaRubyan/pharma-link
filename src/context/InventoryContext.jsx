@@ -472,17 +472,27 @@ export const InventoryProvider = ({ children }) => {
     }
   };
 
+  const bulkImportMedicines = (importedMedicines, importedBatches) => {
+    if (!Array.isArray(importedMedicines) || importedMedicines.length === 0) return;
+    setMedicines((prev) => [...importedMedicines, ...prev]);
+    if (Array.isArray(importedBatches) && importedBatches.length > 0) {
+      setBatches((prev) => [...importedBatches, ...prev]);
+    }
+  };
+
   return (
     <InventoryContext.Provider
       value={{
         medicines,
         setMedicines,
         batches,
+        setBatches,
         vendorReturns,
         auditLogs,
         poTaxLogs,
         inwardPOStock,
         updateMedicineDetails,
+        bulkImportMedicines,
         deductStock,
         restoreStock,
         markItemAsRTV,

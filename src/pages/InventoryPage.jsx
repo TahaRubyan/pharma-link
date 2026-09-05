@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { 
   Package, 
   Search, 
@@ -9,16 +9,20 @@ import {
   Plus, 
   CheckCircle,
   Layers,
-  ShieldCheck
+  ShieldCheck,
+  Download,
+  Upload,
+  FileSpreadsheet
 } from 'lucide-react';
 import { useInventory } from '../context/InventoryContext';
 import { useAuth } from '../context/AuthContext';
 import EditPriceModal from '../components/modals/EditPriceModal';
 
 export const InventoryPage = () => {
-  const { medicines = [], batches = [], setMedicines, updateMedicineDetails } = useInventory();
+  const { medicines = [], batches = [], setMedicines, updateMedicineDetails, bulkImportMedicines } = useInventory();
   const { currentShop } = useAuth();
   const isRetail = currentShop?.mode === 'RETAIL';
+  const csvFileRef = useRef(null);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('ALL');
@@ -26,6 +30,172 @@ export const InventoryPage = () => {
   // Modals state
   const [editingMedicine, setEditingMedicine] = useState(null);
   const [isEditPriceOpen, setIsEditPriceOpen] = useState(false);
+
+  const handleExportCSV = () => {
+    if (medicines.length === 0) {
+      alert('No medicines registered to export.');
+      return;
+    }
+    const headers = ['Item Code', 'Medicine Name', 'Generic Formula', 'Category', 'Manufacturer', 'Physical Shelf', 'Box Stock', 'Purchase Cost (Box)', 'Retail MRP (Box)', 'Strips Per Box', 'Tablets Per Strip', 'Controlled Type', 'Requires Rx'];
+    const rows = medicines.map((m) => [
+      m.itemCode || '',
+      `"${(m.name || m.brandName || '').replace(/"/g, '""')}"`,
+      `"${(m.formula || m.genericFormula || '').replace(/"/g, '""')}"`,
+      m.category || 'Tablets',
+      `"${(m.manufacturer || '').replace(/"/g, '""')}"`,
+      `"${(m.rackLocation || '').replace(/"/g, '""')}"`,
+      m.boxStock || 0,
+      m.purchaseCost || m.purchasePriceBox || 0,
+      m.boxSellingPrice || m.boxPrice || 0,
+      m.stripsPerBox || 10,
+      m.tabletsPerStrip || 10,
+      m.controlledType || 'None',
+      m.requiresPrescription ? 'Yes' : 'No',
+    ]);
+    const csvContent = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `pharmalink_inventory_${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleDownloadTemplate = () => {
+    const headers = ['Item Code', 'Medicine Name', 'Generic Formula', 'Category', 'Manufacturer', 'Physical Shelf', 'Box Stock', 'Purchase Cost (Box)', 'Retail MRP (Box)', 'Strips Per Box', 'Tablets Per Strip', 'Controlled Type', 'Requires Rx'];
+    const sampleRows = [
+      ['2001', 'Panadol Extra 500mg', 'Paracetamol + Caffeine', 'Tablets', 'GSK Pakistan', 'Shelf A-1', '20', '520', '650', '20', '10', 'None', 'No'],
+      ['2002', 'Ciproxin 500mg', 'Ciprofloxacin 500mg', 'Tablets', 'Bayer Pakistan', 'Shelf B-2', '15', '410', '500', '1', '10', 'None', 'Yes'],
+      ['2003', 'Lexotanil 3mg', 'Bromazepam 3mg', 'Tablets', 'Martin Dow', 'Safe Lock-R', '10', '260', '320', '3', '10', 'Narcotic', 'Yes']
+    ];
+    const csvContent = [headers.join(','), ...sampleRows.map((r) => r.map((c) => `"${c}"`).join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `pharmalink_inventory_template.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleImportCSV = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const text = event.target.result;
+        const lines = text.split(/\\r?\\n/).filter((l) => l.trim().length > 0);
+        if (lines.length <= 1) {
+          alert('CSV file is empty or missing data rows.');
+          return;
+        }
+
+        const newMeds = [];
+        const newBatches = [];
+        const nowTime = Date.now();
+
+        for (let i = 1; i < lines.length; i++) {
+          const row = [];
+          let insideQuotes = false;
+          let entry = '';
+          for (let c of lines[i]) {
+            if (c === '"') {
+              insideQuotes = !insideQuotes;
+            } else if (c === ',' && !insideQuotes) {
+              row.push(entry.trim());
+              entry = '';
+            } else {
+              entry += c;
+            }
+          }
+          row.push(entry.trim());
+
+          const name = row[1] ? row[1].replace(/^"|"$/g, '').trim() : '';
+          if (!name) continue;
+
+          const itemCode = row[0] && /^\\d{4}$/.test(row[0].trim()) ? row[0].trim() : (1001 + medicines.length + newMeds.length).toString();
+          const formula = row[2] ? row[2].replace(/^"|"$/g, '').trim() : 'Standard Formula';
+          const category = row[3] ? row[3].replace(/^"|"$/g, '').trim() : 'Tablets';
+          const manufacturer = row[4] ? row[4].replace(/^"|"$/g, '').trim() : 'Pharma Distributor';
+          const rackLocation = row[5] ? row[5].replace(/^"|"$/g, '').trim() : '';
+          const boxStock = Number(row[6]) || 1;
+          const purchaseCost = Number(row[7]) || 400;
+          const boxMrp = Number(row[8]) || 500;
+          const stripsPerBox = Number(row[9]) || 10;
+          const tabletsPerStrip = Number(row[10]) || 10;
+          const tabletsPerBox = stripsPerBox * tabletsPerStrip;
+          const pricePerTablet = Number((boxMrp / tabletsPerBox).toFixed(2));
+          const stripPrice = Number((boxMrp / stripsPerBox).toFixed(2));
+          const controlledType = row[11] ? row[11].replace(/^"|"$/g, '').trim() : 'None';
+          const requiresPrescription = (row[12] || '').toLowerCase().includes('y') || controlledType === 'Narcotic';
+
+          const medId = `MED-${nowTime.toString().slice(-4)}-${i}`;
+          const newMed = {
+            id: medId,
+            itemCode,
+            name,
+            brandName: name,
+            formula,
+            genericFormula: formula,
+            category,
+            manufacturer,
+            rackLocation,
+            boxStock,
+            purchaseCost,
+            purchasePriceBox: purchaseCost,
+            boxSellingPrice: boxMrp,
+            boxPrice: boxMrp,
+            stripsPerBox,
+            tabletsPerStrip,
+            tabletsPerBox,
+            pricePerTablet,
+            stripPrice,
+            controlledType,
+            requiresPrescription,
+            expiryDate: '2028-12-31'
+          };
+
+          const newBatch = {
+            id: `BATCH-${nowTime.toString().slice(-4)}-${i}`,
+            medicineId: medId,
+            medicineName: name,
+            batchNo: `B26-${Math.floor(100 + Math.random() * 900)}`,
+            batchNumber: `B26-${Math.floor(100 + Math.random() * 900)}`,
+            distributorName: manufacturer,
+            expiryDate: '2028-12-31',
+            boxStock,
+            totalTabletsAvailable: boxStock * tabletsPerBox,
+            boxPrice: boxMrp,
+            purchasePriceBox: purchaseCost,
+            pricePerTablet,
+            status: 'Active Stock',
+            rackLocation,
+          };
+
+          newMeds.push(newMed);
+          newBatches.push(newBatch);
+        }
+
+        if (newMeds.length > 0) {
+          if (typeof bulkImportMedicines === 'function') {
+            bulkImportMedicines(newMeds, newBatches);
+          } else {
+            setMedicines((prev) => [...newMeds, ...prev]);
+          }
+          alert(`Successfully imported ${newMeds.length} medicines into the catalog!`);
+        } else {
+          alert('No valid medicine rows found in file.');
+        }
+      } catch (err) {
+        alert('Failed to parse CSV file: ' + err.message);
+      }
+      e.target.value = null;
+    };
+    reader.readAsText(file);
+  };
 
   // Filtered Catalog Items
   const filteredMedicines = useMemo(() => {
@@ -81,9 +251,46 @@ export const InventoryPage = () => {
           </div>
         </div>
 
-        <span style={{ backgroundColor: '#ffffff', color: '#0284c7', padding: '0.35rem 0.75rem', borderRadius: '8px', fontSize: '12px', fontWeight: 800 }}>
-          {medicines.length} Products Registered
-        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+          <span style={{ backgroundColor: '#ffffff', color: '#0284c7', padding: '0.35rem 0.75rem', borderRadius: '8px', fontSize: '12px', fontWeight: 800 }}>
+            {medicines.length} Products Registered
+          </span>
+
+          <button
+            onClick={handleExportCSV}
+            className="btn btn-outline"
+            style={{ backgroundColor: 'rgba(255,255,255,0.15)', color: '#ffffff', border: '1px solid rgba(255,255,255,0.4)', borderRadius: '8px', fontSize: '11px', padding: '0.35rem 0.65rem', display: 'flex', alignItems: 'center', gap: '0.35rem', cursor: 'pointer' }}
+            title="Export catalog to Excel CSV"
+          >
+            <Download size={13} /> Export CSV
+          </button>
+
+          <button
+            onClick={() => csvFileRef.current?.click()}
+            className="btn btn-outline"
+            style={{ backgroundColor: 'rgba(255,255,255,0.15)', color: '#ffffff', border: '1px solid rgba(255,255,255,0.4)', borderRadius: '8px', fontSize: '11px', padding: '0.35rem 0.65rem', display: 'flex', alignItems: 'center', gap: '0.35rem', cursor: 'pointer' }}
+            title="Bulk import medicines from Excel CSV"
+          >
+            <Upload size={13} /> Import CSV
+          </button>
+
+          <button
+            onClick={handleDownloadTemplate}
+            className="btn btn-outline"
+            style={{ backgroundColor: 'rgba(255,255,255,0.15)', color: '#ffffff', border: '1px solid rgba(255,255,255,0.4)', borderRadius: '8px', fontSize: '11px', padding: '0.35rem 0.65rem', display: 'flex', alignItems: 'center', gap: '0.35rem', cursor: 'pointer' }}
+            title="Download CSV sample template for Excel"
+          >
+            <FileSpreadsheet size={13} /> Template
+          </button>
+
+          <input
+            type="file"
+            ref={csvFileRef}
+            accept=".csv"
+            style={{ display: 'none' }}
+            onChange={handleImportCSV}
+          />
+        </div>
       </div>
 
       {/* SEARCH & FILTER BAR */}
