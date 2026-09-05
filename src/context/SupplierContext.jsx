@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { INITIAL_SUPPLIERS } from '../data/mockData';
+import { INITIAL_SUPPLIERS, INITIAL_PURCHASE_ORDERS } from '../data/mockData';
 
 const SupplierContext = createContext();
 
@@ -22,12 +22,12 @@ export const SupplierProvider = ({ children }) => {
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
       } catch (e) {
         console.error('Failed to parse saved purchase orders', e);
       }
     }
-    return [];
+    return INITIAL_PURCHASE_ORDERS;
   });
 
   useEffect(() => {

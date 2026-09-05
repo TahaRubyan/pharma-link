@@ -1,18 +1,18 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { INITIAL_DEBT_CUSTOMERS } from '../data/mockData';
 
 const CustomerDebtContext = createContext();
-
-const MOCK_DEBT_CUSTOMERS = [];
 
 export const CustomerDebtProvider = ({ children }) => {
   const [debtCustomers, setDebtCustomers] = useState(() => {
     const saved = localStorage.getItem('pharmalink_debt_customers');
     if (saved) {
       try {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
       } catch (e) {}
     }
-    return MOCK_DEBT_CUSTOMERS;
+    return INITIAL_DEBT_CUSTOMERS;
   });
 
   useEffect(() => {
