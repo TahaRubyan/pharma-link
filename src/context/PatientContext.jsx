@@ -43,6 +43,8 @@ export const PatientProvider = ({ children }) => {
     else setWholesalePatients(updater);
   };
 
+  const [activePatientForPOS, setActivePatientForPOS] = useState(null);
+
   useEffect(() => {
     try {
       localStorage.setItem('pharmalink_pk_patients', JSON.stringify(wholesalePatients));
