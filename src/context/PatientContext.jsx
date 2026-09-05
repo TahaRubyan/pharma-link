@@ -68,12 +68,20 @@ export const PatientProvider = ({ children }) => {
     });
   };
 
+  const deletePatient = (patientId) => {
+    setPatients((prev) => prev.filter((p) => p.id !== patientId));
+    if (activePatientForPOS?.id === patientId) {
+      setActivePatientForPOS(null);
+    }
+  };
+
   return (
     <PatientContext.Provider
       value={{
         patients,
         activePatientForPOS,
         addPatient,
+        deletePatient,
         searchPatients,
         servePatientInPOS,
         clearActivePatientForPOS,

@@ -68,17 +68,44 @@ button, input, select, textarea {
   border-radius: var(--radius-card);
   padding: 1.25rem;
   box-shadow: var(--shadow-subtle);
-  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), 
+              box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1), 
+              border-color 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.card-hover:hover {
-  transform: translateY(-3px);
+.card:hover {
   border-color: #cbd5e1;
-  box-shadow: 0 10px 20px -3px rgba(15, 23, 42, 0.08), 0 4px 6px -2px rgba(15, 23, 42, 0.04);
+  box-shadow: 0 6px 16px -2px rgba(15, 23, 42, 0.07), 0 2px 4px -1px rgba(15, 23, 42, 0.03);
 }
 
-.card-hover:active {
-  transform: translateY(-1px) scale(0.995);
+.card:active {
+  transform: translateY(0px) scale(0.998);
+}
+
+/* Interactive & Clickable Cards across the system (KPI cards, patient profiles, mode cards) */
+.card-hover,
+.card-interactive,
+.card[onClick],
+.clickable-card {
+  cursor: pointer;
+}
+
+.card-hover:hover,
+.card-interactive:hover,
+.card[onClick]:hover,
+.clickable-card:hover {
+  transform: translateY(-3px);
+  border-color: #0284c7;
+  box-shadow: 0 12px 24px -4px rgba(2, 132, 199, 0.12), 0 4px 8px -2px rgba(15, 23, 42, 0.05);
+}
+
+.card-hover:active,
+.card-interactive:active,
+.card[onClick]:active,
+.clickable-card:active {
+  transform: translateY(0px) scale(0.992);
+  box-shadow: 0 2px 6px -1px rgba(2, 132, 199, 0.18);
+  border-color: #0284c7;
 }
 
 .flex-between {

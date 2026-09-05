@@ -4,19 +4,21 @@ import { X, Edit, DollarSign, CheckCircle } from 'lucide-react';
 export const EditPriceModal = ({ isOpen, medicine, onClose, onSave }) => {
   if (!isOpen || !medicine) return null;
 
+  const [itemCode, setItemCode] = useState(medicine.itemCode || '');
   const [boxSellingPrice, setBoxSellingPrice] = useState(medicine.boxSellingPrice || medicine.boxPrice || medicine.price || 600);
   const [purchaseCost, setPurchaseCost] = useState(medicine.purchaseCost || medicine.purchasePriceBox || 480);
-  const [rackLocation, setRackLocation] = useState(medicine.rackLocation || 'Rack A-01 / Shelf 2');
+  const [rackLocation, setRackLocation] = useState(medicine.rackLocation || '');
 
   const handleSubmit = (e) => {
     e.preventDefault();
     onSave(medicine.id, {
+      itemCode: itemCode.trim() || medicine.itemCode,
       boxSellingPrice: Number(boxSellingPrice) || 0,
       boxPrice: Number(boxSellingPrice) || 0,
       price: Number(boxSellingPrice) || 0,
       purchaseCost: Number(purchaseCost) || 0,
       purchasePriceBox: Number(purchaseCost) || 0,
-      rackLocation,
+      rackLocation: rackLocation.trim(),
     });
     onClose();
   };
@@ -30,17 +32,34 @@ export const EditPriceModal = ({ isOpen, medicine, onClose, onSave }) => {
 
         <div style={{ marginBottom: '1.25rem', borderBottom: '1px solid #f1f5f9', paddingBottom: '0.65rem' }}>
           <h3 className="section-title" style={{ fontSize: '17px', display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#0284c7' }}>
-            <Edit size={18} color="#0284c7" /> Edit Selling Price & Physical Rack
+            <Edit size={18} color="#0284c7" /> Edit Medicine Details (Code, Price & Shelf)
           </h3>
           <p className="subtext" style={{ marginTop: '0.15rem' }}>
-            {medicine.name || medicine.brandName} ({medicine.itemCode || medicine.id})
+            {medicine.name || medicine.brandName} • Current Code: <strong>{medicine.itemCode || medicine.id}</strong>
           </p>
         </div>
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
           <div>
+            <label className="subtext" style={{ fontWeight: 700, display: 'block', marginBottom: '0.2rem', color: '#0f172a' }}>
+              Item Code (Client Managed e.g. 1001, 2045) *:
+            </label>
+            <input
+              type="text"
+              value={itemCode}
+              onChange={(e) => setItemCode(e.target.value)}
+              placeholder="e.g. 1001"
+              style={{ width: '100%', padding: '0.55rem 0.75rem', borderRadius: '10px', border: '1px solid #0284c7', fontSize: '13px', fontWeight: 800, fontFamily: 'var(--font-mono)', outline: 'none', backgroundColor: '#f0f9ff' }}
+              required
+            />
+            <span style={{ fontSize: '10.5px', color: '#64748b', display: 'block', marginTop: '0.2rem' }}>
+              Custom item code for fast lookup across POS, search, and barcode scanning.
+            </span>
+          </div>
+
+          <div>
             <label className="subtext" style={{ fontWeight: 600, display: 'block', marginBottom: '0.2rem', color: '#334155' }}>
-              Selling Box Price (Rs.) *:
+              Selling Box Price / Retail MRP (Rs.) *:
             </label>
             <input
               type="number"
@@ -50,6 +69,9 @@ export const EditPriceModal = ({ isOpen, medicine, onClose, onSave }) => {
               style={{ width: '100%', padding: '0.55rem 0.75rem', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '13px', fontWeight: 700, outline: 'none' }}
               required
             />
+            <span style={{ fontSize: '10px', color: '#0284c7', display: 'block', marginTop: '0.2rem' }}>
+              Updating price synchronizes all existing batches of this medicine on shelf.
+            </span>
           </div>
 
           <div>
@@ -68,10 +90,11 @@ export const EditPriceModal = ({ isOpen, medicine, onClose, onSave }) => {
 
           <div>
             <label className="subtext" style={{ fontWeight: 600, display: 'block', marginBottom: '0.2rem', color: '#334155' }}>
-              Physical Rack / Shelf Location:
+              Physical Rack / Shelf Location (Optional):
             </label>
             <input
               type="text"
+              placeholder="e.g. Rack A-01 / Shelf 2 (Leave blank if unassigned)"
               value={rackLocation}
               onChange={(e) => setRackLocation(e.target.value)}
               style={{ width: '100%', padding: '0.55rem 0.75rem', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '12px', outline: 'none' }}
@@ -83,7 +106,7 @@ export const EditPriceModal = ({ isOpen, medicine, onClose, onSave }) => {
               Cancel
             </button>
             <button type="submit" className="btn btn-primary" style={{ flex: 2, borderRadius: '10px', backgroundColor: '#0284c7' }}>
-              <CheckCircle size={15} /> Update Price & Rack
+              <CheckCircle size={15} /> Save Medicine Details
             </button>
           </div>
         </form>

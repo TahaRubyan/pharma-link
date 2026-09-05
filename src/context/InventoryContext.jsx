@@ -129,7 +129,7 @@ export const InventoryProvider = ({ children }) => {
     );
   };
 
-  // Inward PO Stock with Dynamic Price Updates and Tax Logging
+  // Inward PO Stock with Uniform Dynamic Price Updates and Tax Logging
   const inwardPOStock = (poRecord) => {
     const inwardItems = poRecord.items || [];
     let totalInwardCost = 0;
@@ -143,67 +143,142 @@ export const InventoryProvider = ({ children }) => {
       const totalTabs = boxesCount * stripsPerBox * tabletsPerStrip;
       const tabPrice = boxMrp / (stripsPerBox * tabletsPerStrip);
       const stripPrice = boxMrp / stripsPerBox;
+      const cleanShelf = item.shelfLocation?.trim() || '';
 
       totalInwardCost += boxCost * boxesCount;
 
-      // 1. Update Master Medicine catalog price to new rates and increment stock
-      setMedicines((prevMeds) =>
-        prevMeds.map((m) => {
-          const isMatch = (m.name && m.name.toLowerCase() === (item.tradeName || item.name || '').toLowerCase()) ||
-            (m.brandName && m.brandName.toLowerCase() === (item.tradeName || item.name || '').toLowerCase()) ||
-            m.id === item.medicineId;
+      let matchedMedId = item.medicineId || null;
 
+      // 1. Update Master Medicine catalog price to new rates, increment stock, and update itemCode if provided
+      setMedicines((prevMeds) => {
+        const found = prevMeds.some((m) =>
+          (m.name && m.name.toLowerCase() === (item.tradeName || item.name || '').toLowerCase()) ||
+          (m.brandName && m.brandName.toLowerCase() === (item.tradeName || item.name || '').toLowerCase()) ||
+          (item.itemCode && m.itemCode && m.itemCode.toString() === item.itemCode.toString()) ||
+          m.id === item.medicineId
+        );
+
+        if (found) {
+          return prevMeds.map((m) => {
+            const isMatch = (m.name && m.name.toLowerCase() === (item.tradeName || item.name || '').toLowerCase()) ||
+              (m.brandName && m.brandName.toLowerCase() === (item.tradeName || item.name || '').toLowerCase()) ||
+              (item.itemCode && m.itemCode && m.itemCode.toString() === item.itemCode.toString()) ||
+              m.id === item.medicineId;
+
+            if (isMatch) {
+              matchedMedId = m.id;
+              return {
+                ...m,
+                itemCode: item.itemCode ? item.itemCode.toString().trim() : m.itemCode,
+                boxSellingPrice: boxMrp,
+                boxPrice: boxMrp,
+                purchaseCost: boxCost,
+                purchasePriceBox: boxCost,
+                pricePerTablet: Number(tabPrice.toFixed(2)),
+                stripPrice: Number(stripPrice.toFixed(2)),
+                boxStock: (m.boxStock || 0) + boxesCount,
+                expiryDate: item.expiryDate || m.expiryDate || '2028-12-31',
+                rackLocation: cleanShelf || m.rackLocation || '',
+              };
+            }
+            return m;
+          });
+        } else {
+          // If brand-new medicine being inwarded directly
+          const newMedId = `MED-${Date.now().toString().slice(-4)}`;
+          matchedMedId = newMedId;
+          const newMed = {
+            id: newMedId,
+            itemCode: item.itemCode ? item.itemCode.toString().trim() : (1000 + prevMeds.length + 1).toString(),
+            name: item.tradeName || 'New Medicine',
+            brandName: item.tradeName || 'New Medicine',
+            formula: item.genericFormula || 'Standard Formula',
+            genericFormula: item.genericFormula || 'Standard Formula',
+            category: 'Tablet',
+            boxSellingPrice: boxMrp,
+            boxPrice: boxMrp,
+            purchaseCost: boxCost,
+            purchasePriceBox: boxCost,
+            pricePerTablet: Number(tabPrice.toFixed(2)),
+            stripPrice: Number(stripPrice.toFixed(2)),
+            boxStock: boxesCount,
+            stripsPerBox,
+            tabletsPerStrip,
+            tabletsPerBox: stripsPerBox * tabletsPerStrip,
+            expiryDate: item.expiryDate || '2028-12-31',
+            rackLocation: cleanShelf,
+            requiresPrescription: false,
+            controlledType: 'None',
+          };
+          return [...prevMeds, newMed];
+        }
+      });
+
+      // 2. UNIFORM PRICE SYNCHRONIZATION: Update ALL existing batches of this medicine to the new price!
+      setBatches((prevBatches) => {
+        const updatedPrevious = prevBatches.map((b) => {
+          const isMatch = (b.medicineId && b.medicineId.toLowerCase() === (item.tradeName || item.name || '').toLowerCase()) ||
+            b.medicineId === item.medicineId ||
+            (matchedMedId && b.medicineId === matchedMedId);
           if (isMatch) {
             return {
-              ...m,
-              boxSellingPrice: boxMrp,
+              ...b,
               boxPrice: boxMrp,
-              purchaseCost: boxCost,
               purchasePriceBox: boxCost,
               pricePerTablet: Number(tabPrice.toFixed(2)),
-              stripPrice: Number(stripPrice.toFixed(2)),
-              boxStock: (m.boxStock || 0) + boxesCount,
-              expiryDate: item.expiryDate || m.expiryDate || '2028-12-31',
-              rackLocation: item.shelfLocation || m.rackLocation || 'Rack A-01',
             };
           }
-          return m;
-        })
-      );
+          return b;
+        });
 
-      // 2. Create new batch for this inward shipment
-      const newBatch = {
-        id: `BATCH-${Date.now().toString().slice(-4)}-${Math.floor(Math.random() * 100)}`,
-        batchNo: item.batchNo || `B26-${Math.floor(100 + Math.random() * 900)}`,
-        batchNumber: item.batchNo || `B26-${Math.floor(100 + Math.random() * 900)}`,
-        medicineId: item.medicineId || item.tradeName,
-        distributorName: poRecord.supplierName || 'Pharma Distributor',
-        expiryDate: item.expiryDate || '2028-12-31',
-        totalTabletsAvailable: totalTabs,
-        boxPrice: boxMrp,
-        purchasePriceBox: boxCost,
-        pricePerTablet: Number(tabPrice.toFixed(2)),
-        status: 'Active Stock',
-        rackLocation: item.shelfLocation || 'Rack A-01',
-      };
+        // 3. Create new batch for this inward shipment with the new price
+        const newBatch = {
+          id: `BATCH-${Date.now().toString().slice(-4)}-${Math.floor(Math.random() * 100)}`,
+          batchNo: item.batchNo || `B26-${Math.floor(100 + Math.random() * 900)}`,
+          batchNumber: item.batchNo || `B26-${Math.floor(100 + Math.random() * 900)}`,
+          medicineId: matchedMedId || item.medicineId || item.tradeName,
+          distributorName: poRecord.supplierName || 'Pharma Distributor',
+          expiryDate: item.expiryDate || '2028-12-31',
+          totalTabletsAvailable: totalTabs,
+          boxPrice: boxMrp,
+          purchasePriceBox: boxCost,
+          pricePerTablet: Number(tabPrice.toFixed(2)),
+          status: 'Active Stock',
+          rackLocation: cleanShelf,
+        };
 
-      setBatches((prev) => [newBatch, ...prev]);
-      addAuditLog('PO Inward Stock', item.tradeName, `Inwarded ${boxesCount} Boxes (${totalTabs} Tabs) @ Rs. ${boxCost}/box from ${poRecord.supplierName}`, 'ADD');
+        return [newBatch, ...updatedPrevious];
+      });
+
+      addAuditLog('PO Inward Stock', item.tradeName, `Inwarded ${boxesCount} Boxes (${totalTabs} Tabs) @ Rs. ${boxCost}/box (MRP Rs. ${boxMrp}) from ${poRecord.supplierName}. Previous stock updated to new price.`, 'ADD');
     });
 
-    // 3. Log Input Taxes on Purchase Order for Tax Reconciliation
-    const st18 = totalInwardCost * 0.18;
-    const adv05 = totalInwardCost * 0.005;
-    const fbr01 = totalInwardCost * 0.01;
+    // 4. Dynamic Taxes Logging (Sales Tax, Adv Tax, AWH Tax, Custom Tax)
+    const stAmount = poRecord.totalSalesTax !== undefined ? Number(poRecord.totalSalesTax) : (totalInwardCost * (Number(poRecord.salesTaxRate) || 0) / 100);
+    const advAmount = poRecord.totalAdvTax !== undefined ? Number(poRecord.totalAdvTax) : (totalInwardCost * (Number(poRecord.advTaxRate) || 0) / 100);
+    const awhAmount = poRecord.totalAwhTax !== undefined ? Number(poRecord.totalAwhTax) : (totalInwardCost * (Number(poRecord.awhTaxRate) || 0) / 100);
+    const customTaxRate = Number(poRecord.customTaxRate) || 0;
+    const customTaxAmount = poRecord.totalCustomTax !== undefined ? Number(poRecord.totalCustomTax) : (totalInwardCost * customTaxRate / 100);
+    const customTaxName = poRecord.customTaxName?.trim() || (customTaxRate > 0 ? 'Custom Tax' : null);
+
+    const totalTaxPaid = stAmount + advAmount + awhAmount + customTaxAmount;
+
     const newTaxLog = {
       poNumber: poRecord.poNumber,
       supplierName: poRecord.supplierName || poRecord.distributor || 'Vendor',
       date: poRecord.date || new Date().toISOString().split('T')[0],
       totalPurchaseCost: totalInwardCost,
-      salesTax18: st18,
-      advTax05: adv05,
-      fbrTax01: fbr01,
-      totalInputTaxPaid: st18 + adv05 + fbr01,
+      salesTaxAmount: stAmount,
+      salesTaxRate: poRecord.salesTaxRate !== undefined ? Number(poRecord.salesTaxRate) : 18,
+      advTaxAmount: advAmount,
+      advTaxRate: poRecord.advTaxRate !== undefined ? Number(poRecord.advTaxRate) : 4,
+      awhTaxAmount: awhAmount,
+      awhTaxRate: Number(poRecord.awhTaxRate) || 0,
+      customTaxName,
+      customTaxRate,
+      customTaxAmount,
+      totalInputTaxPaid: totalTaxPaid,
+      grandTotalPO: totalInwardCost + totalTaxPaid,
       status: 'Paid to Supplier',
     };
 
@@ -365,6 +440,38 @@ export const InventoryProvider = ({ children }) => {
     );
   };
 
+  const updateMedicineDetails = (medicineId, updatedData) => {
+    let matchedMed = null;
+    setMedicines((prev) =>
+      prev.map((m) => {
+        if (m.id === medicineId || m.itemCode === medicineId) {
+          matchedMed = { ...m, ...updatedData };
+          return matchedMed;
+        }
+        return m;
+      })
+    );
+
+    // If selling price was updated, synchronize all existing batches for this medicine
+    if (updatedData.boxSellingPrice || updatedData.boxPrice || updatedData.price) {
+      const newPrice = Number(updatedData.boxSellingPrice || updatedData.boxPrice || updatedData.price);
+      setBatches((prev) =>
+        prev.map((b) => {
+          if (b.medicineId === medicineId || (matchedMed && b.medicineId === matchedMed.name) || (matchedMed && b.medicineId === matchedMed.itemCode)) {
+            const tabRatio = (matchedMed?.tabletsPerBox || 200);
+            return {
+              ...b,
+              boxPrice: newPrice,
+              purchasePriceBox: updatedData.purchaseCost !== undefined ? Number(updatedData.purchaseCost) : b.purchasePriceBox,
+              pricePerTablet: Number((newPrice / tabRatio).toFixed(2)),
+            };
+          }
+          return b;
+        })
+      );
+    }
+  };
+
   return (
     <InventoryContext.Provider
       value={{
@@ -375,6 +482,7 @@ export const InventoryProvider = ({ children }) => {
         auditLogs,
         poTaxLogs,
         inwardPOStock,
+        updateMedicineDetails,
         deductStock,
         restoreStock,
         markItemAsRTV,

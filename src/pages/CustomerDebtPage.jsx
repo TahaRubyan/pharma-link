@@ -14,14 +14,15 @@ import {
   ShieldAlert, 
   ArrowUpRight, 
   X, 
-  Send
+  Send,
+  Trash2
 } from 'lucide-react';
 import { useCustomerDebt } from '../context/CustomerDebtContext';
 import { useAuth } from '../context/AuthContext';
 import CustomerDebtStatementModal from '../components/modals/CustomerDebtStatementModal';
 
 export const CustomerDebtPage = () => {
-  const { debtCustomers = [], addDebtCustomer, settleCustomerDebt, generateWhatsAppCreditSlip } = useCustomerDebt();
+  const { debtCustomers = [], addDebtCustomer, settleCustomerDebt, generateWhatsAppCreditSlip, deleteDebtCustomer } = useCustomerDebt();
   const { currentShop } = useAuth();
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -121,6 +122,27 @@ export const CustomerDebtPage = () => {
     setNewCustCnic('');
     setIsAddCustomerOpen(false);
     setSelectedCustomer(created);
+  };
+
+  // Handle Delete Customer Debt (Enforce settlement rule)
+  const handleDeleteCustomer = (cust) => {
+    if (!cust) return;
+    if (cust.currentBalance > 0) {
+      alert(`⚠️ Cannot Delete Khata Account!\n\nCustomer "${cust.name}" has an active outstanding debt balance of Rs. ${cust.currentBalance.toFixed(2)}.\n\nThe customer debt account can only be deleted once cash is fully settled.`);
+      return;
+    }
+
+    if (window.confirm(`Are you sure you want to permanently delete settled khata account for "${cust.name}"? All past invoices and settled cycles for this customer will be removed.`)) {
+      const res = deleteDebtCustomer(cust.id);
+      if (res.success) {
+        alert(res.message);
+        if (selectedCustomer?.id === cust.id) {
+          setSelectedCustomer(null);
+        }
+      } else {
+        alert(res.message);
+      }
+    }
   };
 
   return (
@@ -229,12 +251,13 @@ export const CustomerDebtPage = () => {
                   <th>Khata Activity</th>
                   <th style={{ textAlign: 'right' }}>Khata Balance</th>
                   <th style={{ textAlign: 'center' }}>Status</th>
+                  <th style={{ width: '35px', textAlign: 'center' }}></th>
                 </tr>
               </thead>
               <tbody>
                 {filteredCustomers.length === 0 ? (
                   <tr>
-                    <td colSpan="5" style={{ textAlign: 'center', padding: '2.5rem', color: '#94a3b8' }}>
+                    <td colSpan="6" style={{ textAlign: 'center', padding: '2.5rem', color: '#94a3b8' }}>
                       No customers match your search query.
                     </td>
                   </tr>
@@ -268,6 +291,27 @@ export const CustomerDebtPage = () => {
                             {hasDebt ? 'Due Debt' : 'Clear ✓'}
                           </span>
                         </td>
+                        <td style={{ textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteCustomer(cust)}
+                            title={hasDebt ? "Debt Unsettled (Settle cash to delete)" : "Delete Settled Khata Account"}
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              cursor: 'pointer',
+                              color: hasDebt ? '#cbd5e1' : '#ef4444',
+                              padding: '0.25rem',
+                              borderRadius: '6px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              margin: '0 auto',
+                            }}
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </td>
                       </tr>
                     );
                   })
@@ -297,12 +341,35 @@ export const CustomerDebtPage = () => {
                 <div style={{ fontSize: '20px', fontWeight: 900, color: selectedCustomer.currentBalance > 0 ? '#dc2626' : '#16a34a' }}>
                   Rs. {selectedCustomer.currentBalance.toFixed(2)}
                 </div>
-                <button
-                  onClick={() => setSelectedCustomer(null)}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', fontSize: '11px', marginTop: '0.2rem' }}
-                >
-                  ✕ Close Panel
-                </button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.25rem', justifyContent: 'flex-end' }}>
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteCustomer(selectedCustomer)}
+                    style={{
+                      border: '1px solid',
+                      borderColor: selectedCustomer.currentBalance > 0 ? '#e2e8f0' : '#fecaca',
+                      backgroundColor: selectedCustomer.currentBalance > 0 ? '#f8fafc' : '#fef2f2',
+                      color: selectedCustomer.currentBalance > 0 ? '#94a3b8' : '#ef4444',
+                      cursor: 'pointer',
+                      fontSize: '11px',
+                      fontWeight: 700,
+                      padding: '0.2rem 0.5rem',
+                      borderRadius: '6px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.25rem',
+                    }}
+                    title={selectedCustomer.currentBalance > 0 ? "Debt must be fully settled before deletion" : "Delete settled khata account"}
+                  >
+                    <Trash2 size={12} /> {selectedCustomer.currentBalance > 0 ? 'Debt Unsettled' : 'Delete Khata'}
+                  </button>
+                  <button
+                    onClick={() => setSelectedCustomer(null)}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', fontSize: '11px' }}
+                  >
+                    ✕ Close
+                  </button>
+                </div>
               </div>
             </div>
 

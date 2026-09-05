@@ -138,11 +138,28 @@ export const CustomerDebtProvider = ({ children }) => {
     return `https://api.whatsapp.com/send?phone=${internationalPhone}&text=${encoded}`;
   };
 
+  // Delete Customer Debt/Khata (Only allowed if current balance is 0 / fully settled)
+  const deleteDebtCustomer = (customerId) => {
+    const customer = debtCustomers.find((c) => c.id === customerId);
+    if (!customer) return { success: false, message: 'Customer record not found.' };
+
+    if (customer.currentBalance > 0) {
+      return {
+        success: false,
+        message: `Cannot delete Khata Account: Outstanding balance of Rs. ${customer.currentBalance.toFixed(2)} is pending. The customer debt can only be deleted once cash is fully settled.`
+      };
+    }
+
+    setDebtCustomers((prev) => prev.filter((c) => c.id !== customerId));
+    return { success: true, message: `Customer ${customer.name} Khata account deleted successfully.` };
+  };
+
   return (
     <CustomerDebtContext.Provider
       value={{
         debtCustomers,
         addDebtCustomer,
+        deleteDebtCustomer,
         recordCreditSale,
         settleCustomerDebt,
         generateWhatsAppCreditSlip,

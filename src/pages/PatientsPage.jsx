@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Users, Search, Plus, ShoppingCart, UserCheck, CheckCircle, HeartPulse, ShieldAlert, Phone, MapPin, FileText, FileCheck } from 'lucide-react';
+import { Users, Search, Plus, ShoppingCart, UserCheck, CheckCircle, HeartPulse, ShieldAlert, Phone, MapPin, FileText, FileCheck, Trash2 } from 'lucide-react';
 import { usePatient } from '../context/PatientContext';
 import { useCart } from '../context/CartContext';
 import NewPatientModal from '../components/modals/NewPatientModal';
@@ -7,7 +7,7 @@ import PatientHistoryDrawer from '../components/modals/PatientHistoryDrawer';
 import GovtSectorClaimModal from '../components/modals/GovtSectorClaimModal';
 
 export const PatientsPage = ({ onNavigate }) => {
-  const { patients = [] } = usePatient();
+  const { patients = [], deletePatient } = usePatient();
   const { setRxPatient } = useCart();
   const [searchQuery, setSearchQuery] = useState('');
   
@@ -61,6 +61,13 @@ export const PatientsPage = ({ onNavigate }) => {
       ]
     };
     setSelectedPatientForGovtClaim(mockInvoice);
+  };
+
+  const handleDeletePatient = (patient) => {
+    if (window.confirm(`Are you sure you want to permanently delete patient profile for "${patient.name}"?`)) {
+      deletePatient(patient.id);
+      alert(`Patient profile for "${patient.name}" has been deleted.`);
+    }
   };
 
   return (
@@ -119,11 +126,23 @@ export const PatientsPage = ({ onNavigate }) => {
                   </div>
                 </div>
 
-                {p.govtEmployee && (
-                  <span className="badge badge-success" style={{ fontSize: '10px' }}>
-                    Govt Stipend
-                  </span>
-                )}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  {p.govtEmployee && (
+                    <span className="badge badge-success" style={{ fontSize: '10px' }}>
+                      Govt Stipend
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => handleDeletePatient(p)}
+                    title="Delete Patient Record"
+                    style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: '0.3rem', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                    onMouseEnter={(e) => (e.currentTarget.style.color = '#ef4444')}
+                    onMouseLeave={(e) => (e.currentTarget.style.color = '#94a3b8')}
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
               </div>
 
               <div style={{ fontSize: '11px', color: '#475569', backgroundColor: '#f8fafc', padding: '0.65rem 0.85rem', borderRadius: '10px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '0.3rem', marginBottom: '0.5rem' }}>

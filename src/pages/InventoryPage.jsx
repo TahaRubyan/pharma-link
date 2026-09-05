@@ -16,7 +16,7 @@ import { useAuth } from '../context/AuthContext';
 import EditPriceModal from '../components/modals/EditPriceModal';
 
 export const InventoryPage = () => {
-  const { medicines = [], batches = [], setMedicines } = useInventory();
+  const { medicines = [], batches = [], setMedicines, updateMedicineDetails } = useInventory();
   const { currentShop } = useAuth();
   const isRetail = currentShop?.mode === 'RETAIL';
 
@@ -48,9 +48,13 @@ export const InventoryPage = () => {
   }, [medicines, selectedCategory, searchQuery]);
 
   const handleSavePrice = (id, updatedData) => {
-    setMedicines((prev) =>
-      prev.map((m) => (m.id === id ? { ...m, ...updatedData } : m))
-    );
+    if (typeof updateMedicineDetails === 'function') {
+      updateMedicineDetails(id, updatedData);
+    } else {
+      setMedicines((prev) =>
+        prev.map((m) => (m.id === id ? { ...m, ...updatedData } : m))
+      );
+    }
   };
 
   const handleDeleteMedicine = (id) => {
@@ -168,7 +172,11 @@ export const InventoryPage = () => {
 
                       <td><span className="badge badge-otc">{med.category || 'Tablets'}</span></td>
                       <td>
-                        <span style={{ fontWeight: 600, color: '#0f172a' }}>📍 {med.rackLocation || 'Rack A-01 / Shelf 2'}</span>
+                        {med.rackLocation ? (
+                          <span style={{ fontWeight: 600, color: '#0f172a' }}>📍 {med.rackLocation}</span>
+                        ) : (
+                          <span style={{ color: '#94a3b8', fontStyle: 'italic', fontSize: '11px' }}>Unassigned</span>
+                        )}
                       </td>
                       <td style={{ textAlign: 'center' }}>
                         <span className={`badge ${med.boxStock > 0 ? 'badge-success' : 'badge-danger'}`}>
