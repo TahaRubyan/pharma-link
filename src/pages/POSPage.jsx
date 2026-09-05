@@ -51,11 +51,11 @@ export const POSPage = ({ storeMode: propStoreMode }) => {
   useEffect(() => {
     if (activePatientForPOS) {
       setRxPatient({
-        name: activePatientForPOS.name,
-        phone: activePatientForPOS.phone,
-        doctorName: activePatientForPOS.prescribingDoctor || 'Dr. Aamir Khan (PMC-45812)',
-        doctorRegNo: 'PMC-45812',
-        address: activePatientForPOS.address || 'Islamabad',
+        name: activePatientForPOS.name || '',
+        phone: activePatientForPOS.phone || '',
+        doctorName: activePatientForPOS.prescribingDoctor || '',
+        doctorRegNo: activePatientForPOS.doctorRegNo || '',
+        address: activePatientForPOS.address || '',
       });
     }
   }, [activePatientForPOS]);
@@ -68,20 +68,20 @@ export const POSPage = ({ storeMode: propStoreMode }) => {
   // Retail Tendered Cash State
   const [cashTendered, setCashTendered] = useState('');
 
-  // Wholesale Customer State
+  // Wholesale Customer State (Clean Slate - No Mock Data)
   const [customerData, setCustomerData] = useState({
     customerName: isRetail ? 'Walk-in Retail Customer' : 'Walk-in / Cash Customer',
     shopName: isRetail ? 'Idrees Medical Store' : 'Idrees Pharma Distributor',
-    region: 'Islamabad',
-    customerAddress: 'Local Market, Commercial Zone',
-    licenseNo: 'PK-342-0139',
-    customerNtn: '0792320-1',
-    customerStrn: '-',
+    region: isRetail ? '' : 'Gujrat',
+    customerAddress: '',
+    licenseNo: '',
+    customerNtn: '',
+    customerStrn: '',
     filerStatus: 'FILER',
-    customerPhone: '051-2345678',
-    bookingMan: 'Direct Booking',
-    refNo: 'REF-8891',
-    deliveryMan: 'Ayan',
+    customerPhone: '',
+    bookingMan: '',
+    refNo: '',
+    deliveryMan: '',
   });
 
   // Wholesale & Retail Discounts (% percentage)

@@ -336,12 +336,12 @@ export const AuthProvider = ({ children }) => {
       setCurrentShopState({
         shopId: tenantId || 'TEN-IDREES-RT',
         shopName: 'Idrees Medical Store',
-        city: 'Islamabad',
-        dlNumber: 'PK-DL-20-45812 & Form 21',
-        gstin: 'PK-1234567-8',
-        ntn: '0792320-1',
-        address: 'F-7 Markaz, Islamabad, Pakistan',
-        phone: '051-2345678',
+        city: '',
+        dlNumber: '',
+        gstin: '',
+        ntn: '',
+        address: '',
+        phone: '',
         mode: 'RETAIL',
       });
     } else {

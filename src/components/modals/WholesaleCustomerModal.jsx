@@ -4,17 +4,17 @@ import { X, UserCheck, MapPin, Phone, FileText, CheckCircle } from 'lucide-react
 export const WholesaleCustomerModal = ({ isOpen, customerData, onClose, onSave }) => {
   if (!isOpen) return null;
 
-  const [customerName, setCustomerName] = useState(customerData?.customerName || customerData?.shopName || 'Walk-in / Cash Customer');
-  const [region, setRegion] = useState(customerData?.region || 'Islamabad');
-  const [address, setAddress] = useState(customerData?.customerAddress || 'Local Market, Commercial Zone');
-  const [licenseNo, setLicenseNo] = useState(customerData?.licenseNo || 'PK-342-0139');
-  const [ntn, setNtn] = useState(customerData?.customerNtn || '0792320-1');
-  const [gst, setGst] = useState(customerData?.customerStrn || '-');
+  const [customerName, setCustomerName] = useState(customerData?.customerName || customerData?.shopName || '');
+  const [region, setRegion] = useState(customerData?.region || 'Gujrat');
+  const [address, setAddress] = useState(customerData?.customerAddress || '');
+  const [licenseNo, setLicenseNo] = useState(customerData?.licenseNo || '');
+  const [ntn, setNtn] = useState(customerData?.customerNtn || '');
+  const [gst, setGst] = useState(customerData?.customerStrn || '');
   const [filerStatus, setFilerStatus] = useState(customerData?.filerStatus || 'FILER');
-  const [phone, setPhone] = useState(customerData?.customerPhone || '053-3724601');
-  const [bookingMan, setBookingMan] = useState(customerData?.bookingMan || 'Direct Booking');
-  const [refNo, setRefNo] = useState(customerData?.refNo || 'REF-8891');
-  const [deliveryMan, setDeliveryMan] = useState(customerData?.deliveryMan || 'Ayan');
+  const [phone, setPhone] = useState(customerData?.customerPhone || '');
+  const [bookingMan, setBookingMan] = useState(customerData?.bookingMan || '');
+  const [refNo, setRefNo] = useState(customerData?.refNo || '');
+  const [deliveryMan, setDeliveryMan] = useState(customerData?.deliveryMan || '');
 
   const handleSubmit = (e) => {
     e.preventDefault();

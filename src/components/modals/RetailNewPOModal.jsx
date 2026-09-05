@@ -7,15 +7,15 @@ export const RetailNewPOModal = ({ isOpen, onClose }) => {
   const { suppliers = [], createPurchaseOrder, addSupplier } = useSupplier();
   const { medicines = [], inwardPOStock } = useInventory();
 
-  const [distributor, setDistributor] = useState(suppliers[0]?.name || suppliers[0]?.companyName || 'Muller & Phipps Pakistan');
+  const [distributor, setDistributor] = useState(suppliers[0]?.name || suppliers[0]?.companyName || '');
   const [poNumber, setPoNumber] = useState(`PO-RET-${Date.now().toString().slice(-5)}`);
   const [inwardDate, setInwardDate] = useState(new Date().toISOString().split('T')[0]);
-  const [invoiceNo, setInvoiceNo] = useState(`INV-SUP-${Math.floor(1000 + Math.random() * 9000)}`);
+  const [invoiceNo, setInvoiceNo] = useState('');
 
   // Quick Add Distributor Modal/State
   const [isAddDistributorOpen, setIsAddDistributorOpen] = useState(false);
   const [newDistName, setNewDistName] = useState('');
-  const [newDistCity, setNewDistCity] = useState('Islamabad');
+  const [newDistCity, setNewDistCity] = useState('');
   const [newDistPhone, setNewDistPhone] = useState('');
   const [newDistNtn, setNewDistNtn] = useState('');
 
@@ -273,11 +273,15 @@ export const RetailNewPOModal = ({ isOpen, onClose }) => {
                 onChange={(e) => setDistributor(e.target.value)}
                 style={{ width: '100%', padding: '0.55rem 0.65rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '12.5px', fontWeight: 700, outline: 'none', backgroundColor: '#ffffff' }}
               >
-                {suppliers.map((s, idx) => (
-                  <option key={idx} value={s.name || s.companyName}>
-                    {s.name || s.companyName} ({s.city || 'Lahore'})
-                  </option>
-                ))}
+                {suppliers.length === 0 ? (
+                  <option value="">-- No Suppliers Yet (Click "+ Add New" above) --</option>
+                ) : (
+                  suppliers.map((s, idx) => (
+                    <option key={idx} value={s.name || s.companyName}>
+                      {s.name || s.companyName} {s.city ? `(${s.city})` : ''}
+                    </option>
+                  ))
+                )}
               </select>
             </div>
 
@@ -288,7 +292,7 @@ export const RetailNewPOModal = ({ isOpen, onClose }) => {
 
             <div>
               <label className="subtext" style={{ fontWeight: 700, fontSize: '11px', display: 'block', marginBottom: '0.2rem' }}>Vendor Invoice #:</label>
-              <input type="text" value={invoiceNo} onChange={(e) => setInvoiceNo(e.target.value)} style={{ width: '100%', padding: '0.55rem 0.65rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '12.5px', outline: 'none' }} required />
+              <input type="text" value={invoiceNo} onChange={(e) => setInvoiceNo(e.target.value)} placeholder="e.g. INV-9901" style={{ width: '100%', padding: '0.55rem 0.65rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '12.5px', outline: 'none' }} required />
             </div>
 
             <div>

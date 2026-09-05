@@ -5,8 +5,8 @@ export const EditPriceModal = ({ isOpen, medicine, onClose, onSave }) => {
   if (!isOpen || !medicine) return null;
 
   const [itemCode, setItemCode] = useState(medicine.itemCode || '');
-  const [boxSellingPrice, setBoxSellingPrice] = useState(medicine.boxSellingPrice || medicine.boxPrice || medicine.price || 600);
-  const [purchaseCost, setPurchaseCost] = useState(medicine.purchaseCost || medicine.purchasePriceBox || 480);
+  const [boxSellingPrice, setBoxSellingPrice] = useState(medicine.boxSellingPrice || medicine.boxPrice || medicine.price || '');
+  const [purchaseCost, setPurchaseCost] = useState(medicine.purchaseCost || medicine.purchasePriceBox || '');
   const [rackLocation, setRackLocation] = useState(medicine.rackLocation || '');
 
   const handleSubmit = (e) => {

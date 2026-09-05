@@ -52,8 +52,8 @@ export const PatientRxDrawer = () => {
       phone: patient.phone,
       gender: patient.gender || 'Male',
       age: patient.age || '',
-      doctorName: patient.doctorName || patient.prescribingDoctor || prev.doctorName || 'Dr. Aamir Khan',
-      doctorRegNo: patient.doctorRegNo || prev.doctorRegNo || 'PMC-45812'
+      doctorName: patient.doctorName || patient.prescribingDoctor || prev.doctorName || '',
+      doctorRegNo: patient.doctorRegNo || prev.doctorRegNo || ''
     }));
     setSearchQuery('');
     setSearchResults([]);

@@ -4,7 +4,7 @@ import { useSupplier } from '../../context/SupplierContext';
 
 export const SupplierPaymentModal = ({ isOpen, supplier, onClose }) => {
   const { recordSupplierPayment } = useSupplier();
-  const [amount, setAmount] = useState(supplier?.outstandingDebt || supplier?.pendingBalance || 10000);
+  const [amount, setAmount] = useState(supplier?.outstandingDebt || supplier?.pendingBalance || '');
   const [paymentMode, setPaymentMode] = useState('Bank Transfer');
   const [reference, setReference] = useState(`PAY-${Date.now().toString().slice(-4)}`);
 

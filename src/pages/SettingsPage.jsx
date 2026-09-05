@@ -23,17 +23,17 @@ export const SettingsPage = ({ storeMode }) => {
 
   // Tab 1: Profile State
   const [storeName, setStoreName] = useState(currentShop?.shopName || 'Idrees Medical Store');
-  const [storePhone, setStorePhone] = useState(currentShop?.phone || '051-2345678');
-  const [storeAddress, setStoreAddress] = useState(currentShop?.address || 'F-7 Markaz, Islamabad');
-  const [stnReg, setStnReg] = useState(currentShop?.gstin || 'PK-1234567-8');
-  const [ntnTax, setNtnTax] = useState(currentShop?.ntn || '0792320-1');
-  const [gstinTax, setGstinTax] = useState(currentShop?.gstin || 'PK-1234567-8');
-  const [dslForm20, setDslForm20] = useState(currentShop?.dlNumber || 'PK-DL-20-45812 & Form 21');
-  const [dslForm21, setDslForm21] = useState(currentShop?.dlNumber || 'PK-DL-20-45812 & Form 21');
+  const [storePhone, setStorePhone] = useState(currentShop?.phone || '');
+  const [storeAddress, setStoreAddress] = useState(currentShop?.address || '');
+  const [stnReg, setStnReg] = useState(currentShop?.gstin || '');
+  const [ntnTax, setNtnTax] = useState(currentShop?.ntn || '');
+  const [gstinTax, setGstinTax] = useState(currentShop?.gstin || '');
+  const [dslForm20, setDslForm20] = useState(currentShop?.dlNumber || '');
+  const [dslForm21, setDslForm21] = useState(currentShop?.dlNumber || '');
 
   // Digital Signature
-  const [signatoryName, setSignatoryName] = useState('Dr. Idrees');
-  const [signatoryRole, setSignatoryRole] = useState('Managing Pharmacist & Owner');
+  const [signatoryName, setSignatoryName] = useState(isRetail ? '' : (currentShop?.signatoryName || 'Dr. Idrees'));
+  const [signatoryRole, setSignatoryRole] = useState(isRetail ? '' : (currentShop?.signatoryRole || 'Managing Pharmacist & Owner'));
   const [signatureImage, setSignatureImage] = useState(() => localStorage.getItem('pharmalink_sig_image') || '');
 
   // Tab 2: Global Taxes
