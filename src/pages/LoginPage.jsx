@@ -3,7 +3,7 @@ import { Pill, ShieldCheck, UserCheck, Key, ArrowRight, AlertCircle } from 'luci
 import { useAuth } from '../context/AuthContext';
 
 export const LoginPage = ({ onLoginSuccess }) => {
-  const { loginAsSuperAdmin, loginAsClientUser } = useAuth();
+  const { loginAsSuperAdmin, loginAsClientUser, staffAccounts = [] } = useAuth();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
@@ -18,14 +18,32 @@ export const LoginPage = ({ onLoginSuccess }) => {
     if (cleanUser === 'masteradmin' && cleanPass === 'admin123') {
       loginAsSuperAdmin();
       onLoginSuccess('SUPER_ADMIN', 'NONE', 'SUPER_ADMIN');
-    } else if (cleanUser === 'retailadmin' && cleanPass === 'admin123') {
-      loginAsClientUser('CP-3090', 'Admin', 'RETAIL'); // Retail Store Context
-      onLoginSuccess('CLIENT_USER', 'CP-3090', 'RETAIL');
-    } else if (cleanUser === 'wholesaleadmin' && cleanPass === 'admin123') {
-      loginAsClientUser('CP-2041', 'Admin', 'WHOLESALE'); // Wholesale Store Context
-      onLoginSuccess('CLIENT_USER', 'CP-2041', 'WHOLESALE');
+    } else if (
+      (cleanUser === 'idrees.retail' || cleanUser === 'retailadmin' || cleanUser === 'retail' || cleanUser === 'medicalstore') &&
+      cleanPass === 'admin123'
+    ) {
+      loginAsClientUser('TEN-IDREES-RT', 'Admin', 'RETAIL'); // Clean-Slate Retail Sandbox Context
+      onLoginSuccess('CLIENT_USER', 'TEN-IDREES-RT', 'RETAIL');
+    } else if (
+      (cleanUser === 'idrees.wholesale' || cleanUser === 'wholesaleadmin' || cleanUser === 'wholesale' || cleanUser === 'distributor' || cleanUser === 'idrees') &&
+      cleanPass === 'admin123'
+    ) {
+      loginAsClientUser('TEN-IDREES-WS', 'Admin', 'WHOLESALE'); // Full Wholesale Production Context
+      onLoginSuccess('CLIENT_USER', 'TEN-IDREES-WS', 'WHOLESALE');
     } else {
-      setErrorMsg('Invalid Credentials. Please enter valid admin username and password.');
+      // Dynamic check against staff accounts
+      const matchedStaff = (staffAccounts || []).find(
+        (s) => s.username?.toLowerCase().replace(/\s+/g, '') === cleanUser && s.password === cleanPass
+      );
+
+      if (matchedStaff) {
+        const staffMode = matchedStaff.storeMode || matchedStaff.mode || 'WHOLESALE';
+        const staffTenantId = matchedStaff.tenantId || (staffMode === 'RETAIL' ? 'TEN-IDREES-RT' : 'TEN-IDREES-WS');
+        loginAsClientUser(staffTenantId, matchedStaff.role || 'Cashier', staffMode);
+        onLoginSuccess('CLIENT_USER', staffTenantId, staffMode);
+      } else {
+        setErrorMsg('Invalid Credentials. Please verify your username and password.');
+      }
     }
   };
 
@@ -99,7 +117,7 @@ export const LoginPage = ({ onLoginSuccess }) => {
             </label>
             <input
               type="text"
-              placeholder="e.g. master admin, retail admin, wholesale admin"
+              placeholder="Enter your username or email"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               style={{

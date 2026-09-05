@@ -1,10 +1,19 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { INITIAL_DEBT_CUSTOMERS } from '../data/mockData';
+import { useAuth } from './AuthContext';
 
 const CustomerDebtContext = createContext();
 
 export const CustomerDebtProvider = ({ children }) => {
-  const [debtCustomers, setDebtCustomers] = useState(() => {
+  let isRetail = false;
+  try {
+    const auth = useAuth();
+    isRetail = auth?.currentShop?.mode === 'RETAIL';
+  } catch (e) {
+    isRetail = false;
+  }
+
+  const [wholesaleDebtCustomers, setWholesaleDebtCustomers] = useState(() => {
     const saved = localStorage.getItem('pharmalink_debt_customers');
     if (saved) {
       try {
@@ -15,9 +24,30 @@ export const CustomerDebtProvider = ({ children }) => {
     return INITIAL_DEBT_CUSTOMERS;
   });
 
+  const [retailDebtCustomers, setRetailDebtCustomers] = useState(() => {
+    const saved = localStorage.getItem('pharmalink_retail_debt_customers');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      } catch (e) {}
+    }
+    return [];
+  });
+
+  const debtCustomers = isRetail ? retailDebtCustomers : wholesaleDebtCustomers;
+  const setDebtCustomers = (updater) => {
+    if (isRetail) setRetailDebtCustomers(updater);
+    else setWholesaleDebtCustomers(updater);
+  };
+
   useEffect(() => {
-    localStorage.setItem('pharmalink_debt_customers', JSON.stringify(debtCustomers));
-  }, [debtCustomers]);
+    localStorage.setItem('pharmalink_debt_customers', JSON.stringify(wholesaleDebtCustomers));
+  }, [wholesaleDebtCustomers]);
+
+  useEffect(() => {
+    localStorage.setItem('pharmalink_retail_debt_customers', JSON.stringify(retailDebtCustomers));
+  }, [retailDebtCustomers]);
 
   // Register a new customer for credit/debt khata
   const addDebtCustomer = (customerData) => {

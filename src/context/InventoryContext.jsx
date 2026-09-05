@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { INITIAL_MEDICINES, INITIAL_BATCHES, INITIAL_VENDOR_RETURNS } from '../data/mockData';
+import { useAuth } from './AuthContext';
 
 const InventoryContext = createContext();
 
@@ -7,14 +8,22 @@ const INITIAL_AUDIT_LOGS = [];
 const INITIAL_PO_TAX_LOGS = [];
 
 export const InventoryProvider = ({ children }) => {
-  const [medicines, setMedicines] = useState(() => {
+  let isRetail = false;
+  try {
+    const auth = useAuth();
+    isRetail = auth?.currentShop?.mode === 'RETAIL';
+  } catch (e) {
+    isRetail = false;
+  }
+
+  // Wholesale Medicines: Pre-stocked with master catalog
+  const [wholesaleMedicines, setWholesaleMedicines] = useState(() => {
     const saved = localStorage.getItem('pharmalink_pk_medicines');
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
           return parsed.map((m, idx) => {
-            // Auto-migrate any old MED-101 format codes to 4-digit codes
             if (!m.itemCode || m.itemCode.startsWith('MED-') || isNaN(Number(m.itemCode))) {
               const codeNum = (1001 + idx).toString();
               return { ...m, itemCode: codeNum };
@@ -23,53 +32,143 @@ export const InventoryProvider = ({ children }) => {
           });
         }
       } catch (e) {
-        console.error('Failed to parse saved medicines', e);
+        console.error('Failed to parse saved wholesale medicines', e);
       }
     }
     return INITIAL_MEDICINES;
   });
 
-  const [batches, setBatches] = useState(() => {
+  // Retail Medicines: Clean-slate empty sandbox for store evaluation
+  const [retailMedicines, setRetailMedicines] = useState(() => {
+    const saved = localStorage.getItem('pharmalink_retail_medicines');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      } catch (e) {
+        console.error('Failed to parse saved retail medicines', e);
+      }
+    }
+    return [];
+  });
+
+  const medicines = isRetail ? retailMedicines : wholesaleMedicines;
+  const setMedicines = (updater) => {
+    if (isRetail) {
+      setRetailMedicines(updater);
+    } else {
+      setWholesaleMedicines(updater);
+    }
+  };
+
+  useEffect(() => {
+    localStorage.setItem('pharmalink_pk_medicines', JSON.stringify(wholesaleMedicines));
+  }, [wholesaleMedicines]);
+
+  useEffect(() => {
+    localStorage.setItem('pharmalink_retail_medicines', JSON.stringify(retailMedicines));
+  }, [retailMedicines]);
+
+  // Wholesale Batches
+  const [wholesaleBatches, setWholesaleBatches] = useState(() => {
     const saved = localStorage.getItem('pharmalink_pk_batches');
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) return parsed;
       } catch (e) {
-        console.error('Failed to parse saved batches', e);
+        console.error('Failed to parse saved wholesale batches', e);
       }
     }
     return INITIAL_BATCHES;
   });
 
-  const [vendorReturns, setVendorReturns] = useState(() => {
+  // Retail Batches: Clean-slate empty sandbox
+  const [retailBatches, setRetailBatches] = useState(() => {
+    const saved = localStorage.getItem('pharmalink_retail_batches');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      } catch (e) {}
+    }
+    return [];
+  });
+
+  const batches = isRetail ? retailBatches : wholesaleBatches;
+  const setBatches = (updater) => {
+    if (isRetail) {
+      setRetailBatches(updater);
+    } else {
+      setWholesaleBatches(updater);
+    }
+  };
+
+  useEffect(() => {
+    localStorage.setItem('pharmalink_pk_batches', JSON.stringify(wholesaleBatches));
+  }, [wholesaleBatches]);
+
+  useEffect(() => {
+    localStorage.setItem('pharmalink_retail_batches', JSON.stringify(retailBatches));
+  }, [retailBatches]);
+
+  // Wholesale & Retail Vendor Returns
+  const [wholesaleVendorReturns, setWholesaleVendorReturns] = useState(() => {
     const saved = localStorage.getItem('pharmalink_pk_vendor_returns');
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      } catch (e) {
-        console.error('Failed to parse saved vendor returns', e);
-      }
+      } catch (e) {}
     }
     return INITIAL_VENDOR_RETURNS;
   });
 
-  const [auditLogs, setAuditLogs] = useState(() => {
-    const saved = localStorage.getItem('pharmalink_pk_audit_logs');
+  const [retailVendorReturns, setRetailVendorReturns] = useState(() => {
+    const saved = localStorage.getItem('pharmalink_retail_vendor_returns');
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed)) return parsed;
-      } catch (e) {
-        console.error('Failed to parse saved audit logs', e);
-      }
+      } catch (e) {}
+    }
+    return [];
+  });
+
+  const vendorReturns = isRetail ? retailVendorReturns : wholesaleVendorReturns;
+  const setVendorReturns = (updater) => {
+    if (isRetail) setRetailVendorReturns(updater);
+    else setWholesaleVendorReturns(updater);
+  };
+
+  useEffect(() => {
+    localStorage.setItem('pharmalink_pk_vendor_returns', JSON.stringify(wholesaleVendorReturns));
+  }, [wholesaleVendorReturns]);
+
+  useEffect(() => {
+    localStorage.setItem('pharmalink_retail_vendor_returns', JSON.stringify(retailVendorReturns));
+  }, [retailVendorReturns]);
+
+  const [auditLogs, setAuditLogs] = useState(() => {
+    const key = isRetail ? 'pharmalink_retail_audit_logs' : 'pharmalink_pk_audit_logs';
+    const saved = localStorage.getItem(key);
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      } catch (e) {}
     }
     return INITIAL_AUDIT_LOGS;
   });
 
+  useEffect(() => {
+    const key = isRetail ? 'pharmalink_retail_audit_logs' : 'pharmalink_pk_audit_logs';
+    localStorage.setItem(key, JSON.stringify(auditLogs));
+  }, [auditLogs, isRetail]);
+
   const [poTaxLogs, setPoTaxLogs] = useState(() => {
-    const saved = localStorage.getItem('pharmalink_po_tax_logs');
+    const key = isRetail ? 'pharmalink_retail_po_tax_logs' : 'pharmalink_po_tax_logs';
+    const saved = localStorage.getItem(key);
     if (saved) {
       try {
         return JSON.parse(saved);
@@ -79,24 +178,9 @@ export const InventoryProvider = ({ children }) => {
   });
 
   useEffect(() => {
-    localStorage.setItem('pharmalink_pk_medicines', JSON.stringify(medicines));
-  }, [medicines]);
-
-  useEffect(() => {
-    localStorage.setItem('pharmalink_pk_batches', JSON.stringify(batches));
-  }, [batches]);
-
-  useEffect(() => {
-    localStorage.setItem('pharmalink_pk_vendor_returns', JSON.stringify(vendorReturns));
-  }, [vendorReturns]);
-
-  useEffect(() => {
-    localStorage.setItem('pharmalink_pk_audit_logs', JSON.stringify(auditLogs));
-  }, [auditLogs]);
-
-  useEffect(() => {
-    localStorage.setItem('pharmalink_po_tax_logs', JSON.stringify(poTaxLogs));
-  }, [poTaxLogs]);
+    const key = isRetail ? 'pharmalink_retail_po_tax_logs' : 'pharmalink_po_tax_logs';
+    localStorage.setItem(key, JSON.stringify(poTaxLogs));
+  }, [poTaxLogs, isRetail]);
 
   const addAuditLog = (actionTitle, itemBrandName, details, type = 'INFO', performedBy = 'Dr. Idrees') => {
     const now = new Date();

@@ -9,6 +9,7 @@ import {
   LogOut 
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { NetworkStatusBadge } from '../common/NetworkStatusBadge';
 
 const SCREEN_TITLES = {
   dashboard: 'Executive Dashboard',
@@ -84,6 +85,8 @@ export const Topbar = ({ currentScreen, onNavigate }) => {
 
         {/* Right Controls: Prominent Logout Button & Actions */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <NetworkStatusBadge />
+
           <button
             onClick={toggleRole}
             style={{

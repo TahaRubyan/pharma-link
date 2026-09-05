@@ -1,0 +1,47 @@
+// Offline-First Sync Queue Service for PharmaLink
+const QUEUE_STORAGE_KEY = 'pharmalink_offline_sync_queue';
+
+export const offlineSyncService = {
+  getQueue: () => {
+    try {
+      return JSON.parse(localStorage.getItem(QUEUE_STORAGE_KEY) || '[]');
+    } catch {
+      return [];
+    }
+  },
+
+  enqueueMutation: (type, payload) => {
+    try {
+      const queue = offlineSyncService.getQueue();
+      const mutation = {
+        id: `MUT-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+        type, // 'CREATE_INVOICE' | 'INWARD_STOCK' | 'RECORD_DEBT' | 'SETTLE_DEBT'
+        payload,
+        timestamp: new Date().toISOString(),
+        status: 'PENDING'
+      };
+      queue.push(mutation);
+      localStorage.setItem(QUEUE_STORAGE_KEY, JSON.stringify(queue));
+      return mutation;
+    } catch (e) {
+      console.error('Failed to enqueue offline mutation', e);
+      return null;
+    }
+  },
+
+  clearQueue: () => {
+    localStorage.removeItem(QUEUE_STORAGE_KEY);
+  },
+
+  processQueue: async () => {
+    const queue = offlineSyncService.getQueue();
+    if (queue.length === 0) return { count: 0, success: true };
+
+    console.log(`🔄 Flushing ${queue.length} offline mutations to cloud database...`);
+    // Simulated cloud sync flush (will push to Supabase when credentials are configured)
+    await new Promise((resolve) => setTimeout(resolve, 800));
+
+    offlineSyncService.clearQueue();
+    return { count: queue.length, success: true };
+  }
+};

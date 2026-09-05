@@ -1,10 +1,19 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { INITIAL_SUPPLIERS, INITIAL_PURCHASE_ORDERS } from '../data/mockData';
+import { useAuth } from './AuthContext';
 
 const SupplierContext = createContext();
 
 export const SupplierProvider = ({ children }) => {
-  const [suppliers, setSuppliers] = useState(() => {
+  let isRetail = false;
+  try {
+    const auth = useAuth();
+    isRetail = auth?.currentShop?.mode === 'RETAIL';
+  } catch (e) {
+    isRetail = false;
+  }
+
+  const [wholesaleSuppliers, setWholesaleSuppliers] = useState(() => {
     const saved = localStorage.getItem('pharmalink_pk_suppliers');
     if (saved) {
       try {
@@ -17,7 +26,36 @@ export const SupplierProvider = ({ children }) => {
     return INITIAL_SUPPLIERS;
   });
 
-  const [purchaseOrders, setPurchaseOrders] = useState(() => {
+  const [retailSuppliers, setRetailSuppliers] = useState(() => {
+    const saved = localStorage.getItem('pharmalink_retail_suppliers');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      } catch (e) {}
+    }
+    return [];
+  });
+
+  const suppliers = isRetail ? retailSuppliers : wholesaleSuppliers;
+  const setSuppliers = (updater) => {
+    if (isRetail) setRetailSuppliers(updater);
+    else setWholesaleSuppliers(updater);
+  };
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('pharmalink_pk_suppliers', JSON.stringify(wholesaleSuppliers));
+    } catch (e) {}
+  }, [wholesaleSuppliers]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('pharmalink_retail_suppliers', JSON.stringify(retailSuppliers));
+    } catch (e) {}
+  }, [retailSuppliers]);
+
+  const [wholesalePurchaseOrders, setWholesalePurchaseOrders] = useState(() => {
     const saved = localStorage.getItem('pharmalink_pk_purchase_orders');
     if (saved) {
       try {
@@ -30,21 +68,34 @@ export const SupplierProvider = ({ children }) => {
     return INITIAL_PURCHASE_ORDERS;
   });
 
-  useEffect(() => {
-    try {
-      localStorage.setItem('pharmalink_pk_suppliers', JSON.stringify(suppliers));
-    } catch (e) {
-      console.error('Failed to save suppliers to localStorage', e);
+  const [retailPurchaseOrders, setRetailPurchaseOrders] = useState(() => {
+    const saved = localStorage.getItem('pharmalink_retail_purchase_orders');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      } catch (e) {}
     }
-  }, [suppliers]);
+    return [];
+  });
+
+  const purchaseOrders = isRetail ? retailPurchaseOrders : wholesalePurchaseOrders;
+  const setPurchaseOrders = (updater) => {
+    if (isRetail) setRetailPurchaseOrders(updater);
+    else setWholesalePurchaseOrders(updater);
+  };
 
   useEffect(() => {
     try {
-      localStorage.setItem('pharmalink_pk_purchase_orders', JSON.stringify(purchaseOrders));
-    } catch (e) {
-      console.error('Failed to save purchase orders to localStorage', e);
-    }
-  }, [purchaseOrders]);
+      localStorage.setItem('pharmalink_pk_purchase_orders', JSON.stringify(wholesalePurchaseOrders));
+    } catch (e) {}
+  }, [wholesalePurchaseOrders]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('pharmalink_retail_purchase_orders', JSON.stringify(retailPurchaseOrders));
+    } catch (e) {}
+  }, [retailPurchaseOrders]);
 
   // Helper to generate PO Number: PO-YYYYMMDD-XXXX
   const generatePONumber = () => {

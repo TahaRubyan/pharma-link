@@ -1,10 +1,19 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { INITIAL_INVOICES } from '../data/mockData';
+import { useAuth } from './AuthContext';
 
 const SalesContext = createContext();
 
 export const SalesProvider = ({ children }) => {
-  const [invoices, setInvoices] = useState(() => {
+  let isRetail = false;
+  try {
+    const auth = useAuth();
+    isRetail = auth?.currentShop?.mode === 'RETAIL';
+  } catch (e) {
+    isRetail = false;
+  }
+
+  const [wholesaleInvoices, setWholesaleInvoices] = useState(() => {
     const saved = localStorage.getItem('pharmalink_pk_invoices');
     if (saved) {
       try {
@@ -17,34 +26,74 @@ export const SalesProvider = ({ children }) => {
     return INITIAL_INVOICES;
   });
 
-  const [returns, setReturns] = useState(() => {
+  const [retailInvoices, setRetailInvoices] = useState(() => {
+    const saved = localStorage.getItem('pharmalink_retail_invoices');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      } catch (e) {}
+    }
+    return [];
+  });
+
+  const invoices = isRetail ? retailInvoices : wholesaleInvoices;
+  const setInvoices = (updater) => {
+    if (isRetail) setRetailInvoices(updater);
+    else setWholesaleInvoices(updater);
+  };
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('pharmalink_pk_invoices', JSON.stringify(wholesaleInvoices));
+    } catch (e) {}
+  }, [wholesaleInvoices]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('pharmalink_retail_invoices', JSON.stringify(retailInvoices));
+    } catch (e) {}
+  }, [retailInvoices]);
+
+  const [wholesaleReturns, setWholesaleReturns] = useState(() => {
     const saved = localStorage.getItem('pharmalink_pk_returns');
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed)) return parsed;
-      } catch (e) {
-        console.error('Failed to parse saved returns', e);
-      }
+      } catch (e) {}
     }
     return [];
   });
 
-  useEffect(() => {
-    try {
-      localStorage.setItem('pharmalink_pk_invoices', JSON.stringify(invoices));
-    } catch (e) {
-      console.error('Failed to save invoices to localStorage', e);
+  const [retailReturns, setRetailReturns] = useState(() => {
+    const saved = localStorage.getItem('pharmalink_retail_returns');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      } catch (e) {}
     }
-  }, [invoices]);
+    return [];
+  });
+
+  const returns = isRetail ? retailReturns : wholesaleReturns;
+  const setReturns = (updater) => {
+    if (isRetail) setRetailReturns(updater);
+    else setWholesaleReturns(updater);
+  };
 
   useEffect(() => {
     try {
-      localStorage.setItem('pharmalink_pk_returns', JSON.stringify(returns));
-    } catch (e) {
-      console.error('Failed to save returns to localStorage', e);
-    }
-  }, [returns]);
+      localStorage.setItem('pharmalink_pk_returns', JSON.stringify(wholesaleReturns));
+    } catch (e) {}
+  }, [wholesaleReturns]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('pharmalink_retail_returns', JSON.stringify(retailReturns));
+    } catch (e) {}
+  }, [retailReturns]);
 
   // Record a new POS Sale
   const recordSale = (saleData) => {

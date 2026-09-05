@@ -1,10 +1,19 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { INITIAL_PATIENTS } from '../data/mockData';
+import { useAuth } from './AuthContext';
 
 const PatientContext = createContext();
 
 export const PatientProvider = ({ children }) => {
-  const [patients, setPatients] = useState(() => {
+  let isRetail = false;
+  try {
+    const auth = useAuth();
+    isRetail = auth?.currentShop?.mode === 'RETAIL';
+  } catch (e) {
+    isRetail = false;
+  }
+
+  const [wholesalePatients, setWholesalePatients] = useState(() => {
     const saved = localStorage.getItem('pharmalink_pk_patients');
     if (saved) {
       try {
@@ -17,15 +26,34 @@ export const PatientProvider = ({ children }) => {
     return INITIAL_PATIENTS;
   });
 
-  const [activePatientForPOS, setActivePatientForPOS] = useState(null);
+  const [retailPatients, setRetailPatients] = useState(() => {
+    const saved = localStorage.getItem('pharmalink_retail_patients');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      } catch (e) {}
+    }
+    return [];
+  });
+
+  const patients = isRetail ? retailPatients : wholesalePatients;
+  const setPatients = (updater) => {
+    if (isRetail) setRetailPatients(updater);
+    else setWholesalePatients(updater);
+  };
 
   useEffect(() => {
     try {
-      localStorage.setItem('pharmalink_pk_patients', JSON.stringify(patients));
-    } catch (e) {
-      console.error('Failed to save patients to localStorage', e);
-    }
-  }, [patients]);
+      localStorage.setItem('pharmalink_pk_patients', JSON.stringify(wholesalePatients));
+    } catch (e) {}
+  }, [wholesalePatients]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('pharmalink_retail_patients', JSON.stringify(retailPatients));
+    } catch (e) {}
+  }, [retailPatients]);
 
   const addPatient = (patientData) => {
     if (!patientData || !patientData.name) return null;

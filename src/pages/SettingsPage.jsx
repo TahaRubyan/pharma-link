@@ -137,19 +137,29 @@ export const SettingsPage = ({ storeMode }) => {
   };
 
   const handleExportBackup = () => {
+    const medKey = isRetail ? 'pharmalink_retail_medicines' : 'pharmalink_pk_medicines';
+    const batchKey = isRetail ? 'pharmalink_retail_batches' : 'pharmalink_pk_batches';
+    const invKey = isRetail ? 'pharmalink_retail_invoices' : 'pharmalink_pk_invoices';
+    const debtKey = isRetail ? 'pharmalink_retail_debt_customers' : 'pharmalink_debt_customers';
+    const supKey = isRetail ? 'pharmalink_retail_suppliers' : 'pharmalink_pk_suppliers';
+    const poKey = isRetail ? 'pharmalink_retail_purchase_orders' : 'pharmalink_pk_purchase_orders';
+    const patKey = isRetail ? 'pharmalink_retail_patients' : 'pharmalink_pk_patients';
+    const vRetKey = isRetail ? 'pharmalink_retail_vendor_returns' : 'pharmalink_pk_vendor_returns';
+
     const backupData = {
       version: '2.5.0',
+      systemMode: isRetail ? 'RETAIL' : 'WHOLESALE',
       exportedAt: new Date().toISOString(),
       storeProfile: { storeName, storePhone, storeAddress, ntnTax, gstinTax, dslForm20, dslForm21, signatoryName, signatoryRole, signatureImage },
       staffAccounts,
-      medicines: JSON.parse(localStorage.getItem('pharmalink_pk_medicines') || '[]'),
-      batches: JSON.parse(localStorage.getItem('pharmalink_pk_batches') || '[]'),
-      invoices: JSON.parse(localStorage.getItem('pharmalink_pk_invoices') || '[]'),
-      debtCustomers: JSON.parse(localStorage.getItem('pharmalink_debt_customers') || '[]'),
-      suppliers: JSON.parse(localStorage.getItem('pharmalink_pk_suppliers') || '[]'),
-      purchaseOrders: JSON.parse(localStorage.getItem('pharmalink_pk_purchase_orders') || '[]'),
-      patients: JSON.parse(localStorage.getItem('pharmalink_pk_patients') || '[]'),
-      vendorReturns: JSON.parse(localStorage.getItem('pharmalink_pk_vendor_returns') || '[]'),
+      medicines: JSON.parse(localStorage.getItem(medKey) || '[]'),
+      batches: JSON.parse(localStorage.getItem(batchKey) || '[]'),
+      invoices: JSON.parse(localStorage.getItem(invKey) || '[]'),
+      debtCustomers: JSON.parse(localStorage.getItem(debtKey) || '[]'),
+      suppliers: JSON.parse(localStorage.getItem(supKey) || '[]'),
+      purchaseOrders: JSON.parse(localStorage.getItem(poKey) || '[]'),
+      patients: JSON.parse(localStorage.getItem(patKey) || '[]'),
+      vendorReturns: JSON.parse(localStorage.getItem(vRetKey) || '[]'),
     };
     const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -157,7 +167,7 @@ export const SettingsPage = ({ storeMode }) => {
     const safeStoreName = (storeName || 'pharmalink').toLowerCase().replace(/[^a-z0-9]/g, '_');
     const dateStr = new Date().toISOString().split('T')[0];
     a.href = url;
-    a.download = `pharmalink_backup_${safeStoreName}_${dateStr}.json`;
+    a.download = `pharmalink_${isRetail ? 'retail' : 'wholesale'}_backup_${safeStoreName}_${dateStr}.json`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -172,14 +182,23 @@ export const SettingsPage = ({ storeMode }) => {
         const imported = JSON.parse(event.target.result);
         if (!imported) throw new Error('File is empty.');
 
-        if (Array.isArray(imported.medicines)) localStorage.setItem('pharmalink_pk_medicines', JSON.stringify(imported.medicines));
-        if (Array.isArray(imported.batches)) localStorage.setItem('pharmalink_pk_batches', JSON.stringify(imported.batches));
-        if (Array.isArray(imported.invoices)) localStorage.setItem('pharmalink_pk_invoices', JSON.stringify(imported.invoices));
-        if (Array.isArray(imported.debtCustomers)) localStorage.setItem('pharmalink_debt_customers', JSON.stringify(imported.debtCustomers));
-        if (Array.isArray(imported.suppliers)) localStorage.setItem('pharmalink_pk_suppliers', JSON.stringify(imported.suppliers));
-        if (Array.isArray(imported.purchaseOrders)) localStorage.setItem('pharmalink_pk_purchase_orders', JSON.stringify(imported.purchaseOrders));
-        if (Array.isArray(imported.patients)) localStorage.setItem('pharmalink_pk_patients', JSON.stringify(imported.patients));
-        if (Array.isArray(imported.vendorReturns)) localStorage.setItem('pharmalink_pk_vendor_returns', JSON.stringify(imported.vendorReturns));
+        const medKey = isRetail ? 'pharmalink_retail_medicines' : 'pharmalink_pk_medicines';
+        const batchKey = isRetail ? 'pharmalink_retail_batches' : 'pharmalink_pk_batches';
+        const invKey = isRetail ? 'pharmalink_retail_invoices' : 'pharmalink_pk_invoices';
+        const debtKey = isRetail ? 'pharmalink_retail_debt_customers' : 'pharmalink_debt_customers';
+        const supKey = isRetail ? 'pharmalink_retail_suppliers' : 'pharmalink_pk_suppliers';
+        const poKey = isRetail ? 'pharmalink_retail_purchase_orders' : 'pharmalink_pk_purchase_orders';
+        const patKey = isRetail ? 'pharmalink_retail_patients' : 'pharmalink_pk_patients';
+        const vRetKey = isRetail ? 'pharmalink_retail_vendor_returns' : 'pharmalink_pk_vendor_returns';
+
+        if (Array.isArray(imported.medicines)) localStorage.setItem(medKey, JSON.stringify(imported.medicines));
+        if (Array.isArray(imported.batches)) localStorage.setItem(batchKey, JSON.stringify(imported.batches));
+        if (Array.isArray(imported.invoices)) localStorage.setItem(invKey, JSON.stringify(imported.invoices));
+        if (Array.isArray(imported.debtCustomers)) localStorage.setItem(debtKey, JSON.stringify(imported.debtCustomers));
+        if (Array.isArray(imported.suppliers)) localStorage.setItem(supKey, JSON.stringify(imported.suppliers));
+        if (Array.isArray(imported.purchaseOrders)) localStorage.setItem(poKey, JSON.stringify(imported.purchaseOrders));
+        if (Array.isArray(imported.patients)) localStorage.setItem(patKey, JSON.stringify(imported.patients));
+        if (Array.isArray(imported.vendorReturns)) localStorage.setItem(vRetKey, JSON.stringify(imported.vendorReturns));
         if (Array.isArray(imported.staffAccounts)) localStorage.setItem('pharmalink_staff_list', JSON.stringify(imported.staffAccounts));
         
         if (imported.storeProfile) {
@@ -203,10 +222,14 @@ export const SettingsPage = ({ storeMode }) => {
   };
 
   const handlePurgeTransactionsOnly = () => {
+    const invKey = isRetail ? 'pharmalink_retail_invoices' : 'pharmalink_pk_invoices';
+    const debtKey = isRetail ? 'pharmalink_retail_debt_customers' : 'pharmalink_debt_customers';
+    const patKey = isRetail ? 'pharmalink_retail_patients' : 'pharmalink_pk_patients';
+
     if (window.confirm('⚠️ PURGE TEST TRANSACTIONS:\\n\\nThis will clear all test invoices, test customer khata debts, and sample patient files, but KEEP your medicine inventory intact.\\n\\nReady to begin fresh production sales?')) {
-      localStorage.setItem('pharmalink_pk_invoices', JSON.stringify([]));
-      localStorage.setItem('pharmalink_debt_customers', JSON.stringify([]));
-      localStorage.setItem('pharmalink_pk_patients', JSON.stringify([]));
+      localStorage.setItem(invKey, JSON.stringify([]));
+      localStorage.setItem(debtKey, JSON.stringify([]));
+      localStorage.setItem(patKey, JSON.stringify([]));
       alert('Test transactions, debts, and patient files purged! System is ready for Day 1 production sales.');
       window.location.reload();
     }

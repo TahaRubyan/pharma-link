@@ -65,6 +65,44 @@ const DEFAULT_ROLES = [
 
 const INITIAL_TENANTS = [
   {
+    tenantId: 'TEN-IDREES-WS',
+    shopName: 'Idrees Pharma Distributor',
+    ownerName: 'Dr. Idrees',
+    phone: '053-3724601',
+    form20: '09-342-0139-045748D',
+    form21: '09-342-0139-045749D',
+    gstin: '3277876174544',
+    city: 'Gujrat',
+    subscribedSystemScope: 'WHOLESALE_ONLY',
+    setupFeePaid: 75000,
+    monthlyFee: 7500,
+    subscriptionStatus: 'Active',
+    lastPaymentDate: '01-09-2026',
+    nextDueDate: '01-10-2026',
+    adminUsername: 'idrees.wholesale',
+    isTempPassword: false,
+    createdDate: '01-09-2026',
+  },
+  {
+    tenantId: 'TEN-IDREES-RT',
+    shopName: 'Idrees Medical Store',
+    ownerName: 'Dr. Idrees',
+    phone: '051-2345678',
+    form20: 'PK-DL-20-45812',
+    form21: 'PK-DL-21-45813',
+    gstin: 'PK-1234567-8',
+    city: 'Islamabad',
+    subscribedSystemScope: 'RETAIL_ONLY',
+    setupFeePaid: 0,
+    monthlyFee: 0,
+    subscriptionStatus: 'Free Trial',
+    lastPaymentDate: '01-09-2026',
+    nextDueDate: '01-10-2026',
+    adminUsername: 'idrees.retail',
+    isTempPassword: false,
+    createdDate: '01-09-2026',
+  },
+  {
     tenantId: 'CP-1092',
     shopName: 'PharmaLink Islamabad Flagship',
     ownerName: 'Dr. Idrees',
@@ -296,7 +334,7 @@ export const AuthProvider = ({ children }) => {
 
     if (mode === 'RETAIL') {
       setCurrentShopState({
-        shopId: 'SHOP-ISB-01',
+        shopId: tenantId || 'TEN-IDREES-RT',
         shopName: 'Idrees Medical Store',
         city: 'Islamabad',
         dlNumber: 'PK-DL-20-45812 & Form 21',
@@ -308,7 +346,7 @@ export const AuthProvider = ({ children }) => {
       });
     } else {
       setCurrentShopState({
-        shopId: 'SHOP-LHR-02',
+        shopId: tenantId || 'TEN-IDREES-WS',
         shopName: 'Idrees Pharma Distributor',
         city: 'Gujrat',
         dlNumber: '09-342-0139-045748D',
