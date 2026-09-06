@@ -17,10 +17,9 @@ import {
   UserPlus,
   ShieldAlert,
   Layers,
-  HeartPulse,
-  Save,
   CreditCard,
-  Send
+  Send,
+  Sparkles
 } from 'lucide-react';
 import { useInventory } from '../context/InventoryContext';
 import { useCart } from '../context/CartContext';
@@ -28,6 +27,7 @@ import { useSales } from '../context/SalesContext';
 import { useAuth } from '../context/AuthContext';
 import { useCustomerDebt } from '../context/CustomerDebtContext';
 import { usePatient } from '../context/PatientContext';
+import { loadRetailMockData } from '../services/mockDataManager';
 import A4InvoicePrintModal from '../components/modals/A4InvoicePrintModal';
 import EditLineDiscountTaxModal from '../components/modals/EditLineDiscountTaxModal';
 import WholesaleCustomerModal from '../components/modals/WholesaleCustomerModal';
@@ -499,6 +499,22 @@ export const POSPage = ({ storeMode: propStoreMode }) => {
                 autoFocus
               />
             </div>
+
+            {/* TESTING HELPER BANNER WHEN RETAIL INVENTORY IS EMPTY */}
+            {medicines.length === 0 && isRetail && (
+              <div style={{ marginTop: '0.65rem', padding: '0.6rem 0.85rem', backgroundColor: '#f0f9ff', border: '1px dashed #7dd3fc', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
+                <div style={{ fontSize: '11.5px', color: '#0369a1' }}>
+                  <strong>💡 Testing Mode:</strong> Retail inventory is empty. Load sample medicines to test fast barcode search & 80mm receipts.
+                </div>
+                <button
+                  onClick={() => loadRetailMockData(true)}
+                  className="btn btn-primary"
+                  style={{ fontSize: '11px', padding: '0.3rem 0.75rem', borderRadius: '7px', backgroundColor: '#0284c7', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
+                >
+                  <Sparkles size={12} /> Load Sample Medicines
+                </button>
+              </div>
+            )}
 
             {/* SEARCH DROPDOWN (AUTO-SCROLL ON ARROW DOWN / UP) */}
             {searchResults.length > 0 && isSearchFocused && (

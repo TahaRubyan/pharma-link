@@ -10,10 +10,12 @@ import {
   CheckCircle,
   Layers,
   ShieldCheck,
-  Download
+  Download,
+  Sparkles
 } from 'lucide-react';
 import { useInventory } from '../context/InventoryContext';
 import { useAuth } from '../context/AuthContext';
+import { loadRetailMockData, clearRetailMockData } from '../services/mockDataManager';
 import EditPriceModal from '../components/modals/EditPriceModal';
 import RetailNewPOModal from '../components/modals/RetailNewPOModal';
 import NewPOModal from '../components/modals/NewPOModal';
@@ -151,6 +153,36 @@ export const InventoryPage = () => {
             <Plus size={13} /> {isRetail ? '+ Inward New Stock' : '+ New Purchase Order'}
           </button>
 
+          {isRetail && (
+            <>
+              <button
+                onClick={() => {
+                  if (window.confirm('📥 Load Pakistani retail pharmacy sample medicines (Panadol, Augmentin, etc.)?')) {
+                    loadRetailMockData(true);
+                  }
+                }}
+                className="btn btn-outline"
+                style={{ backgroundColor: '#ffffff', color: '#0369a1', border: 'none', borderRadius: '8px', fontSize: '11px', padding: '0.35rem 0.65rem', display: 'flex', alignItems: 'center', gap: '0.35rem', cursor: 'pointer', fontWeight: 700 }}
+                title="Load retail testing sample catalog"
+              >
+                <Sparkles size={12} color="#0284c7" /> Load Sample Data
+              </button>
+
+              <button
+                onClick={() => {
+                  if (window.confirm('🧹 Clear all retail mock medicines and reset catalog to blank?')) {
+                    clearRetailMockData(true);
+                  }
+                }}
+                className="btn btn-outline"
+                style={{ backgroundColor: 'rgba(255,255,255,0.15)', color: '#fee2e2', border: '1px solid rgba(254,202,202,0.4)', borderRadius: '8px', fontSize: '11px', padding: '0.35rem 0.65rem', display: 'flex', alignItems: 'center', gap: '0.35rem', cursor: 'pointer', fontWeight: 700 }}
+                title="Clear all test medicines and reset store"
+              >
+                <Trash2 size={12} color="#fca5a5" /> Clear Mock Data
+              </button>
+            </>
+          )}
+
           <button
             onClick={handleExportCSV}
             className="btn btn-outline"
@@ -225,8 +257,25 @@ export const InventoryPage = () => {
             <tbody>
               {filteredMedicines.length === 0 ? (
                 <tr>
-                  <td colSpan={isRetail ? 11 : 9} style={{ textAlign: 'center', padding: '3rem', color: '#94a3b8' }}>
-                    No medicines match the search criteria.
+                  <td colSpan={isRetail ? 11 : 9} style={{ textAlign: 'center', padding: '3.5rem 1.5rem', color: '#64748b' }}>
+                    {medicines.length === 0 && isRetail ? (
+                      <div style={{ maxWidth: '400px', margin: '0 auto', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.65rem' }}>
+                        <Package size={36} color="#0284c7" />
+                        <div style={{ fontSize: '14px', fontWeight: 800, color: '#0f172a' }}>Retail Catalog is Empty</div>
+                        <div style={{ fontSize: '12px', color: '#64748b' }}>
+                          No medicines are currently in stock. You can add medicines manually or load realistic sample data for testing.
+                        </div>
+                        <button
+                          onClick={() => loadRetailMockData(true)}
+                          className="btn btn-primary"
+                          style={{ marginTop: '0.35rem', backgroundColor: '#0284c7', fontSize: '12px', borderRadius: '8px', padding: '0.45rem 0.85rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
+                        >
+                          <Sparkles size={13} /> Load Retail Mock Data
+                        </button>
+                      </div>
+                    ) : (
+                      'No medicines match the search criteria.'
+                    )}
                   </td>
                 </tr>
               ) : (

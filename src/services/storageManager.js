@@ -96,6 +96,16 @@ export const storageManager = {
     }
   },
 
+  safeRemoveItem: (key) => {
+    try {
+      const storage = getStorage();
+      storage.removeItem(key);
+      return true;
+    } catch {
+      return false;
+    }
+  },
+
   // Compact historical invoices older than 60 days
   compactHistoricalInvoices: () => {
     const storage = getStorage();

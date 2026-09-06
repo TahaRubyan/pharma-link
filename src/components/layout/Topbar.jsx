@@ -4,13 +4,16 @@ import {
   UserCheck, 
   Store, 
   Eye, 
-  LogOut,
-  Download,
-  Laptop
+  LogOut, 
+  Download, 
+  Laptop,
+  Sparkles,
+  Trash2
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { usePWA } from '../../context/PWAContext';
 import { NetworkStatusBadge } from '../common/NetworkStatusBadge';
+import { loadRetailMockData, clearRetailMockData } from '../../services/mockDataManager';
 
 const SCREEN_TITLES = {
   dashboard: 'Executive Dashboard',
@@ -86,7 +89,64 @@ export const Topbar = ({ currentScreen, onNavigate }) => {
         </div>
 
         {/* Right Controls: Prominent Logout Button & Actions */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+          {/* Retail Demo Mock Data Controls */}
+          {currentShop?.mode === 'RETAIL' && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+              <button
+                onClick={() => {
+                  if (window.confirm('📥 LOAD RETAIL SAMPLE DATA:\n\nThis will populate your retail store with realistic Pakistani retail pharmaceuticals (Panadol, Augmentin, Risek, Brufen, etc.), active/near-expiry batches, customer credit khata, and sample sales.\n\nProceed to load test data?')) {
+                    loadRetailMockData(true);
+                  }
+                }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.3rem',
+                  padding: '0.3rem 0.65rem',
+                  borderRadius: '8px',
+                  backgroundColor: '#e0f2fe',
+                  border: '1px solid #7dd3fc',
+                  color: '#0369a1',
+                  fontSize: '11px',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease',
+                }}
+                title="Load realistic sample medicines and data for retail testing"
+              >
+                <Sparkles size={12} color="#0284c7" />
+                <span>Load Mock Data</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  if (window.confirm('🧹 CLEAR RETAIL MOCK DATA:\n\nThis will wipe all retail medicines, batches, sales invoices, and customer khata, resetting the store back to a completely clean slate.\n\nProceed to clear all test data?')) {
+                    clearRetailMockData(true);
+                  }
+                }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.3rem',
+                  padding: '0.3rem 0.65rem',
+                  borderRadius: '8px',
+                  backgroundColor: '#fef2f2',
+                  border: '1px solid #fecaca',
+                  color: '#b91c1c',
+                  fontSize: '11px',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease',
+                }}
+                title="Wipe retail test data and reset to empty store"
+              >
+                <Trash2 size={12} color="#dc2626" />
+                <span>Clear Mock Data</span>
+              </button>
+            </div>
+          )}
+
           <NetworkStatusBadge />
 
           {/* PWA App State or Install Action */}

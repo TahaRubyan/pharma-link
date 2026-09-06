@@ -25,14 +25,17 @@ export const CustomerDebtProvider = ({ children }) => {
   });
 
   const [retailDebtCustomers, setRetailDebtCustomers] = useState(() => {
-    const saved = localStorage.getItem('pharmalink_retail_debt_customers');
+    const isCleared = typeof localStorage !== 'undefined' && localStorage.getItem('pharmalink_retail_cleared') === 'true';
+    if (isCleared) return [];
+
+    const saved = typeof localStorage !== 'undefined' ? localStorage.getItem('pharmalink_retail_debt_customers') : null;
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed)) return parsed;
       } catch (e) {}
     }
-    return [];
+    return INITIAL_DEBT_CUSTOMERS;
   });
 
   const debtCustomers = isRetail ? retailDebtCustomers : wholesaleDebtCustomers;

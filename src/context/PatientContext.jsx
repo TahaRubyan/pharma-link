@@ -27,14 +27,17 @@ export const PatientProvider = ({ children }) => {
   });
 
   const [retailPatients, setRetailPatients] = useState(() => {
-    const saved = localStorage.getItem('pharmalink_retail_patients');
+    const isCleared = typeof localStorage !== 'undefined' && localStorage.getItem('pharmalink_retail_cleared') === 'true';
+    if (isCleared) return [];
+
+    const saved = typeof localStorage !== 'undefined' ? localStorage.getItem('pharmalink_retail_patients') : null;
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed)) return parsed;
       } catch (e) {}
     }
-    return [];
+    return INITIAL_PATIENTS;
   });
 
   const patients = isRetail ? retailPatients : wholesalePatients;

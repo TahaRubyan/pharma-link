@@ -20,8 +20,10 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { usePWA } from '../context/PWAContext';
+import { useInventory } from '../context/InventoryContext';
 import { ThermalPrintModal } from '../components/modals/ThermalPrintModal';
 import { MOCK_STAFF_ACCOUNTS } from '../data/mockData';
+import { loadRetailMockData, clearRetailMockData } from '../services/mockDataManager';
 
 const SAMPLE_TEST_INVOICE = {
   invoiceNo: 'POS-TEST-80MM',
@@ -61,6 +63,15 @@ export const SettingsPage = ({ storeMode }) => {
 
   // Tab: PWA State & Hooks
   const { isInstallable, isInstalled, swRegistered, triggerInstall, updateCache } = usePWA();
+
+  let inventoryContext = null;
+  try {
+    inventoryContext = useInventory();
+  } catch (e) {
+    inventoryContext = null;
+  }
+  const medicines = inventoryContext?.medicines || [];
+  const batches = inventoryContext?.batches || [];
   const [cacheUpdating, setCacheUpdating] = useState(false);
   const [cacheMessage, setCacheMessage] = useState('');
 
@@ -1024,6 +1035,53 @@ export const SettingsPage = ({ storeMode }) => {
               <input type="file" accept=".json" onChange={handleRestoreFile} style={{ fontSize: '11px' }} />
             </div>
           </div>
+
+          {/* RETAIL SAMPLE & MOCK DATA CONTROLS */}
+          {isRetail && (
+            <div style={{ border: '2px solid #38bdf8', backgroundColor: '#f0f9ff', borderRadius: '14px', padding: '1.25rem', marginBottom: '1.5rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
+                <div>
+                  <div style={{ fontSize: '13.5px', fontWeight: 800, color: '#0369a1', display: 'flex', alignItems: 'center', gap: '0.45rem', marginBottom: '0.35rem' }}>
+                    <Sparkles size={16} color="#0284c7" /> Retail Testing & Mock Data Controls
+                  </div>
+                  <p style={{ fontSize: '12px', color: '#0c4a6e', margin: '0 0 0.5rem 0', maxWidth: '650px', lineHeight: 1.5 }}>
+                    Easily load or clear mock data on your own. Loading mock data populates realistic Pakistani retail pharmaceuticals (Panadol, Augmentin, Risek, Brufen, etc.), active & near-expiry batches, customer credit khata, and sales history for testing POS billing and 80mm receipts. When testing is finished, clear all mock data to start with a completely empty store.
+                  </p>
+                  <div style={{ fontSize: '11px', fontWeight: 600, color: '#0284c7', display: 'flex', alignItems: 'center', gap: '0.75rem', marginTop: '0.4rem' }}>
+                    <span>Catalog Status: <strong>{medicines.length} Medicines</strong></span>
+                    <span>•</span>
+                    <span>Batches: <strong>{batches.length} Lots</strong></span>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: '0.65rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                  <button
+                    onClick={() => {
+                      if (window.confirm('📥 LOAD RETAIL TESTING SAMPLE DATA:\n\nThis will populate your retail store with realistic Pakistani retail pharmaceuticals, batches, customer credit khata, and sample sales.\n\nProceed to load test data?')) {
+                        loadRetailMockData(true);
+                      }
+                    }}
+                    className="btn btn-primary"
+                    style={{ backgroundColor: '#0284c7', fontSize: '12px', borderRadius: '9px', padding: '0.55rem 1rem', display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontWeight: 700 }}
+                  >
+                    <Sparkles size={14} /> Load Retail Mock Data
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      if (window.confirm('🧹 CLEAR ALL RETAIL MOCK DATA:\n\nThis will wipe all retail medicines, batches, sales invoices, and customer khata, returning your store to an empty clean slate.\n\nProceed to clear all test data?')) {
+                        clearRetailMockData(true);
+                      }
+                    }}
+                    className="btn btn-outline"
+                    style={{ backgroundColor: '#ffffff', color: '#dc2626', border: '1px solid #fca5a5', fontSize: '12px', borderRadius: '9px', padding: '0.55rem 1rem', display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontWeight: 700 }}
+                  >
+                    <Trash2 size={14} /> Clear All Mock Data
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* PRODUCTION ONBOARDING & DATA RESET */}
           <div style={{ border: '1px solid #fecaca', backgroundColor: '#fff5f5', borderRadius: '14px', padding: '1.25rem' }}>

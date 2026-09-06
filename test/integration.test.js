@@ -2,6 +2,8 @@
  * Comprehensive Integration & Unit Testing Suite for PharmaLink ERP & POS System
  */
 
+import { loadRetailMockData, clearRetailMockData, hasRetailData, getRetailDataStats } from '../src/services/mockDataManager.js';
+
 export function runIntegrationTests() {
   console.log('🔗 [2/10] Running Integration Testing Suite...');
 
@@ -298,6 +300,32 @@ test('Retail PO Math - Accurately calculates 18% ST, 4% Adv Tax, and Net Line To
   if (salesTax18 !== 720.00) throw new Error(`Expected ST 720, got ${salesTax18}`);
   if (advTax04 !== 160.00) throw new Error(`Expected Adv Tax 160, got ${advTax04}`);
   if (netLineTotal !== 4880.00) throw new Error(`Expected net line total 4880, got ${netLineTotal}`);
+});
+
+// 13. TEST: Retail Mock Data Lifecycle (Load -> Validate -> Clear -> Validate Clean Slate)
+test('Mock Data Engine - Successfully loads retail sample dataset and clears back to blank slate', () => {
+  // 1. Wipe to clean slate
+  clearRetailMockData(false);
+  const clearedStats = getRetailDataStats();
+  if (clearedStats.hasData !== false) throw new Error('Expected hasData to be false after clear');
+  if (clearedStats.medicinesCount !== 0) throw new Error('Expected 0 medicines after clear');
+
+  // 2. Load retail sample data
+  loadRetailMockData(false);
+  const loadedStats = getRetailDataStats();
+  if (loadedStats.hasData !== true) throw new Error('Expected hasData to be true after load');
+  if (loadedStats.medicinesCount < 10) throw new Error(`Expected at least 10 medicines, got ${loadedStats.medicinesCount}`);
+  if (loadedStats.batchesCount < 10) throw new Error(`Expected at least 10 batches, got ${loadedStats.batchesCount}`);
+  if (loadedStats.invoicesCount < 5) throw new Error(`Expected at least 5 invoices, got ${loadedStats.invoicesCount}`);
+  if (loadedStats.customersCount < 2) throw new Error(`Expected at least 2 debt customers, got ${loadedStats.customersCount}`);
+
+  // 3. Clear mock data again
+  clearRetailMockData(false);
+  if (hasRetailData()) throw new Error('Expected hasRetailData() to return false after second clear');
+
+  // 4. Re-load sample data to ensure store is pre-stocked for testing
+  loadRetailMockData(false);
+  if (!hasRetailData()) throw new Error('Expected hasRetailData() to return true after final load');
 });
 
   console.log(`📊 Integration Tests Summary: ${passedCount} Passed, ${failedCount} Failed\n`);

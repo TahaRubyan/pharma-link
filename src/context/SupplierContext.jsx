@@ -27,14 +27,17 @@ export const SupplierProvider = ({ children }) => {
   });
 
   const [retailSuppliers, setRetailSuppliers] = useState(() => {
-    const saved = localStorage.getItem('pharmalink_retail_suppliers');
+    const isCleared = typeof localStorage !== 'undefined' && localStorage.getItem('pharmalink_retail_cleared') === 'true';
+    if (isCleared) return [];
+
+    const saved = typeof localStorage !== 'undefined' ? localStorage.getItem('pharmalink_retail_suppliers') : null;
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed)) return parsed;
       } catch (e) {}
     }
-    return [];
+    return INITIAL_SUPPLIERS;
   });
 
   const suppliers = isRetail ? retailSuppliers : wholesaleSuppliers;
@@ -69,14 +72,17 @@ export const SupplierProvider = ({ children }) => {
   });
 
   const [retailPurchaseOrders, setRetailPurchaseOrders] = useState(() => {
-    const saved = localStorage.getItem('pharmalink_retail_purchase_orders');
+    const isCleared = typeof localStorage !== 'undefined' && localStorage.getItem('pharmalink_retail_cleared') === 'true';
+    if (isCleared) return [];
+
+    const saved = typeof localStorage !== 'undefined' ? localStorage.getItem('pharmalink_retail_purchase_orders') : null;
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed)) return parsed;
       } catch (e) {}
     }
-    return [];
+    return INITIAL_PURCHASE_ORDERS;
   });
 
   const purchaseOrders = isRetail ? retailPurchaseOrders : wholesalePurchaseOrders;

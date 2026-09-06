@@ -28,14 +28,17 @@ export const SalesProvider = ({ children }) => {
   });
 
   const [retailInvoices, setRetailInvoices] = useState(() => {
-    const saved = localStorage.getItem('pharmalink_retail_invoices');
+    const isCleared = typeof localStorage !== 'undefined' && localStorage.getItem('pharmalink_retail_cleared') === 'true';
+    if (isCleared) return [];
+
+    const saved = typeof localStorage !== 'undefined' ? localStorage.getItem('pharmalink_retail_invoices') : null;
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed)) return parsed;
       } catch (e) {}
     }
-    return [];
+    return INITIAL_INVOICES;
   });
 
   const invoices = isRetail ? retailInvoices : wholesaleInvoices;

@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { INITIAL_MEDICINES, INITIAL_BATCHES, INITIAL_VENDOR_RETURNS } from '../data/mockData';
 import { useAuth } from './AuthContext';
 import { storageManager } from '../services/storageManager';
+import { loadRetailMockData, clearRetailMockData } from '../services/mockDataManager';
 
 const InventoryContext = createContext();
 
@@ -39,9 +40,12 @@ export const InventoryProvider = ({ children }) => {
     return INITIAL_MEDICINES;
   });
 
-  // Retail Medicines: Clean-slate empty sandbox for store evaluation
+  // Retail Medicines: Pre-stocked with sample data for testing unless explicitly cleared by user
   const [retailMedicines, setRetailMedicines] = useState(() => {
-    const saved = localStorage.getItem('pharmalink_retail_medicines');
+    const isCleared = typeof localStorage !== 'undefined' && localStorage.getItem('pharmalink_retail_cleared') === 'true';
+    if (isCleared) return [];
+
+    const saved = typeof localStorage !== 'undefined' ? localStorage.getItem('pharmalink_retail_medicines') : null;
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
@@ -50,7 +54,7 @@ export const InventoryProvider = ({ children }) => {
         console.error('Failed to parse saved retail medicines', e);
       }
     }
-    return [];
+    return INITIAL_MEDICINES;
   });
 
   const medicines = isRetail ? retailMedicines : wholesaleMedicines;
@@ -84,16 +88,19 @@ export const InventoryProvider = ({ children }) => {
     return INITIAL_BATCHES;
   });
 
-  // Retail Batches: Clean-slate empty sandbox
+  // Retail Batches: Pre-stocked with sample batches for testing unless explicitly cleared by user
   const [retailBatches, setRetailBatches] = useState(() => {
-    const saved = localStorage.getItem('pharmalink_retail_batches');
+    const isCleared = typeof localStorage !== 'undefined' && localStorage.getItem('pharmalink_retail_cleared') === 'true';
+    if (isCleared) return [];
+
+    const saved = typeof localStorage !== 'undefined' ? localStorage.getItem('pharmalink_retail_batches') : null;
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed)) return parsed;
       } catch (e) {}
     }
-    return [];
+    return INITIAL_BATCHES;
   });
 
   const batches = isRetail ? retailBatches : wholesaleBatches;
@@ -126,14 +133,17 @@ export const InventoryProvider = ({ children }) => {
   });
 
   const [retailVendorReturns, setRetailVendorReturns] = useState(() => {
-    const saved = localStorage.getItem('pharmalink_retail_vendor_returns');
+    const isCleared = typeof localStorage !== 'undefined' && localStorage.getItem('pharmalink_retail_cleared') === 'true';
+    if (isCleared) return [];
+
+    const saved = typeof localStorage !== 'undefined' ? localStorage.getItem('pharmalink_retail_vendor_returns') : null;
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed)) return parsed;
       } catch (e) {}
     }
-    return [];
+    return INITIAL_VENDOR_RETURNS;
   });
 
   const vendorReturns = isRetail ? retailVendorReturns : wholesaleVendorReturns;
@@ -633,6 +643,8 @@ export const InventoryProvider = ({ children }) => {
         getEarliestValidBatch,
         isExpiryGreaterThan6Months,
         togglePrescriptionRequirement,
+        loadRetailMockData,
+        clearRetailMockData,
       }}
     >
       {children}
