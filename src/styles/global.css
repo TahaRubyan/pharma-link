@@ -318,7 +318,7 @@ button, input, select, textarea {
 /* Print View: Enforce strict 80mm roll dimensions and hide #root */
 @media print {
   @page {
-    margin: 0mm !important;
+    margin: 0mm;
   }
 
   html {
@@ -326,9 +326,6 @@ button, input, select, textarea {
     padding: 0 !important;
     background: #ffffff !important;
     color: #000000 !important;
-    height: auto !important;
-    min-height: 0 !important;
-    overflow: visible !important;
   }
 
   body {
@@ -336,12 +333,6 @@ button, input, select, textarea {
     padding: 0 !important;
     background: #ffffff !important;
     color: #000000 !important;
-    width: 80mm !important;
-    max-width: 80mm !important;
-    height: auto !important;
-    min-height: 0 !important;
-    max-height: none !important;
-    overflow: visible !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
@@ -365,20 +356,12 @@ button, input, select, textarea {
   .thermal-print-only {
     display: block !important;
     visibility: visible !important;
-    width: 72mm !important;
-    max-width: 72mm !important;
+    width: 100% !important;
+    max-width: 80mm !important;
     margin: 0 auto !important;
-    padding: 2mm 0 4mm 0 !important;
+    padding: 0 !important;
     background: #ffffff !important;
     color: #000000 !important;
-    height: auto !important;
-    min-height: 0 !important;
-    max-height: none !important;
-    overflow: visible !important;
-    page-break-after: avoid !important;
-    page-break-before: avoid !important;
-    break-after: avoid !important;
-    break-before: avoid !important;
   }
 
   #thermal-print-mount * {

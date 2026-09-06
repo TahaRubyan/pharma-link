@@ -29,43 +29,43 @@ const ReceiptView = React.forwardRef(({
       id={isPrintVersion ? 'thermal-receipt-print-box' : 'thermal-receipt-preview-box'}
       style={{
         backgroundColor: '#ffffff',
-        border: '1px solid #000000',
+        border: '1.5px solid #000000',
         padding: '6px 8px',
         fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
         color: '#000000',
         fontSize: '11px',
         lineHeight: 1.25,
         width: '100%',
-        maxWidth: isPrintVersion ? '72mm' : '300px',
+        maxWidth: isPrintVersion ? '76mm' : '320px',
         margin: '0 auto',
         boxSizing: 'border-box'
       }}
     >
-      {/* 1. HEADER SECTION: DETAILS OF SHOP */}
+      {/* 1. HEADER SECTION: SHOP DETAILS PROMINENT & HIGH-CONTRAST */}
       <div style={{ textAlign: 'center', marginBottom: '4px' }}>
-        <div style={{ fontWeight: 800, fontSize: '15px', letterSpacing: '0.3px', textTransform: 'uppercase' }}>
+        <div style={{ fontWeight: 900, fontSize: '16px', letterSpacing: '0.4px', textTransform: 'uppercase', lineHeight: 1.2 }}>
           {activeShopName}
         </div>
-        <div style={{ fontSize: '10px', marginTop: '2px', whiteSpace: 'pre-line', lineHeight: 1.2 }}>
+        <div style={{ fontSize: '11px', fontWeight: 700, marginTop: '3px', whiteSpace: 'pre-line', lineHeight: 1.25 }}>
           {activeAddress}
         </div>
-        <div style={{ fontSize: '10px', marginTop: '2px' }}>
+        <div style={{ fontSize: '11px', fontWeight: 700, marginTop: '2px' }}>
           Phone: {activePhone}
         </div>
-        <div style={{ fontSize: '10px', marginTop: '1px' }}>
+        <div style={{ fontSize: '11px', fontWeight: 700, marginTop: '1px' }}>
           {activeEmail}
         </div>
       </div>
 
-      {/* INVOICE METADATA & CASHIER */}
-      <div style={{ fontSize: '10.5px', marginTop: '4px', marginBottom: '4px' }}>
+      {/* INVOICE METADATA & CASHIER: CRISP DASHED SEPARATOR & BOLD LABELS */}
+      <div style={{ fontSize: '11px', fontWeight: 700, marginTop: '6px', marginBottom: '6px', borderTop: '1px dashed #000000', paddingTop: '4px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span>No : {formattedNo}</span>
-          <span>Date: {formattedDateTime}</span>
+          <span>Invoice #: <strong>{formattedNo}</strong></span>
+          <span>Date: <strong>{formattedDateTime}</strong></span>
         </div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '2px' }}>
-          <span style={{ textTransform: 'lowercase' }}>counter</span>
-          <span>Cashier: {activeCashier}</span>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '3px' }}>
+          <span>Counter: <strong>Main</strong></span>
+          <span>Cashier: <strong>{activeCashier}</strong></span>
         </div>
       </div>
 
@@ -74,11 +74,11 @@ const ReceiptView = React.forwardRef(({
         <div
           style={{
             display: 'inline-block',
-            border: '1px solid #000000',
-            padding: '2px 14px',
-            fontWeight: 700,
-            fontSize: '11px',
-            lineHeight: 1.2
+            border: '1.5px solid #000000',
+            padding: '2px 18px',
+            fontWeight: 800,
+            fontSize: '11.5px',
+            letterSpacing: '0.5px'
           }}
         >
           Customer Copy
@@ -92,25 +92,25 @@ const ReceiptView = React.forwardRef(({
           width: '100%',
           borderCollapse: 'collapse',
           border: '1px solid #000000',
-          fontSize: '10.5px',
+          fontSize: '11px',
           boxSizing: 'border-box'
         }}
       >
         <thead>
           <tr style={{ backgroundColor: '#ffffff' }}>
-            <th style={{ border: '1px solid #000000', padding: '3px 2px', width: '8%', textAlign: 'center', fontWeight: 700 }}>
+            <th style={{ border: '1px solid #000000', padding: '4px 2px', width: '8%', textAlign: 'center', fontWeight: 800 }}>
               No.
             </th>
-            <th style={{ border: '1px solid #000000', padding: '3px 4px', width: '46%', textAlign: 'left', fontWeight: 700 }}>
+            <th style={{ border: '1px solid #000000', padding: '4px 4px', width: '46%', textAlign: 'left', fontWeight: 800 }}>
               Item Name
             </th>
-            <th style={{ border: '1px solid #000000', padding: '3px 2px', width: '15%', textAlign: 'center', fontWeight: 700 }}>
+            <th style={{ border: '1px solid #000000', padding: '4px 2px', width: '14%', textAlign: 'center', fontWeight: 800 }}>
               Qty
             </th>
-            <th style={{ border: '1px solid #000000', padding: '3px 2px', width: '15%', textAlign: 'right', fontWeight: 700 }}>
+            <th style={{ border: '1px solid #000000', padding: '4px 2px', width: '16%', textAlign: 'right', fontWeight: 800 }}>
               Price
             </th>
-            <th style={{ border: '1px solid #000000', padding: '3px 2px', width: '16%', textAlign: 'right', fontWeight: 700 }}>
+            <th style={{ border: '1px solid #000000', padding: '4px 2px', width: '16%', textAlign: 'right', fontWeight: 800 }}>
               Amount
             </th>
           </tr>
@@ -130,19 +130,19 @@ const ReceiptView = React.forwardRef(({
 
             return (
               <tr key={idx} style={{ pageBreakInside: 'avoid' }}>
-                <td style={{ border: '1px solid #000000', padding: '3px 2px', textAlign: 'center' }}>
+                <td style={{ border: '1px solid #000000', padding: '3px 2px', textAlign: 'center', fontWeight: 700 }}>
                   {idx + 1}
                 </td>
-                <td style={{ border: '1px solid #000000', padding: '3px 4px', textAlign: 'left', fontWeight: 600, wordBreak: 'break-word' }}>
+                <td style={{ border: '1px solid #000000', padding: '3px 4px', textAlign: 'left', fontWeight: 700, wordBreak: 'break-word' }}>
                   {item.name || item.brandName}
                 </td>
-                <td style={{ border: '1px solid #000000', padding: '3px 2px', textAlign: 'center' }}>
+                <td style={{ border: '1px solid #000000', padding: '3px 2px', textAlign: 'center', fontWeight: 700 }}>
                   {itemQty.toFixed(2)}
                 </td>
-                <td style={{ border: '1px solid #000000', padding: '3px 2px', textAlign: 'right' }}>
+                <td style={{ border: '1px solid #000000', padding: '3px 2px', textAlign: 'right', fontWeight: 700 }}>
                   {Math.round(itemPrice)}
                 </td>
-                <td style={{ border: '1px solid #000000', padding: '3px 2px', textAlign: 'right', fontWeight: 600 }}>
+                <td style={{ border: '1px solid #000000', padding: '3px 2px', textAlign: 'right', fontWeight: 800 }}>
                   {Math.round(itemTotal)}
                 </td>
               </tr>
@@ -151,10 +151,15 @@ const ReceiptView = React.forwardRef(({
         </tbody>
         {/* Table footer aligns Quantity and Subtotal directly beneath Qty and Amount columns */}
         <tfoot>
-          <tr>
-            <td colSpan={2} style={{ border: 'none', textAlign: 'right', fontWeight: 700, padding: '4px 2px' }}></td>
-            <td style={{ border: 'none', textAlign: 'center', fontWeight: 700, padding: '4px 2px' }}>{totalQty.toFixed(2)}</td>
-            <td colSpan={2} style={{ border: 'none', textAlign: 'right', fontWeight: 700, padding: '4px 2px' }}>Rs.{Math.round(subtotal)}</td>
+          <tr style={{ borderTop: '1px solid #000000' }}>
+            <td colSpan={2} style={{ border: 'none', padding: '4px 2px' }}></td>
+            <td style={{ border: 'none', textAlign: 'center', fontWeight: 800, padding: '4px 2px' }}>
+              {totalQty.toFixed(2)}
+            </td>
+            <td style={{ border: 'none' }}></td>
+            <td style={{ border: 'none', textAlign: 'right', fontWeight: 800, padding: '4px 2px' }}>
+              Rs.{Math.round(subtotal)}
+            </td>
           </tr>
         </tfoot>
       </table>
@@ -166,11 +171,11 @@ const ReceiptView = React.forwardRef(({
           flexDirection: 'column',
           alignItems: 'flex-end',
           marginTop: '2px',
-          fontSize: '11px',
-          fontWeight: 700
+          fontSize: '11.5px',
+          fontWeight: 800
         }}
       >
-        <div style={{ width: '175px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+        <div style={{ width: '185px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
             <span>Net Receivable:</span>
             <span>{Math.round(netTotal)}</span>
@@ -185,10 +190,12 @@ const ReceiptView = React.forwardRef(({
             <span>Cash Received:</span>
             <span>Rs. {Math.round(tendered).toLocaleString()}</span>
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <span>Cash Returned:</span>
-            <span>Rs. {Math.round(change).toLocaleString()}</span>
-          </div>
+          {change > 0 && (
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span>Cash Returned:</span>
+              <span>Rs. {Math.round(change).toLocaleString()}</span>
+            </div>
+          )}
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
             <span>Balance:</span>
             <span>Rs. 0</span>
@@ -196,27 +203,14 @@ const ReceiptView = React.forwardRef(({
         </div>
       </div>
 
-      {/* 3. FOOTER SECTION: TAX, RETURN POLICY & THANK YOU NOTE */}
+      {/* 3. FOOTER SECTION: RETURN POLICY, STAY HEALTHY NOTE & THANK YOU (NO TAX, NO FBR) */}
       <div style={{ pageBreakInside: 'avoid', marginTop: '6px' }}>
-        {/* TAX INCLUSIVE NOTICE */}
-        <div
-          style={{
-            textAlign: 'center',
-            fontWeight: 700,
-            fontSize: '10px',
-            margin: '4px 0',
-            letterSpacing: '0.2px'
-          }}
-        >
-          ********** Tax is Inclusive in Price **********
-        </div>
-
         {/* RETURN POLICY NOTE */}
         <div
           style={{
             textAlign: 'center',
-            fontSize: '8.5px',
-            marginTop: '4px',
+            fontSize: '9px',
+            marginTop: '6px',
             lineHeight: 1.3,
             fontWeight: 600
           }}
@@ -224,8 +218,13 @@ const ReceiptView = React.forwardRef(({
           {returnPolicyNote}
         </div>
 
+        {/* STAY HEALTHY NOTE */}
+        <div style={{ textAlign: 'center', fontWeight: 800, fontSize: '11px', marginTop: '4px', color: '#000000' }}>
+          Wish you good health & stay safe!
+        </div>
+
         {/* THANK YOU NOTE */}
-        <div style={{ textAlign: 'center', fontWeight: 700, fontSize: '11px', marginTop: '5px' }}>
+        <div style={{ textAlign: 'center', fontWeight: 800, fontSize: '11.5px', marginTop: '2px', color: '#000000' }}>
           Thank you for Visiting us!
         </div>
       </div>
@@ -236,7 +235,6 @@ const ReceiptView = React.forwardRef(({
 export const ThermalPrintModal = ({ invoice, onClose }) => {
   const { currentShop, user } = useAuth();
   const [mountReady, setMountReady] = useState(false);
-  const [pageHeightMm, setPageHeightMm] = useState(115);
   const mountElRef = useRef(null);
   const previewRef = useRef(null);
 
@@ -250,22 +248,22 @@ export const ThermalPrintModal = ({ invoice, onClose }) => {
   const change = Number(invoice.changeDue || invoice.change || Math.max(0, tendered - netTotal));
 
   // Dynamic Store Data with exact sample defaults
-  const activeShopName = currentShop?.shopName || invoice.shopName || 'IDREES PHARMACY';
+  const activeShopName = currentShop?.shopName || invoice.shopName || 'IDREES MEDICAL STORE';
   const activeAddress = currentShop?.address || invoice.shopAddress || 'NEAR HBL BANK MAIN BAZAR JALAL PUR JATTAN,\nGUJRAT';
   const activePhone = currentShop?.phone || invoice.shopPhone || '03126262942';
   const activeEmail = currentShop?.email || invoice.shopEmail || 'Company@gmail.com';
-  const activeCashier = invoice.cashierName || user?.name || 'HASSAN SALEEM';
+  const activeCashier = invoice.cashierName || user?.name || 'Dr. Idrees (Retail Admin)';
 
-  // Format Invoice Number
+  // Format Invoice Number: 8 digits formatted
   const formattedNo = useMemo(() => {
-    const rawNo = String(invoice.invoiceNo || '137');
+    const rawNo = String(invoice.invoiceNo || '00416960');
     const digits = rawNo.replace(/[^0-9]/g, '');
     return digits ? digits.padStart(8, '0').slice(-8) : rawNo;
   }, [invoice.invoiceNo]);
 
-  // Format Date & Time: 06-Sep-2026 2:57 am
+  // Format Date & Time: 06-Sep-2026 1:26 am
   const formattedDateTime = useMemo(() => {
-    if (!invoice.date) return '06-Sep-2026 2:57 am';
+    if (!invoice.date) return '06-Sep-2026 1:26 am';
     try {
       const dt = new Date(`${invoice.date} ${invoice.time || ''}`);
       if (!isNaN(dt.getTime())) {
@@ -291,21 +289,86 @@ export const ThermalPrintModal = ({ invoice, onClose }) => {
   const returnPolicyNote = (typeof window !== 'undefined' && localStorage.getItem('pharmalink_receipt_footer')) ||
     '* Medicines once sold can be returned/exchanged within 7 days with original receipt. *';
 
-  // Measure receipt height and calculate exact page height in millimeters
-  useEffect(() => {
-    const updateHeight = () => {
-      if (previewRef.current) {
-        const px = previewRef.current.offsetHeight;
-        if (px > 0) {
-          // Convert pixels to mm (1px = 0.264583mm) + 6mm safe padding
-          const calculatedMm = Math.ceil(px * 0.264583) + 6;
-          setPageHeightMm(Math.max(65, calculatedMm));
-        }
+  // Synchronously inject or update the @page size in document.head (WITHOUT !important descriptor to ensure 100% valid CSS)
+  const syncPageStyle = (heightInMm) => {
+    if (typeof document === 'undefined') return;
+    let styleEl = document.getElementById('thermal-dynamic-page-size');
+    if (!styleEl) {
+      styleEl = document.createElement('style');
+      styleEl.id = 'thermal-dynamic-page-size';
+      document.head.appendChild(styleEl);
+    }
+    styleEl.innerHTML = `
+      @page {
+        size: 80mm ${heightInMm}mm;
+        margin: 0mm;
       }
+      html, body {
+        width: 80mm !important;
+        max-width: 80mm !important;
+        height: ${heightInMm}mm !important;
+        max-height: ${heightInMm}mm !important;
+        overflow: hidden !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        background: #ffffff !important;
+      }
+      #thermal-print-mount {
+        width: 100% !important;
+        max-width: 80mm !important;
+        height: ${heightInMm}mm !important;
+        max-height: ${heightInMm}mm !important;
+        margin: 0 auto !important;
+        padding: 0 !important;
+        overflow: hidden !important;
+      }
+      #thermal-receipt-print-box {
+        width: 76mm !important;
+        max-width: 76mm !important;
+        margin: 0 auto !important;
+        box-sizing: border-box !important;
+      }
+    `;
+  };
+
+  const measureAndSync = () => {
+    const el = document.getElementById('thermal-receipt-print-box') || previewRef.current;
+    if (el) {
+      const px = el.offsetHeight;
+      if (px > 0) {
+        const mm = Math.ceil(px * 0.264583) + 4;
+        const finalMm = Math.max(65, mm);
+        syncPageStyle(finalMm);
+        return finalMm;
+      }
+    }
+    syncPageStyle(115);
+    return 115;
+  };
+
+  useEffect(() => {
+    measureAndSync();
+    const timer = setTimeout(measureAndSync, 50);
+
+    const handleBeforePrint = () => {
+      document.body.classList.add('printing-thermal');
+      measureAndSync();
     };
-    updateHeight();
-    const timer = setTimeout(updateHeight, 100);
-    return () => clearTimeout(timer);
+
+    const handleAfterPrint = () => {
+      // Keep style ready or clean up
+    };
+
+    window.addEventListener('beforeprint', handleBeforePrint);
+    window.addEventListener('afterprint', handleAfterPrint);
+
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('beforeprint', handleBeforePrint);
+      window.removeEventListener('afterprint', handleAfterPrint);
+      const styleEl = document.getElementById('thermal-dynamic-page-size');
+      if (styleEl) styleEl.remove();
+    };
   }, [invoice, items]);
 
   // Mount dedicated portal container outside root and activate printing-thermal class
@@ -348,9 +411,10 @@ export const ThermalPrintModal = ({ invoice, onClose }) => {
     returnPolicyNote
   };
 
-  // Immediate, isolated window print: #root is display:none during print, only #thermal-print-mount prints
+  // Isolated window print: re-measures immediately before trigger
   const handlePrint = () => {
     document.body.classList.add('printing-thermal');
+    measureAndSync();
     setTimeout(() => {
       window.print();
     }, 50);
@@ -358,30 +422,6 @@ export const ThermalPrintModal = ({ invoice, onClose }) => {
 
   return (
     <>
-      {/* Dynamic @page sizing: Forces Chromium to match the EXACT receipt height without 200mm blank overflow */}
-      <style>{`
-        @media print {
-          @page {
-            size: 80mm ${pageHeightMm}mm !important;
-            margin: 0mm !important;
-          }
-          html, body {
-            width: 80mm !important;
-            max-width: 80mm !important;
-            height: ${pageHeightMm}mm !important;
-            max-height: ${pageHeightMm}mm !important;
-            overflow: hidden !important;
-          }
-          #thermal-print-mount {
-            width: 72mm !important;
-            max-width: 72mm !important;
-            height: auto !important;
-            margin: 0 auto !important;
-            padding: 0 !important;
-          }
-        }
-      `}</style>
-
       {/* 1. PORTAL RENDER: Renders strictly outside #root into #thermal-print-mount for 100% isolated print */}
       {mountReady && mountElRef.current && ReactDOM.createPortal(
         <ReceiptView {...receiptProps} isPrintVersion={true} />,
@@ -409,7 +449,7 @@ export const ThermalPrintModal = ({ invoice, onClose }) => {
             backgroundColor: '#ffffff',
             borderRadius: '12px',
             width: '100%',
-            maxWidth: '350px',
+            maxWidth: '360px',
             padding: '1rem',
             boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.2), 0 10px 10px -5px rgba(0, 0, 0, 0.1)',
             display: 'flex',
@@ -438,7 +478,7 @@ export const ThermalPrintModal = ({ invoice, onClose }) => {
           </div>
 
           {/* Screen Preview Container */}
-          <div style={{ overflowY: 'auto', maxHeight: '70vh' }}>
+          <div style={{ overflowY: 'auto', maxHeight: '72vh' }}>
             <ReceiptView ref={previewRef} {...receiptProps} isPrintVersion={false} />
           </div>
 
