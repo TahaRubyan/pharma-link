@@ -3,6 +3,8 @@
  * Utilizes JSDOM to simulate real browser DOM interactions, event lifecycles, and hotkeys.
  */
 
+import fs from 'fs';
+import path from 'path';
 import { JSDOM } from 'jsdom';
 
 let passedCount = 0;
@@ -266,6 +268,65 @@ export function runInterfaceTests() {
     const supplierPOs = purchaseOrders.filter(po => po.distributorName === supplier.name);
     if (supplierPOs.length !== 1) throw new Error('Failed to filter supplier POs');
     if (supplier.paymentHistory.length !== 1) throw new Error('Failed to bind payment history');
+  });
+
+  // 11. Static JSX Component & Icon Integrity Verification (Zero Undefined References)
+  test('Interface - Complete codebase static audit confirms zero undefined JSX components or icons', () => {
+    function walk(dir) {
+      let results = [];
+      const list = fs.readdirSync(dir);
+      list.forEach(file => {
+        file = path.join(dir, file);
+        const stat = fs.statSync(file);
+        if (stat && stat.isDirectory()) {
+          results = results.concat(walk(file));
+        } else if (file.endsWith('.jsx') || file.endsWith('.js')) {
+          results.push(file);
+        }
+      });
+      return results;
+    }
+
+    const files = walk('src');
+    const missing = [];
+
+    for (const file of files) {
+      const code = fs.readFileSync(file, 'utf8');
+
+      // Collect all imported symbols
+      const importedSymbols = new Set();
+      const importMatches = code.matchAll(/import\s+(?:([A-Za-z0-9_$]+)|(?:\{([^}]+)\})|(?:\*\s+as\s+([A-Za-z0-9_$]+)))\s+from/g);
+      for (const match of importMatches) {
+        if (match[1]) importedSymbols.add(match[1]);
+        if (match[2]) {
+          match[2].split(',').forEach(item => {
+            const parts = item.trim().split(/\s+as\s+/);
+            const name = parts[parts.length - 1].trim();
+            if (name) importedSymbols.add(name);
+          });
+        }
+        if (match[3]) importedSymbols.add(match[3]);
+      }
+
+      // Find all JSX components used: <ComponentName ...>
+      const jsxTagMatches = code.matchAll(/<([A-Z][A-Za-z0-9_]*)\b/g);
+      for (const m of jsxTagMatches) {
+        const componentName = m[1];
+        if (importedSymbols.has(componentName)) continue;
+
+        const declRegex = new RegExp(`(?:const|let|var|function|class)\\s+${componentName}\\b`);
+        if (declRegex.test(code)) continue;
+
+        const paramRegex = new RegExp(`\\(\\s*\\{[^}]*\\b${componentName}\\b`);
+        if (paramRegex.test(code)) continue;
+
+        missing.push(`<${componentName} /> in ${file}`);
+      }
+    }
+
+    if (missing.length > 0) {
+      throw new Error(`Found ${missing.length} missing JSX imports:\n${missing.join('\n')}`);
+    }
   });
 
   console.log(`📊 Interface Tests Summary: ${passedCount} Passed, ${failedCount} Failed\n`);

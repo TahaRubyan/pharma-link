@@ -19,7 +19,9 @@ import {
   Layers,
   CreditCard,
   Send,
-  Sparkles
+  Sparkles,
+  HeartPulse,
+  Save
 } from 'lucide-react';
 import { useInventory } from '../context/InventoryContext';
 import { useCart } from '../context/CartContext';
