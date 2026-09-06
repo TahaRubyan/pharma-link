@@ -3,81 +3,6 @@ import ReactDOM from 'react-dom';
 import { Printer, X } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
-// High-contrast, crisp 29x29 vector SVG QR matrix for POS verification
-const renderCrispQR = (seedString = '19517326090625751354') => {
-  const size = 29;
-  const matrix = Array.from({ length: size }, () => Array(size).fill(0));
-
-  const setFinder = (startR, startC) => {
-    for (let r = 0; r < 7; r++) {
-      for (let c = 0; c < 7; c++) {
-        if (
-          r === 0 || r === 6 || c === 0 || c === 6 ||
-          (r >= 2 && r <= 4 && c >= 2 && c <= 4)
-        ) {
-          matrix[startR + r][startC + c] = 1;
-        } else {
-          matrix[startR + r][startC + c] = 0;
-        }
-      }
-    }
-  };
-
-  setFinder(0, 0);          // Top-Left
-  setFinder(0, size - 7);   // Top-Right
-  setFinder(size - 7, 0);   // Bottom-Left
-
-  for (let i = 8; i < size - 8; i++) {
-    matrix[6][i] = i % 2 === 0 ? 1 : 0;
-    matrix[i][6] = i % 2 === 0 ? 1 : 0;
-  }
-
-  for (let r = -2; r <= 2; r++) {
-    for (let c = -2; c <= 2; c++) {
-      if (Math.abs(r) === 2 || Math.abs(c) === 2 || (r === 0 && c === 0)) {
-        matrix[20 + r][20 + c] = 1;
-      }
-    }
-  }
-
-  let hash = 0;
-  for (let i = 0; i < seedString.length; i++) {
-    hash = (hash * 31 + seedString.charCodeAt(i)) >>> 0;
-  }
-
-  const isReserved = (r, c) => {
-    if (r <= 7 && c <= 7) return true;
-    if (r <= 7 && c >= size - 8) return true;
-    if (r >= size - 8 && c <= 7) return true;
-    if (r === 6 || c === 6) return true;
-    if (r >= 18 && r <= 22 && c >= 18 && c <= 22) return true;
-    return false;
-  };
-
-  let bitState = hash;
-  for (let r = 0; r < size; r++) {
-    for (let c = 0; c < size; c++) {
-      if (!isReserved(r, c)) {
-        bitState = ((bitState * 1664525 + 1013904223) >>> 0);
-        matrix[r][c] = (bitState % 3 === 0 || (r + c) % 5 === 0) ? 1 : 0;
-      }
-    }
-  }
-
-  return (
-    <svg viewBox="0 0 29 29" width="88" height="88" shapeRendering="crispEdges" style={{ display: 'block' }}>
-      <rect width="29" height="29" fill="#ffffff" />
-      {matrix.map((row, r) =>
-        row.map((val, c) =>
-          val === 1 ? (
-            <rect key={`${r}-${c}`} x={c} y={r} width="1" height="1" fill="#000000" />
-          ) : null
-        )
-      )}
-    </svg>
-  );
-};
-
 // Pure Receipt Content component: Renders Header, Body (Items & Totals), and Footer
 const ReceiptView = ({
   invoice,
@@ -95,7 +20,6 @@ const ReceiptView = ({
   netTotal,
   tendered,
   change,
-  fbrBarcodeNumber,
   returnPolicyNote
 }) => {
   return (
@@ -292,97 +216,22 @@ const ReceiptView = ({
           ********** Tax is Inclusive in Price **********
         </div>
 
-        {/* FBR BARCODE NUMBER */}
-        <div
-          style={{
-            textAlign: 'center',
-            fontSize: '11px',
-            fontWeight: 700,
-            letterSpacing: '0.4px',
-            marginBottom: '4px'
-          }}
-        >
-          {fbrBarcodeNumber}
-        </div>
-
-        {/* FBR POS EMBLEM & CRISP QR CODE */}
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            padding: '0 10px',
-            margin: '4px 0 6px 0'
-          }}
-        >
-          {/* FBR POS Boxed Badge */}
-          <div
-            style={{
-              border: '2px solid #000000',
-              borderRadius: '6px',
-              padding: '4px 6px',
-              textAlign: 'center',
-              width: '98px',
-              boxSizing: 'border-box'
-            }}
-          >
-            <div style={{ fontSize: '9px', fontWeight: 900, letterSpacing: '1px' }}>
-              ::: FBR :::
-            </div>
-            <div style={{ fontSize: '20px', fontWeight: 900, lineHeight: 1.05, letterSpacing: '1px' }}>
-              POS
-            </div>
-            <div
-              style={{
-                fontSize: '7px',
-                fontWeight: 800,
-                letterSpacing: '0.3px',
-                borderTop: '1px solid #000000',
-                paddingTop: '2px',
-                marginTop: '2px'
-              }}
-            >
-              INVOICING SYSTEM
-            </div>
-          </div>
-
-          {/* High-Contrast Crisp QR Code */}
-          <div style={{ padding: '2px', backgroundColor: '#ffffff' }}>
-            {renderCrispQR(fbrBarcodeNumber)}
-          </div>
-        </div>
-
-        {/* FBR MOBILE APP NOTICE */}
-        <div
-          style={{
-            textAlign: 'center',
-            fontSize: '8.5px',
-            lineHeight: 1.25,
-            marginTop: '4px'
-          }}
-        >
-          Verifiy this invoice through FBR TaxAsaan MobileApp or SMS at 9966 and win exciting prizes in draw
-        </div>
-
         {/* RETURN POLICY NOTE */}
         <div
           style={{
             textAlign: 'center',
             fontSize: '8.5px',
-            marginTop: '4px',
-            lineHeight: 1.25,
+            marginTop: '6px',
+            lineHeight: 1.3,
             fontWeight: 600
           }}
         >
           {returnPolicyNote}
         </div>
 
-        {/* THANK YOU NOTE & SOFTWARE CONTACT */}
-        <div style={{ textAlign: 'center', fontWeight: 700, fontSize: '11px', marginTop: '5px' }}>
+        {/* THANK YOU NOTE */}
+        <div style={{ textAlign: 'center', fontWeight: 700, fontSize: '11.5px', marginTop: '6px' }}>
           Thank you for Visiting us!
-        </div>
-        <div style={{ textAlign: 'center', fontWeight: 700, fontSize: '10px', marginTop: '2px' }}>
-          Contact for Software 03214873721
         </div>
       </div>
     </div>
@@ -442,13 +291,6 @@ export const ThermalPrintModal = ({ invoice, onClose }) => {
     return items.reduce((sum, it) => sum + Number(it.qty || it.quantity || 1), 0);
   }, [items]);
 
-  // FBR Barcode Number
-  const fbrBarcodeNumber = useMemo(() => {
-    if (invoice.fbrInvoiceNo) return invoice.fbrInvoiceNo;
-    const cleanInv = String(invoice.invoiceNo || '137').replace(/[^0-9]/g, '').slice(-4).padStart(4, '0');
-    return `195173260906${cleanInv}1354"`;
-  }, [invoice.fbrInvoiceNo, invoice.invoiceNo]);
-
   const returnPolicyNote = (typeof window !== 'undefined' && localStorage.getItem('pharmalink_receipt_footer')) ||
     '* Medicines once sold can be returned/exchanged within 7 days with original receipt. *';
 
@@ -489,7 +331,6 @@ export const ThermalPrintModal = ({ invoice, onClose }) => {
     netTotal,
     tendered,
     change,
-    fbrBarcodeNumber,
     returnPolicyNote
   };
 
