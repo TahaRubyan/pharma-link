@@ -298,3 +298,110 @@ button, input, select, textarea {
 .table tr:hover td {
   background-color: #f1f5f9;
 }
+
+/* ==========================================================================
+   80MM POS THERMAL RECEIPT PRINT ENGINE (ZERO MULTI-PAGE OVERFLOW GUARANTEE)
+   ========================================================================== */
+
+/* Screen View: Hide the isolated print mount completely */
+@media screen {
+  #thermal-print-mount,
+  .thermal-print-only {
+    display: none !important;
+    visibility: hidden !important;
+    height: 0 !important;
+    width: 0 !important;
+    overflow: hidden !important;
+  }
+}
+
+/* Print View: Enforce strict 80mm roll dimensions and hide #root */
+@media print {
+  @page {
+    size: 80mm auto;
+    margin: 0mm !important;
+  }
+
+  html {
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+  }
+
+  body {
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    width: 80mm !important;
+    max-width: 80mm !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* When printing thermal receipt, completely remove the entire SPA root from layout */
+  body.printing-thermal #root,
+  body:has(#thermal-print-mount > *) #root {
+    display: none !important;
+    height: 0 !important;
+    max-height: 0 !important;
+    overflow: hidden !important;
+    visibility: hidden !important;
+  }
+
+  body.printing-thermal > *:not(#thermal-print-mount) {
+    display: none !important;
+  }
+
+  /* Render ONLY the isolated 80mm thermal container */
+  #thermal-print-mount,
+  .thermal-print-only {
+    display: block !important;
+    visibility: visible !important;
+    width: 72mm !important;
+    max-width: 72mm !important;
+    margin: 0 auto !important;
+    padding: 2mm 0 4mm 0 !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+    page-break-after: avoid !important;
+    page-break-before: avoid !important;
+    break-after: avoid !important;
+    break-before: avoid !important;
+  }
+
+  #thermal-print-mount * {
+    visibility: visible !important;
+    color: #000000 !important;
+    box-sizing: border-box !important;
+  }
+
+  #thermal-print-mount table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    page-break-inside: auto !important;
+  }
+
+  #thermal-print-mount tr {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  .no-print,
+  .thermal-no-print {
+    display: none !important;
+  }
+}
+
