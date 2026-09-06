@@ -279,14 +279,23 @@ export const AuthProvider = ({ children }) => {
     localStorage.setItem('pharmalink_active_shop', JSON.stringify(currentShop));
   }, [currentShop]);
 
+  const [sessionLoginRole, setSessionLoginRole] = useState(() => {
+    return localStorage.getItem('pharmalink_session_login_role') || 'Admin';
+  });
+
   useEffect(() => {
     localStorage.setItem('pharmalink_user_role', role);
     if (userAccountType === 'CLIENT_USER') {
+      const isRetail = currentShop?.mode === 'RETAIL';
       setUser({
-        name: role === 'Admin' ? 'Dr. Idrees' : 'Usman Tariq',
+        name: role === 'Admin' 
+          ? (isRetail ? 'Dr. Idrees (Retail Admin)' : 'Dr. Idrees (Wholesale Admin)')
+          : (isRetail ? 'Retail Counter Cashier' : 'Wholesale Billing Cashier'),
         role: role,
         staffId: role === 'Admin' ? 'EMP-001' : 'EMP-002',
-        title: role === 'Admin' ? 'Chief Pharmacist & Store Manager' : 'Counter Pharmacist'
+        title: role === 'Admin' 
+          ? (isRetail ? 'Chief Pharmacist & Store Manager' : 'Distributor Operations Head')
+          : (isRetail ? 'Counter Cashier & POS Dispenser' : 'B2B Billing & Dispatch Cashier')
       });
     } else {
       setUser({
@@ -296,7 +305,7 @@ export const AuthProvider = ({ children }) => {
         title: 'MediStore SaaS Platform Owner'
       });
     }
-  }, [role, userAccountType]);
+  }, [role, userAccountType, currentShop?.mode]);
 
   useEffect(() => {
     localStorage.setItem('pharmalink_custom_roles', JSON.stringify(roles));
@@ -313,48 +322,81 @@ export const AuthProvider = ({ children }) => {
   const logout = () => {
     setIsAuthenticated(false);
     setUserAccountType('CLIENT_USER');
+    setRoleState('Admin');
+    setSessionLoginRole('Admin');
     setInspectingTenantId(null);
     localStorage.removeItem('pharmalink_is_auth');
     localStorage.removeItem('medistore_account_type');
+    localStorage.removeItem('pharmalink_user_role');
+    localStorage.removeItem('pharmalink_session_login_role');
+    localStorage.removeItem('pharmalink_current_screen');
   };
 
   const loginAsSuperAdmin = () => {
     setIsAuthenticated(true);
     setUserAccountType('SUPER_ADMIN');
+    setRoleState('Admin');
+    setSessionLoginRole('Admin');
     setInspectingTenantId(null);
     localStorage.setItem('pharmalink_is_auth', 'true');
+    localStorage.setItem('medistore_account_type', 'SUPER_ADMIN');
+    localStorage.setItem('pharmalink_session_login_role', 'Admin');
   };
 
   const loginAsClientUser = (tenantId = 'CP-1092', roleType = 'Admin', mode = 'RETAIL') => {
     setIsAuthenticated(true);
     setUserAccountType('CLIENT_USER');
     setRoleState(roleType);
+    setSessionLoginRole(roleType);
     setInspectingTenantId(null);
     localStorage.setItem('pharmalink_is_auth', 'true');
+    localStorage.setItem('medistore_account_type', 'CLIENT_USER');
+    localStorage.setItem('pharmalink_user_role', roleType);
+    localStorage.setItem('pharmalink_session_login_role', roleType);
 
     if (mode === 'RETAIL') {
+      let existingData = {};
+      try {
+        const savedShop = localStorage.getItem('pharmalink_active_shop');
+        if (savedShop) {
+          const parsed = JSON.parse(savedShop);
+          if (parsed.mode === 'RETAIL') existingData = parsed;
+        }
+      } catch (e) {}
+
       setCurrentShopState({
         shopId: tenantId || 'TEN-IDREES-RT',
-        shopName: 'Idrees Medical Store',
-        city: '',
-        dlNumber: '',
-        gstin: '',
-        ntn: '',
-        address: '',
-        phone: '',
+        shopName: existingData.shopName || 'Idrees Medical Store',
+        city: existingData.city || '',
+        dlNumber: existingData.dlNumber || '',
+        gstin: existingData.gstin || '',
+        ntn: existingData.ntn || '',
+        address: existingData.address || '',
+        phone: existingData.phone || '',
         mode: 'RETAIL',
+        ...existingData
       });
     } else {
+      let existingData = {};
+      try {
+        const savedShop = localStorage.getItem('pharmalink_active_shop');
+        if (savedShop) {
+          const parsed = JSON.parse(savedShop);
+          if (parsed.mode === 'WHOLESALE') existingData = parsed;
+        }
+      } catch (e) {}
+
       setCurrentShopState({
         shopId: tenantId || 'TEN-IDREES-WS',
-        shopName: 'Idrees Pharma Distributor',
-        city: 'Gujrat',
-        dlNumber: '09-342-0139-045748D',
-        gstin: '3277876174544',
-        ntn: '4442705-7',
-        address: 'Jalal Pur Jattan, Gujrat',
-        phone: '053-3724601, 053-3724602',
+        shopName: existingData.shopName || 'Idrees Pharma Distributor',
+        city: existingData.city || 'Gujrat',
+        dlNumber: existingData.dlNumber || '09-342-0139-045748D',
+        gstin: existingData.gstin || '3277876174544',
+        ntn: existingData.ntn || '4442705-7',
+        address: existingData.address || 'Jalal Pur Jattan, Gujrat',
+        phone: existingData.phone || '053-3724601, 053-3724602',
         mode: 'WHOLESALE',
+        ...existingData
       });
     }
   };
@@ -541,7 +583,9 @@ export const AuthProvider = ({ children }) => {
     permissions,
     staffAccounts,
     setStaffAccounts,
-    addStaffAccount
+    addStaffAccount,
+    sessionLoginRole,
+    setSessionLoginRole
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

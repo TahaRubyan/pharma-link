@@ -31,11 +31,26 @@ export const Topbar = ({ currentScreen, onNavigate }) => {
     user, 
     toggleRole, 
     isAdmin, 
+    isCashier,
+    sessionLoginRole,
     currentShop, 
     inspectingTenantId, 
     stopInspecting,
     logout
   } = useAuth();
+
+  const handleRoleToggle = () => {
+    if (sessionLoginRole === 'Cashier' && isCashier) {
+      const pin = window.prompt("Admin Password Required\nEnter Admin password to switch to Admin role:", "");
+      if (pin === 'admin123' || pin === 'retail123') {
+        toggleRole();
+      } else if (pin !== null) {
+        alert("Incorrect Admin password. Cashier access maintained.");
+      }
+    } else {
+      toggleRole();
+    }
+  };
 
   return (
     <header style={{
@@ -88,7 +103,7 @@ export const Topbar = ({ currentScreen, onNavigate }) => {
           <NetworkStatusBadge />
 
           <button
-            onClick={toggleRole}
+            onClick={handleRoleToggle}
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -103,7 +118,7 @@ export const Topbar = ({ currentScreen, onNavigate }) => {
               cursor: 'pointer',
               transition: 'all 0.15s ease'
             }}
-            title="Click to toggle active user role (Admin ↔ Cashier)"
+            title={sessionLoginRole === 'Cashier' && isCashier ? "Cashier session. Click to enter Admin password to switch roles." : "Click to toggle active user role (Admin ↔ Cashier)"}
           >
             {isAdmin ? (
               <>
@@ -114,6 +129,7 @@ export const Topbar = ({ currentScreen, onNavigate }) => {
               <>
                 <UserCheck size={14} color="#6b7280" />
                 <span>Cashier Role</span>
+                {sessionLoginRole === 'Cashier' && <Lock size={10} color="#94a3b8" style={{ marginLeft: '0.1rem' }} />}
               </>
             )}
             <RefreshCw size={10} style={{ marginLeft: '0.15rem', opacity: 0.6 }} />

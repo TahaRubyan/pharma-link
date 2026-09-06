@@ -1,4 +1,4 @@
-import React, { useState, Component } from 'react';
+import React, { useState, useEffect, Component } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { InventoryProvider } from './context/InventoryContext';
 import { SupplierProvider } from './context/SupplierContext';
@@ -90,22 +90,53 @@ class ErrorBoundary extends Component {
 }
 
 function AppContent() {
-  const { isSuperAdmin, tenantsList, isAuthenticated, setIsAuthenticated, currentShop } = useAuth();
+  const { isSuperAdmin, tenantsList, isAuthenticated, setIsAuthenticated, currentShop, isCashier } = useAuth();
   const [isModeSelected, setIsModeSelected] = useState(true);
-  const [storeMode, setStoreMode] = useState(() => currentShop?.mode || 'RETAIL'); // 'RETAIL' | 'WHOLESALE'
-  const [currentScreen, setCurrentScreen] = useState('dashboard');
+  const [storeMode, setStoreMode] = useState(() => {
+    try {
+      const savedShop = localStorage.getItem('pharmalink_active_shop');
+      if (savedShop) {
+        const parsed = JSON.parse(savedShop);
+        if (parsed.mode) return parsed.mode;
+      }
+    } catch (e) {}
+    return currentShop?.mode || 'RETAIL';
+  });
 
-  const handleLoginSuccess = (accountType, tenantId, mode) => {
+  const [currentScreen, setCurrentScreen] = useState(() => {
+    const savedScreen = localStorage.getItem('pharmalink_current_screen');
+    const savedRole = localStorage.getItem('pharmalink_user_role');
+    if (savedScreen) return savedScreen;
+    return savedRole === 'Cashier' ? 'pos' : 'dashboard';
+  });
+
+  useEffect(() => {
+    localStorage.setItem('pharmalink_current_screen', currentScreen);
+  }, [currentScreen]);
+
+  const handleLoginSuccess = (accountType, tenantId, mode, userRole = 'Admin', targetScreen = null) => {
     setIsAuthenticated(true);
 
     if (accountType === 'SUPER_ADMIN') {
-      // Super Admin Dashboard
+      // Handled by isSuperAdmin state
     } else if (mode === 'RETAIL') {
       setStoreMode('RETAIL');
-      setCurrentScreen('dashboard');
+      if (targetScreen) {
+        setCurrentScreen(targetScreen);
+      } else if (userRole === 'Cashier') {
+        setCurrentScreen('pos');
+      } else {
+        setCurrentScreen('dashboard');
+      }
     } else {
       setStoreMode('WHOLESALE');
-      setCurrentScreen('pos');
+      if (targetScreen) {
+        setCurrentScreen(targetScreen);
+      } else if (userRole === 'Cashier') {
+        setCurrentScreen('pos');
+      } else {
+        setCurrentScreen('pos');
+      }
     }
   };
 
@@ -130,23 +161,23 @@ function AppContent() {
       case 'expiry':
         return <ExpiryRadarPage />;
       case 'controlled':
-        return <ControlledSubstancesPage />;
+        return isCashier ? <POSPage storeMode={storeMode} /> : <ControlledSubstancesPage />;
       case 'suppliers':
-        return <SuppliersPage />;
+        return isCashier ? <POSPage storeMode={storeMode} /> : <SuppliersPage />;
       case 'region-ledger':
-        return <RegionLedgerPage />;
+        return isCashier ? <POSPage storeMode={storeMode} /> : <RegionLedgerPage />;
       case 'customer-ledger':
-        return <CustomerLedgerPage />;
+        return isCashier ? <POSPage storeMode={storeMode} /> : <CustomerLedgerPage />;
       case 'patients':
         return <PatientsPage onNavigate={setCurrentScreen} />;
       case 'fbr':
-        return <FBRTaxPage />;
+        return isCashier ? <POSPage storeMode={storeMode} /> : <FBRTaxPage />;
       case 'analytics':
-        return <AnalyticsPage />;
+        return isCashier ? <POSPage storeMode={storeMode} /> : <AnalyticsPage />;
       case 'settings':
-        return <SettingsPage storeMode={storeMode} />;
+        return isCashier ? <POSPage storeMode={storeMode} /> : <SettingsPage storeMode={storeMode} />;
       default:
-        return <DashboardPage onNavigate={setCurrentScreen} />;
+        return isCashier ? <POSPage storeMode={storeMode} /> : <DashboardPage onNavigate={setCurrentScreen} />;
     }
   };
 
