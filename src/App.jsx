@@ -6,6 +6,7 @@ import { PatientProvider } from './context/PatientContext';
 import { SalesProvider } from './context/SalesContext';
 import { CartProvider } from './context/CartContext';
 import { CustomerDebtProvider } from './context/CustomerDebtContext';
+import { PWAProvider } from './context/PWAContext';
 import Layout from './components/layout/Layout';
 import LoginPage from './pages/LoginPage';
 import ModeSelectionPage from './pages/ModeSelectionPage';
@@ -199,21 +200,23 @@ function AppContent() {
 export function App() {
   return (
     <ErrorBoundary>
-      <AuthProvider>
-        <InventoryProvider>
-          <SupplierProvider>
-            <PatientProvider>
-              <SalesProvider>
-                <CartProvider>
-                  <CustomerDebtProvider>
-                    <AppContent />
-                  </CustomerDebtProvider>
-                </CartProvider>
-              </SalesProvider>
-            </PatientProvider>
-          </SupplierProvider>
-        </InventoryProvider>
-      </AuthProvider>
+      <PWAProvider>
+        <AuthProvider>
+          <InventoryProvider>
+            <SupplierProvider>
+              <PatientProvider>
+                <SalesProvider>
+                  <CartProvider>
+                    <CustomerDebtProvider>
+                      <AppContent />
+                    </CustomerDebtProvider>
+                  </CartProvider>
+                </SalesProvider>
+              </PatientProvider>
+            </SupplierProvider>
+          </InventoryProvider>
+        </AuthProvider>
+      </PWAProvider>
     </ErrorBoundary>
   );
 }

@@ -101,8 +101,8 @@ export const ThermalPrintModal = ({ invoice, onClose }) => {
           </div>
 
           <hr style={{ borderTop: '1px dashed #000', margin: '0.5rem 0' }} />
-          <div style={{ textAlign: 'center', fontSize: '0.65rem' }}>
-            * Medicines once sold can be returned/exchanged within 7 days with original receipt. *
+          <div style={{ textAlign: 'center', fontSize: '0.65rem', whiteSpace: 'pre-line' }}>
+            {localStorage.getItem('pharmalink_receipt_footer') || '* Medicines once sold can be returned/exchanged within 7 days with original receipt. *'}
           </div>
           <div style={{ textAlign: 'center', fontSize: '0.75rem', fontWeight: 700, marginTop: '0.2rem' }}>
             Thank you! Wish you good health.

@@ -4,9 +4,12 @@ import {
   UserCheck, 
   Store, 
   Eye, 
-  LogOut 
+  LogOut,
+  Download,
+  Laptop
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { usePWA } from '../../context/PWAContext';
 import { NetworkStatusBadge } from '../common/NetworkStatusBadge';
 
 const SCREEN_TITLES = {
@@ -34,6 +37,7 @@ export const Topbar = ({ currentScreen, onNavigate }) => {
     stopInspecting,
     logout
   } = useAuth();
+  const { isInstallable, isInstalled, triggerInstall } = usePWA();
 
   return (
     <header style={{
@@ -84,6 +88,70 @@ export const Topbar = ({ currentScreen, onNavigate }) => {
         {/* Right Controls: Prominent Logout Button & Actions */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
           <NetworkStatusBadge />
+
+          {/* PWA App State or Install Action */}
+          {isInstalled ? (
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.35rem',
+                padding: '0.35rem 0.65rem',
+                borderRadius: '8px',
+                backgroundColor: '#eff6ff',
+                border: '1px solid #bfdbfe',
+                color: '#1d4ed8',
+                fontSize: '11px',
+                fontWeight: 700,
+                userSelect: 'none'
+              }}
+              title="PharmaLink is running as an installed standalone Desktop / PWA app"
+            >
+              <Laptop size={13} color="#2563eb" />
+              <span>Desktop App</span>
+            </div>
+          ) : (
+            <button
+              onClick={async () => {
+                const res = await triggerInstall();
+                if (res === 'manual_instructions') {
+                  alert(
+                    '💡 PharmaLink Desktop App Installation:\n\n' +
+                    'To install PharmaLink on this desktop/laptop:\n' +
+                    '1. Look at your browser address bar (top right).\n' +
+                    '2. Click the install icon (⊕ or computer icon).\n' +
+                    '3. Click "Install" to run PharmaLink in dedicated window mode with desktop shortcuts.'
+                  );
+                }
+              }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.35rem',
+                padding: '0.35rem 0.65rem',
+                borderRadius: '8px',
+                backgroundColor: '#f0f9ff',
+                border: '1px solid #bae6fd',
+                color: '#0284c7',
+                fontSize: '11px',
+                fontWeight: 700,
+                cursor: 'pointer',
+                transition: 'all 0.15s ease'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = '#e0f2fe';
+                e.currentTarget.style.borderColor = '#7dd3fc';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = '#f0f9ff';
+                e.currentTarget.style.borderColor = '#bae6fd';
+              }}
+              title="Install PharmaLink as a Standalone Desktop / PWA App"
+            >
+              <Download size={13} color="#0284c7" />
+              <span>Install PWA</span>
+            </button>
+          )}
 
           {/* Authenticated User Role Badge (Production Static Badge) */}
           <div

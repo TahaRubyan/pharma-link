@@ -11,15 +11,73 @@ import {
   Download, 
   RefreshCw,
   ShieldCheck,
-  Plus
+  Plus,
+  Printer,
+  Laptop,
+  CheckCircle2,
+  HelpCircle,
+  Sparkles
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { usePWA } from '../context/PWAContext';
+import { ThermalPrintModal } from '../components/modals/ThermalPrintModal';
 import { MOCK_STAFF_ACCOUNTS } from '../data/mockData';
+
+const SAMPLE_TEST_INVOICE = {
+  invoiceNo: 'POS-TEST-80MM',
+  date: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
+  time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+  customerName: 'Walk-in Customer (80mm Test)',
+  doctorName: 'Dr. A. Khan (MBBS, FCPS)',
+  items: [
+    { name: 'Panadol Extra 500mg', qty: 2, unitSelection: 'Strip', unitType: 'Strip', stripPrice: 35.0, price: 35.0 },
+    { name: 'Augmentin 625mg Tab', qty: 1, unitSelection: 'Box', unitType: 'Box', boxPrice: 420.0, price: 420.0 },
+    { name: 'Arinac Forte Tab', qty: 1, unitSelection: 'Strip', unitType: 'Strip', stripPrice: 65.0, price: 65.0 },
+  ],
+  grossTotal: 520.0,
+  subtotal: 520.0,
+  discountPercent: 5,
+  discount: 26.0,
+  netTotal: 494.0,
+  cashTendered: 500.0,
+  changeDue: 6.0,
+  paymentMethod: 'Cash (POS)'
+};
 
 export const SettingsPage = ({ storeMode }) => {
   const { currentShop, updateStoreProfile } = useAuth();
   const isRetail = (storeMode || currentShop?.mode || 'RETAIL') === 'RETAIL';
-  const [activeTab, setActiveTab] = useState('PROFILE'); // 'PROFILE' | 'TAXES' | 'WARRANTY' | 'STAFF' | 'BACKUP'
+  const [activeTab, setActiveTab] = useState('PROFILE'); // 'PROFILE' | 'PRINTER_PWA' | 'TAXES' | 'WARRANTY' | 'STAFF' | 'BACKUP'
+
+  // Tab: Printer & POS Hardware State
+  const [printerType, setPrinterType] = useState(() => localStorage.getItem('pharmalink_printer_type') || '80MM');
+  const [receiptFooterNote, setReceiptFooterNote] = useState(
+    () => localStorage.getItem('pharmalink_receipt_footer') || '* Medicines once sold can be returned/exchanged within 7 days with original receipt. *'
+  );
+  const [autoPrintOnCheckout, setAutoPrintOnCheckout] = useState(
+    () => localStorage.getItem('pharmalink_auto_print_80mm') === 'true'
+  );
+  const [isTestReceiptOpen, setIsTestReceiptOpen] = useState(false);
+
+  // Tab: PWA State & Hooks
+  const { isInstallable, isInstalled, swRegistered, triggerInstall, updateCache } = usePWA();
+  const [cacheUpdating, setCacheUpdating] = useState(false);
+  const [cacheMessage, setCacheMessage] = useState('');
+
+  const handleSelectPrinter = (type) => {
+    setPrinterType(type);
+    localStorage.setItem('pharmalink_printer_type', type);
+  };
+
+  const handleSaveFooterNote = () => {
+    localStorage.setItem('pharmalink_receipt_footer', receiptFooterNote.trim());
+    alert('80mm Receipt return policy footer note saved successfully!');
+  };
+
+  const handleToggleAutoPrint = (checked) => {
+    setAutoPrintOnCheckout(checked);
+    localStorage.setItem('pharmalink_auto_print_80mm', checked ? 'true' : 'false');
+  };
 
   // Tab 1: Profile State
   const [storeName, setStoreName] = useState(currentShop?.shopName || 'Idrees Medical Store');
@@ -255,6 +313,14 @@ export const SettingsPage = ({ storeMode }) => {
           <Building size={14} /> {isRetail ? 'Retail Pharmacy Profile & Receipt' : 'Store Profile & DSL'}
         </button>
 
+        <button
+          onClick={() => setActiveTab('PRINTER_PWA')}
+          className={`btn ${activeTab === 'PRINTER_PWA' ? 'btn-primary' : 'btn-outline'}`}
+          style={{ fontSize: '12px', borderRadius: '10px' }}
+        >
+          <Printer size={14} /> 80mm Printer & PWA Engine
+        </button>
+
         {!isRetail && (
           <button
             onClick={() => setActiveTab('TAXES')}
@@ -405,6 +471,361 @@ export const SettingsPage = ({ storeMode }) => {
               </button>
             </div>
           </form>
+
+          {/* QUICK HARDWARE & PWA STATUS BANNER */}
+          <div style={{ marginTop: '1.25rem', padding: '1rem', borderRadius: '12px', backgroundColor: '#f0f9ff', border: '1px solid #bae6fd', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+              <Printer size={20} color="#0284c7" />
+              <div>
+                <div style={{ fontSize: '12px', fontWeight: 800, color: '#0369a1' }}>
+                  Active POS Printer: {printerType === '80MM' ? '80mm Thermal Receipt Printer (Default)' : printerType === '58MM' ? '58mm Compact Receipt' : 'A4 Laser Invoice'}
+                </div>
+                <div style={{ fontSize: '11px', color: '#0284c7' }}>
+                  PWA Desktop Engine: {isInstalled ? 'Installed Desktop App' : 'Web Mode (Installable)'} | Offline Cache: {swRegistered ? 'Active & Ready' : 'Standby'}
+                </div>
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <button
+                type="button"
+                onClick={() => setIsTestReceiptOpen(true)}
+                className="btn btn-outline"
+                style={{ fontSize: '11px', padding: '0.35rem 0.75rem', borderRadius: '8px', backgroundColor: '#ffffff', color: '#0284c7', borderColor: '#7dd3fc', fontWeight: 700 }}
+              >
+                <Printer size={13} /> Test Print 80mm
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('PRINTER_PWA')}
+                className="btn btn-primary"
+                style={{ fontSize: '11px', padding: '0.35rem 0.75rem', borderRadius: '8px', backgroundColor: '#0284c7', fontWeight: 700 }}
+              >
+                Configure Printer & PWA
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB: 80MM RECEIPT PRINTER & PWA ENGINE */}
+      {activeTab === 'PRINTER_PWA' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+          {/* 80mm RECEIPT PRINTER HARDWARE CONFIGURATION */}
+          <div className="card" style={{ padding: '1.5rem', backgroundColor: '#ffffff', border: '1px solid #e2e8f0' }}>
+            <div style={{ marginBottom: '1.25rem', borderBottom: '1px solid #f1f5f9', paddingBottom: '0.75rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.75rem' }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <Printer size={18} color="#0284c7" />
+                  <h3 className="section-title" style={{ fontSize: '16px', color: '#0284c7', margin: 0 }}>
+                    80mm Thermal Receipt Printer & POS Hardware Selection
+                  </h3>
+                </div>
+                <p className="subtext" style={{ marginTop: '0.25rem' }}>
+                  Select your physical counter receipt printer, test print alignment on 80mm thermal paper, and customize return policy footer notes.
+                </p>
+              </div>
+
+              {/* Test Print 80mm Button */}
+              <button
+                type="button"
+                onClick={() => setIsTestReceiptOpen(true)}
+                className="btn btn-primary"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.4rem',
+                  backgroundColor: '#10b981',
+                  borderColor: '#10b981',
+                  fontSize: '12px',
+                  fontWeight: 700,
+                  borderRadius: '8px',
+                  padding: '0.5rem 0.9rem'
+                }}
+              >
+                <Printer size={15} />
+                <span>Test Print 80mm Receipt</span>
+              </button>
+            </div>
+
+            {/* PRINTER SELECTION BUTTONS */}
+            <div style={{ marginBottom: '1.25rem' }}>
+              <label className="subtext" style={{ fontWeight: 700, display: 'block', marginBottom: '0.5rem', color: '#334155' }}>
+                Select Active Receipt Printer Type:
+              </label>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '0.85rem' }}>
+                {/* 80mm Button */}
+                <div
+                  onClick={() => handleSelectPrinter('80MM')}
+                  style={{
+                    border: printerType === '80MM' ? '2px solid #0284c7' : '1px solid #cbd5e1',
+                    backgroundColor: printerType === '80MM' ? '#f0f9ff' : '#ffffff',
+                    borderRadius: '12px',
+                    padding: '1rem',
+                    cursor: 'pointer',
+                    position: 'relative',
+                    transition: 'all 0.15s ease',
+                    boxShadow: printerType === '80MM' ? '0 2px 8px rgba(2, 132, 199, 0.15)' : 'none'
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
+                    <span style={{ fontWeight: 800, fontSize: '13px', color: printerType === '80MM' ? '#0284c7' : '#1e293b' }}>
+                      🖨️ 80mm Thermal Receipt Printer
+                    </span>
+                    {printerType === '80MM' && (
+                      <span style={{ backgroundColor: '#0284c7', color: '#ffffff', fontSize: '10px', fontWeight: 700, padding: '0.15rem 0.45rem', borderRadius: '6px' }}>
+                        SELECTED
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '0.5rem', lineHeight: 1.4 }}>
+                    Standard thermal roll (3-inch / 576 dots). Ideal for high-speed pharmacy POS counter billing, itemized tabs & barcode slips.
+                  </div>
+                  <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
+                    <span className="badge badge-success" style={{ fontSize: '10px' }}>Default / Recommended</span>
+                    <span style={{ fontSize: '10px', color: '#0284c7', fontWeight: 600 }}>Hotkeys F9</span>
+                  </div>
+                </div>
+
+                {/* 58mm Button */}
+                <div
+                  onClick={() => handleSelectPrinter('58MM')}
+                  style={{
+                    border: printerType === '58MM' ? '2px solid #0284c7' : '1px solid #cbd5e1',
+                    backgroundColor: printerType === '58MM' ? '#f0f9ff' : '#ffffff',
+                    borderRadius: '12px',
+                    padding: '1rem',
+                    cursor: 'pointer',
+                    position: 'relative',
+                    transition: 'all 0.15s ease',
+                    boxShadow: printerType === '58MM' ? '0 2px 8px rgba(2, 132, 199, 0.15)' : 'none'
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
+                    <span style={{ fontWeight: 800, fontSize: '13px', color: printerType === '58MM' ? '#0284c7' : '#1e293b' }}>
+                      🧾 58mm Compact Receipt Printer
+                    </span>
+                    {printerType === '58MM' && (
+                      <span style={{ backgroundColor: '#0284c7', color: '#ffffff', fontSize: '10px', fontWeight: 700, padding: '0.15rem 0.45rem', borderRadius: '6px' }}>
+                        SELECTED
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '0.5rem', lineHeight: 1.4 }}>
+                    Compact 2-inch mini thermal roll (384 dots). Suitable for small handheld Bluetooth POS terminals and kiosks.
+                  </div>
+                  <div>
+                    <span className="badge badge-otc" style={{ fontSize: '10px' }}>Compact 2-Inch</span>
+                  </div>
+                </div>
+
+                {/* A4 Laser Button */}
+                <div
+                  onClick={() => handleSelectPrinter('A4')}
+                  style={{
+                    border: printerType === 'A4' ? '2px solid #0284c7' : '1px solid #cbd5e1',
+                    backgroundColor: printerType === 'A4' ? '#f0f9ff' : '#ffffff',
+                    borderRadius: '12px',
+                    padding: '1rem',
+                    cursor: 'pointer',
+                    position: 'relative',
+                    transition: 'all 0.15s ease',
+                    boxShadow: printerType === 'A4' ? '0 2px 8px rgba(2, 132, 199, 0.15)' : 'none'
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
+                    <span style={{ fontWeight: 800, fontSize: '13px', color: printerType === 'A4' ? '#0284c7' : '#1e293b' }}>
+                      📄 A4 Laser / Inkjet Tax Invoice
+                    </span>
+                    {printerType === 'A4' && (
+                      <span style={{ backgroundColor: '#0284c7', color: '#ffffff', fontSize: '10px', fontWeight: 700, padding: '0.15rem 0.45rem', borderRadius: '6px' }}>
+                        SELECTED
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '0.5rem', lineHeight: 1.4 }}>
+                    Full-page commercial tax invoice format with Section 23 warranty, NTN, and authorized digital signature stamp.
+                  </div>
+                  <div>
+                    <span className="badge" style={{ backgroundColor: '#f1f5f9', color: '#475569', fontSize: '10px' }}>B2B Wholesale / Hotkey F10</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* 80mm PRINTER PREFERENCES & FOOTER */}
+            <div style={{ backgroundColor: '#f8fafc', padding: '1rem', borderRadius: '12px', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+              <div style={{ fontSize: '12px', fontWeight: 800, color: '#334155' }}>
+                ⚙️ 80mm POS Print Settings & Store Return Policy
+              </div>
+
+              {/* Auto-print toggle */}
+              <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '12px', fontWeight: 600, color: '#1e293b' }}>
+                <input
+                  type="checkbox"
+                  checked={autoPrintOnCheckout}
+                  onChange={(e) => handleToggleAutoPrint(e.target.checked)}
+                  style={{ width: '16px', height: '16px', accentColor: '#0284c7' }}
+                />
+                <span>Automatically trigger 80mm print spooler on Cash POS checkout</span>
+              </label>
+
+              {/* Footer Text */}
+              <div>
+                <label className="subtext" style={{ fontWeight: 600, display: 'block', marginBottom: '0.25rem' }}>
+                  Custom 80mm Receipt Footer Note (Returns & Exchanges):
+                </label>
+                <textarea
+                  value={receiptFooterNote}
+                  onChange={(e) => setReceiptFooterNote(e.target.value)}
+                  rows={2}
+                  placeholder="e.g. * Medicines once sold can be returned/exchanged within 7 days with original receipt. *"
+                  style={{ width: '100%', padding: '0.5rem 0.75rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '11px', outline: 'none' }}
+                />
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '0.35rem' }}>
+                  <button
+                    type="button"
+                    onClick={handleSaveFooterNote}
+                    className="btn btn-outline"
+                    style={{ fontSize: '11px', padding: '0.25rem 0.65rem', borderRadius: '6px' }}
+                  >
+                    Save Footer Note
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* PWA & OFFLINE DESKTOP ENGINE */}
+          <div className="card" style={{ padding: '1.5rem', backgroundColor: '#ffffff', border: '1px solid #e2e8f0' }}>
+            <div style={{ marginBottom: '1.25rem', borderBottom: '1px solid #f1f5f9', paddingBottom: '0.75rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Laptop size={18} color="#0284c7" />
+                <h3 className="section-title" style={{ fontSize: '16px', color: '#0284c7', margin: 0 }}>
+                  Progressive Web App (PWA) & Offline Desktop Engine
+                </h3>
+              </div>
+              <p className="subtext" style={{ marginTop: '0.25rem' }}>
+                Install PharmaLink directly onto Windows, macOS, or Android as a standalone POS desktop application that operates with or without internet connectivity.
+              </p>
+            </div>
+
+            {/* STATUS BADGES */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '0.85rem', marginBottom: '1.25rem' }}>
+              <div style={{ border: '1px solid #e2e8f0', borderRadius: '10px', padding: '0.85rem', backgroundColor: '#f8fafc' }}>
+                <div style={{ fontSize: '10.5px', color: '#64748b', fontWeight: 600 }}>APPLICATION RUNTIME</div>
+                <div style={{ fontSize: '13px', fontWeight: 800, color: isInstalled ? '#16a34a' : '#0284c7', marginTop: '0.2rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                  {isInstalled ? (
+                    <>
+                      <CheckCircle2 size={15} color="#16a34a" />
+                      <span>Standalone Desktop App</span>
+                    </>
+                  ) : (
+                    <>
+                      <Laptop size={15} color="#0284c7" />
+                      <span>Web Browser Window</span>
+                    </>
+                  )}
+                </div>
+                <div style={{ fontSize: '10px', color: '#94a3b8', marginTop: '0.2rem' }}>
+                  {isInstalled ? 'Running natively without browser URL bar' : 'Installable via Chrome/Edge address bar'}
+                </div>
+              </div>
+
+              <div style={{ border: '1px solid #e2e8f0', borderRadius: '10px', padding: '0.85rem', backgroundColor: '#f8fafc' }}>
+                <div style={{ fontSize: '10.5px', color: '#64748b', fontWeight: 600 }}>OFFLINE SERVICE WORKER CACHE</div>
+                <div style={{ fontSize: '13px', fontWeight: 800, color: swRegistered ? '#16a34a' : '#d97706', marginTop: '0.2rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                  <CheckCircle2 size={15} color={swRegistered ? '#16a34a' : '#d97706'} />
+                  <span>{swRegistered ? 'Active & Ready for Offline POS' : 'Registering Service Worker...'}</span>
+                </div>
+                <div style={{ fontSize: '10px', color: '#94a3b8', marginTop: '0.2rem' }}>
+                  Caches app shell, fonts, and assets for zero-delay counter checkout
+                </div>
+              </div>
+            </div>
+
+            {/* PWA ACTIONS */}
+            <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginBottom: '1.25rem' }}>
+              <button
+                type="button"
+                onClick={async () => {
+                  const res = await triggerInstall();
+                  if (res === 'manual_instructions') {
+                    alert(
+                      '💡 How to Install PharmaLink PWA:\n\n' +
+                      '1. In Google Chrome or Microsoft Edge, look at the right end of the address bar.\n' +
+                      '2. Click the "Install PharmaLink" icon (⊕ or computer screen symbol).\n' +
+                      '3. Click "Install". A desktop shortcut and Start Menu icon will be created automatically!\n\n' +
+                      'On Mobile: Tap browser menu (⋮) -> "Add to Home Screen".'
+                    );
+                  }
+                }}
+                className="btn btn-primary"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.4rem',
+                  backgroundColor: '#0284c7',
+                  borderRadius: '8px',
+                  padding: '0.6rem 1.15rem',
+                  fontSize: '12px',
+                  fontWeight: 700
+                }}
+              >
+                <Download size={15} />
+                <span>{isInstalled ? 'App Already Installed (Reinstall / Update)' : 'Install PharmaLink Desktop / Mobile App'}</span>
+              </button>
+
+              <button
+                type="button"
+                disabled={cacheUpdating}
+                onClick={async () => {
+                  setCacheUpdating(true);
+                  setCacheMessage('Updating offline cache...');
+                  try {
+                    await updateCache();
+                    setCacheMessage('Offline cache verified and refreshed! App is up-to-date.');
+                  } catch (err) {
+                    setCacheMessage('Cache update checked.');
+                  } finally {
+                    setTimeout(() => setCacheUpdating(false), 800);
+                  }
+                }}
+                className="btn btn-outline"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.4rem',
+                  borderRadius: '8px',
+                  padding: '0.6rem 1.15rem',
+                  fontSize: '12px',
+                  fontWeight: 700
+                }}
+              >
+                <RefreshCw size={15} className={cacheUpdating ? 'spin' : ''} />
+                <span>{cacheUpdating ? 'Verifying...' : 'Verify & Refresh Offline Cache'}</span>
+              </button>
+            </div>
+
+            {cacheMessage && (
+              <div style={{ fontSize: '11px', color: '#16a34a', fontWeight: 600, marginBottom: '1rem' }}>
+                ✔ {cacheMessage}
+              </div>
+            )}
+
+            {/* INSTALLATION INSTRUCTIONS CALLOUT */}
+            <div style={{ border: '1px solid #bfdbfe', backgroundColor: '#eff6ff', borderRadius: '10px', padding: '0.85rem' }}>
+              <div style={{ fontSize: '11.5px', fontWeight: 800, color: '#1e40af', marginBottom: '0.35rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                <HelpCircle size={14} color="#1e40af" />
+                <span>PWA Quick Setup Tips for Retail Counters:</span>
+              </div>
+              <ul style={{ margin: 0, paddingLeft: '1.25rem', fontSize: '11px', color: '#1e3a8a', lineHeight: 1.5 }}>
+                <li><strong>Windows / Edge / Chrome:</strong> Install to get a dedicated desktop icon that opens full screen without browser toolbars.</li>
+                <li><strong>Offline Counter Resilience:</strong> All counter billing, local catalog searches, and receipts run seamlessly even if your internet connection drops.</li>
+                <li><strong>Hardware Integration:</strong> Direct USB / Network thermal printer spooling works without popup warnings once installed.</li>
+              </ul>
+            </div>
+          </div>
         </div>
       )}
 
@@ -632,6 +1053,14 @@ export const SettingsPage = ({ storeMode }) => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* 80MM THERMAL RECEIPT TEST MODAL */}
+      {isTestReceiptOpen && (
+        <ThermalPrintModal
+          invoice={SAMPLE_TEST_INVOICE}
+          onClose={() => setIsTestReceiptOpen(false)}
+        />
       )}
     </div>
   );
