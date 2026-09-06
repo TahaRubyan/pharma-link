@@ -26,23 +26,28 @@ import { MOCK_STAFF_ACCOUNTS } from '../data/mockData';
 import { loadRetailMockData, clearRetailMockData } from '../services/mockDataManager';
 
 const SAMPLE_TEST_INVOICE = {
-  invoiceNo: 'POS-TEST-80MM',
-  date: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
-  time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
-  customerName: 'Walk-in Customer (80mm Test)',
-  doctorName: 'Dr. A. Khan (MBBS, FCPS)',
+  invoiceNo: '00000137',
+  date: '2026-09-06',
+  time: '2:57 am',
+  customerName: 'Customer Copy',
+  cashierName: 'HASSAN SALEEM',
+  shopName: 'IDREES PHARMACY',
+  shopAddress: 'NEAR HBL BANK MAIN BAZAR JALAL PUR JATTAN,\nGUJRAT',
+  shopPhone: '03126262942',
+  shopEmail: 'Company@gmail.com',
   items: [
-    { name: 'Panadol Extra 500mg', qty: 2, unitSelection: 'Strip', unitType: 'Strip', stripPrice: 35.0, price: 35.0 },
-    { name: 'Augmentin 625mg Tab', qty: 1, unitSelection: 'Box', unitType: 'Box', boxPrice: 420.0, price: 420.0 },
-    { name: 'Arinac Forte Tab', qty: 1, unitSelection: 'Strip', unitType: 'Strip', stripPrice: 65.0, price: 65.0 },
+    { name: 'Myfol 400mcg tab 30s', qty: 10, unitSelection: 'Tablet', unitType: 'Tablet', price: 19, boxPrice: 19 },
+    { name: 'QSNATE-D TAB', qty: 10, unitSelection: 'Strip', unitType: 'Strip', price: 20, boxPrice: 20 },
+    { name: 'SG INDROP-D 200000IU AMP', qty: 2, unitSelection: 'Ampoule', unitType: 'Amp', price: 313, boxPrice: 313 },
   ],
-  grossTotal: 520.0,
-  subtotal: 520.0,
-  discountPercent: 5,
-  discount: 26.0,
-  netTotal: 494.0,
-  cashTendered: 500.0,
-  changeDue: 6.0,
+  grossTotal: 1018.0,
+  subtotal: 1018.0,
+  discountPercent: 0,
+  discount: 0,
+  netTotal: 1018.0,
+  cashTendered: 1018.0,
+  changeDue: 0.0,
+  fbrInvoiceNo: '19517326090625751354"',
   paymentMethod: 'Cash (POS)'
 };
 
