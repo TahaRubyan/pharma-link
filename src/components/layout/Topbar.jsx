@@ -3,9 +3,7 @@ import {
   ShieldCheck, 
   UserCheck, 
   Store, 
-  RefreshCw, 
   Eye, 
-  Lock, 
   LogOut 
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
@@ -29,28 +27,13 @@ const SCREEN_TITLES = {
 export const Topbar = ({ currentScreen, onNavigate }) => {
   const { 
     user, 
-    toggleRole, 
     isAdmin, 
     isCashier,
-    sessionLoginRole,
     currentShop, 
     inspectingTenantId, 
     stopInspecting,
     logout
   } = useAuth();
-
-  const handleRoleToggle = () => {
-    if (sessionLoginRole === 'Cashier' && isCashier) {
-      const pin = window.prompt("Admin Password Required\nEnter Admin password to switch to Admin role:", "");
-      if (pin === 'admin123' || pin === 'retail123') {
-        toggleRole();
-      } else if (pin !== null) {
-        alert("Incorrect Admin password. Cashier access maintained.");
-      }
-    } else {
-      toggleRole();
-    }
-  };
 
   return (
     <header style={{
@@ -102,38 +85,34 @@ export const Topbar = ({ currentScreen, onNavigate }) => {
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
           <NetworkStatusBadge />
 
-          <button
-            onClick={handleRoleToggle}
+          {/* Authenticated User Role Badge (Production Static Badge) */}
+          <div
             style={{
               display: 'flex',
               alignItems: 'center',
               gap: '0.35rem',
-              padding: '0.35rem 0.7rem',
+              padding: '0.35rem 0.75rem',
               borderRadius: '9999px',
-              border: '1px solid #e5e7eb',
-              backgroundColor: isAdmin ? '#ecfdf5' : '#f9fafb',
-              color: isAdmin ? '#047857' : '#4b5563',
+              border: isAdmin ? '1px solid #bbf7d0' : '1px solid #e2e8f0',
+              backgroundColor: isAdmin ? '#f0fdf4' : '#f8fafc',
+              color: isAdmin ? '#15803d' : '#475569',
               fontWeight: 700,
               fontSize: '11px',
-              cursor: 'pointer',
-              transition: 'all 0.15s ease'
+              userSelect: 'none'
             }}
-            title={sessionLoginRole === 'Cashier' && isCashier ? "Cashier session. Click to enter Admin password to switch roles." : "Click to toggle active user role (Admin ↔ Cashier)"}
           >
             {isAdmin ? (
               <>
-                <ShieldCheck size={14} color="#047857" />
-                <span>Admin Role</span>
+                <ShieldCheck size={14} color="#16a34a" />
+                <span>Admin</span>
               </>
             ) : (
               <>
-                <UserCheck size={14} color="#6b7280" />
-                <span>Cashier Role</span>
-                {sessionLoginRole === 'Cashier' && <Lock size={10} color="#94a3b8" style={{ marginLeft: '0.1rem' }} />}
+                <UserCheck size={14} color="#64748b" />
+                <span>Cashier</span>
               </>
             )}
-            <RefreshCw size={10} style={{ marginLeft: '0.15rem', opacity: 0.6 }} />
-          </button>
+          </div>
 
           {/* Prominent Logout Button */}
           <button
