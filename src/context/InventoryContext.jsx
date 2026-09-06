@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { INITIAL_MEDICINES, INITIAL_BATCHES, INITIAL_VENDOR_RETURNS } from '../data/mockData';
 import { useAuth } from './AuthContext';
+import { storageManager } from '../services/storageManager';
 
 const InventoryContext = createContext();
 
@@ -62,11 +63,11 @@ export const InventoryProvider = ({ children }) => {
   };
 
   useEffect(() => {
-    localStorage.setItem('pharmalink_pk_medicines', JSON.stringify(wholesaleMedicines));
+    storageManager.safeSetItem('pharmalink_pk_medicines', wholesaleMedicines);
   }, [wholesaleMedicines]);
 
   useEffect(() => {
-    localStorage.setItem('pharmalink_retail_medicines', JSON.stringify(retailMedicines));
+    storageManager.safeSetItem('pharmalink_retail_medicines', retailMedicines);
   }, [retailMedicines]);
 
   // Wholesale Batches
@@ -105,11 +106,11 @@ export const InventoryProvider = ({ children }) => {
   };
 
   useEffect(() => {
-    localStorage.setItem('pharmalink_pk_batches', JSON.stringify(wholesaleBatches));
+    storageManager.safeSetItem('pharmalink_pk_batches', wholesaleBatches);
   }, [wholesaleBatches]);
 
   useEffect(() => {
-    localStorage.setItem('pharmalink_retail_batches', JSON.stringify(retailBatches));
+    storageManager.safeSetItem('pharmalink_retail_batches', retailBatches);
   }, [retailBatches]);
 
   // Wholesale & Retail Vendor Returns
@@ -369,56 +370,79 @@ export const InventoryProvider = ({ children }) => {
     setPoTaxLogs((prev) => [newTaxLog, ...prev]);
   };
 
-  // FIFO / FEFO Strict Stock Deduction: Prioritizes earliest expiring batches first
+  // FIFO / FEFO Strict Stock Deduction: Consolidated single-pass batch update
   const deductStock = (cartItems) => {
     if (!cartItems || cartItems.length === 0) return;
 
-    cartItems.forEach((ci) => {
-      const q = Number(ci.qty || ci.quantity || 1);
-      const tabletsToDeduct = (ci.unitSelection === 'Box' || ci.unitType === 'Box')
-        ? q * Number(ci.tabletsPerBox || 200)
-        : (ci.unitSelection === 'Strip' || ci.unitType === 'Strip')
-        ? q * Number(ci.tabletsPerStrip || 10)
-        : q;
+    // 1. Single pass on batches
+    setBatches((prevBatches) => {
+      const updatedBatches = prevBatches.map((b) => ({ ...b }));
 
-      let remainingToDeduct = tabletsToDeduct;
+      cartItems.forEach((ci) => {
+        const q = Number(ci.qty || ci.quantity || 1);
+        const tabletsToDeduct = (ci.unitSelection === 'Box' || ci.unitType === 'Box')
+          ? q * Number(ci.tabletsPerBox || 200)
+          : (ci.unitSelection === 'Strip' || ci.unitType === 'Strip')
+          ? q * Number(ci.tabletsPerStrip || 10)
+          : q;
 
-      setBatches((prevBatches) => {
-        // Sort matching batches by earliest expiry date (FIFO/FEFO)
-        const medBatches = prevBatches
-          .filter((b) => b.medicineId === ci.medicineId || b.id === ci.medicineId || (ci.name && b.medicineId === ci.name))
-          .sort((a, b) => new Date(a.expiryDate || '2028-01-01') - new Date(b.expiryDate || '2028-01-01'));
+        let remainingToDeduct = tabletsToDeduct;
 
-        return prevBatches.map((b) => {
-          if (remainingToDeduct <= 0) return b;
-          const isTargetBatch = b.batchNo === ci.batchNo || b.batchNumber === ci.batchNumber || b.id === medBatches[0]?.id;
+        // Find candidate matching batches, sorted by FEFO
+        const candidateIndices = [];
+        updatedBatches.forEach((b, idx) => {
+          const matchesMed = b.medicineId === ci.medicineId || b.id === ci.medicineId || (ci.name && b.medicineId === ci.name);
+          if (matchesMed) candidateIndices.push(idx);
+        });
 
-          if (isTargetBatch) {
+        candidateIndices.sort((a, b) => {
+          return new Date(updatedBatches[a].expiryDate || '2028-01-01') - new Date(updatedBatches[b].expiryDate || '2028-01-01');
+        });
+
+        // Deduct from target batch or earliest candidate
+        for (const idx of candidateIndices) {
+          if (remainingToDeduct <= 0) break;
+          const b = updatedBatches[idx];
+          const isTarget = !ci.batchNo || b.batchNo === ci.batchNo || b.batchNumber === ci.batchNumber || candidateIndices.length === 1;
+
+          if (isTarget) {
             const avail = b.totalTabletsAvailable || 0;
             const take = Math.min(avail, remainingToDeduct);
             remainingToDeduct -= take;
-            return {
-              ...b,
-              totalTabletsAvailable: Math.max(0, avail - take),
-            };
+            updatedBatches[idx].totalTabletsAvailable = Math.max(0, avail - take);
           }
-          return b;
+        }
+      });
+
+      return updatedBatches;
+    });
+
+    // 2. Single pass on medicines
+    setMedicines((prevMeds) => {
+      // Aggregate box deductions by medicine identifier
+      const deductions = new Map();
+      cartItems.forEach((ci) => {
+        const q = Number(ci.qty || ci.quantity || 1);
+        const boxes = (ci.unitSelection === 'Box' || ci.unitType === 'Box')
+          ? q
+          : (q / Number(ci.tabletsPerBox || 200));
+
+        const keys = [ci.medicineId, ci.id, ci.name, ci.brandName].filter(Boolean);
+        keys.forEach((k) => {
+          deductions.set(k, (deductions.get(k) || 0) + boxes);
         });
       });
 
-      // Update medicine box stock count
-      setMedicines((prevMeds) =>
-        prevMeds.map((m) => {
-          if (m.id === ci.medicineId || m.name === ci.name || m.brandName === ci.brandName) {
-            const boxesDeducted = (ci.unitSelection === 'Box' || ci.unitType === 'Box') ? q : (q / (m.tabletsPerBox || 200));
-            return {
-              ...m,
-              boxStock: Math.max(0, Math.round(((m.boxStock || 10) - boxesDeducted) * 10) / 10),
-            };
-          }
-          return m;
-        })
-      );
+      return prevMeds.map((m) => {
+        const deducted = deductions.get(m.id) || deductions.get(m.name) || deductions.get(m.brandName) || 0;
+        if (deducted > 0) {
+          return {
+            ...m,
+            boxStock: Math.max(0, Math.round(((m.boxStock || 10) - deducted) * 10) / 10),
+          };
+        }
+        return m;
+      });
     });
   };
 
@@ -442,16 +466,41 @@ export const InventoryProvider = ({ children }) => {
 
   const restoreStock = (returnedItems) => {
     if (!returnedItems || returnedItems.length === 0) return;
+
     setBatches((prevBatches) => {
-      return prevBatches.map((b) => {
-        const match = returnedItems.find((ri) => ri.batchNumber === b.batchNumber || ri.batchNo === b.batchNo);
+      const updatedBatches = prevBatches.map((b) => ({ ...b }));
+      returnedItems.forEach((ri) => {
+        const match = updatedBatches.find((b) => b.batchNumber === ri.batchNumber || b.batchNo === ri.batchNo);
         if (match) {
-          const tabletsToRestore = ri.unitSelection === 'Box' || ri.unitType === 'Box'
-            ? ri.quantity * (ri.tabletsPerBox || 1)
-            : ri.quantity;
-          return { ...b, totalTabletsAvailable: b.totalTabletsAvailable + tabletsToRestore };
+          const tabletsToRestore = (ri.unitSelection === 'Box' || ri.unitType === 'Box')
+            ? Number(ri.quantity || 1) * Number(ri.tabletsPerBox || 1)
+            : Number(ri.quantity || 1);
+          match.totalTabletsAvailable = (match.totalTabletsAvailable || 0) + tabletsToRestore;
         }
-        return b;
+      });
+      return updatedBatches;
+    });
+
+    setMedicines((prevMeds) => {
+      const restorations = new Map();
+      returnedItems.forEach((ri) => {
+        const q = Number(ri.quantity || 1);
+        const boxes = (ri.unitSelection === 'Box' || ri.unitType === 'Box') ? q : (q / Number(ri.tabletsPerBox || 200));
+        const keys = [ri.medicineId, ri.id, ri.name, ri.brandName].filter(Boolean);
+        keys.forEach((k) => {
+          restorations.set(k, (restorations.get(k) || 0) + boxes);
+        });
+      });
+
+      return prevMeds.map((m) => {
+        const restored = restorations.get(m.id) || restorations.get(m.name) || restorations.get(m.brandName) || 0;
+        if (restored > 0) {
+          return {
+            ...m,
+            boxStock: Math.round(((m.boxStock || 0) + restored) * 10) / 10,
+          };
+        }
+        return m;
       });
     });
   };

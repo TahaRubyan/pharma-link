@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { INITIAL_INVOICES } from '../data/mockData';
 import { useAuth } from './AuthContext';
+import { storageManager } from '../services/storageManager';
 
 const SalesContext = createContext();
 
@@ -44,15 +45,11 @@ export const SalesProvider = ({ children }) => {
   };
 
   useEffect(() => {
-    try {
-      localStorage.setItem('pharmalink_pk_invoices', JSON.stringify(wholesaleInvoices));
-    } catch (e) {}
+    storageManager.safeSetItem('pharmalink_pk_invoices', wholesaleInvoices);
   }, [wholesaleInvoices]);
 
   useEffect(() => {
-    try {
-      localStorage.setItem('pharmalink_retail_invoices', JSON.stringify(retailInvoices));
-    } catch (e) {}
+    storageManager.safeSetItem('pharmalink_retail_invoices', retailInvoices);
   }, [retailInvoices]);
 
   const [wholesaleReturns, setWholesaleReturns] = useState(() => {
@@ -84,15 +81,11 @@ export const SalesProvider = ({ children }) => {
   };
 
   useEffect(() => {
-    try {
-      localStorage.setItem('pharmalink_pk_returns', JSON.stringify(wholesaleReturns));
-    } catch (e) {}
+    storageManager.safeSetItem('pharmalink_pk_returns', wholesaleReturns);
   }, [wholesaleReturns]);
 
   useEffect(() => {
-    try {
-      localStorage.setItem('pharmalink_retail_returns', JSON.stringify(retailReturns));
-    } catch (e) {}
+    storageManager.safeSetItem('pharmalink_retail_returns', retailReturns);
   }, [retailReturns]);
 
   // Record a new POS Sale

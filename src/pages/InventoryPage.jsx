@@ -25,6 +25,8 @@ export const InventoryPage = () => {
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('ALL');
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 50;
 
   // Modals state
   const [editingMedicine, setEditingMedicine] = useState(null);
@@ -81,6 +83,12 @@ export const InventoryPage = () => {
       return true;
     });
   }, [medicines, selectedCategory, searchQuery]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredMedicines.length / ITEMS_PER_PAGE));
+  const paginatedMedicines = useMemo(() => {
+    const start = (currentPage - 1) * ITEMS_PER_PAGE;
+    return filteredMedicines.slice(start, start + ITEMS_PER_PAGE);
+  }, [filteredMedicines, currentPage]);
 
   const handleSavePrice = (id, updatedData) => {
     if (typeof updateMedicineDetails === 'function') {
@@ -162,7 +170,10 @@ export const InventoryPage = () => {
             type="text"
             placeholder={isRetail ? "Search by Brand Name, Formula, Shelf (Rack A-01)..." : "Search by Item Code, Trade Name, Formula, Batch..."}
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              setCurrentPage(1);
+            }}
             style={{ width: '100%', padding: '0.45rem 0.75rem 0.45rem 2.3rem', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '12px', outline: 'none' }}
           />
         </div>
@@ -172,7 +183,10 @@ export const InventoryPage = () => {
             <span className="subtext" style={{ fontWeight: 600 }}>Category:</span>
             <select
               value={selectedCategory}
-              onChange={(e) => setSelectedCategory(e.target.value)}
+              onChange={(e) => {
+                setSelectedCategory(e.target.value);
+                setCurrentPage(1);
+              }}
               style={{ padding: '0.4rem 0.65rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '12px', outline: 'none', cursor: 'pointer' }}
             >
               <option value="ALL">ALL Categories</option>
@@ -216,7 +230,7 @@ export const InventoryPage = () => {
                   </td>
                 </tr>
               ) : (
-                filteredMedicines.map((med, idx) => {
+                paginatedMedicines.map((med, idx) => {
                   const price = Number(med.boxSellingPrice || med.boxPrice || med.price || 600);
                   const tabPrice = Number(med.pricePerTablet || (price / (med.tabletsPerBox || 200)) || 3.0);
                   const isNarcotic = med.controlledType === 'Narcotic';
@@ -287,6 +301,36 @@ export const InventoryPage = () => {
             </tbody>
           </table>
         </div>
+
+        {/* PAGINATION NAVIGATION CONTROLS */}
+        {filteredMedicines.length > ITEMS_PER_PAGE && (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.75rem 0.5rem 0 0.5rem', borderTop: '1px solid #f1f5f9', marginTop: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+            <div style={{ fontSize: '11px', color: '#64748b' }}>
+              Showing {((currentPage - 1) * ITEMS_PER_PAGE) + 1} to {Math.min(currentPage * ITEMS_PER_PAGE, filteredMedicines.length)} of {filteredMedicines.length} Medicines
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+              <button
+                disabled={currentPage <= 1}
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                className="btn btn-outline"
+                style={{ fontSize: '11px', padding: '0.25rem 0.65rem', borderRadius: '6px', opacity: currentPage <= 1 ? 0.5 : 1, cursor: currentPage <= 1 ? 'not-allowed' : 'pointer' }}
+              >
+                Previous
+              </button>
+              <span style={{ fontSize: '11px', fontWeight: 700, color: '#0f172a' }}>
+                Page {currentPage} of {totalPages}
+              </span>
+              <button
+                disabled={currentPage >= totalPages}
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                className="btn btn-outline"
+                style={{ fontSize: '11px', padding: '0.25rem 0.65rem', borderRadius: '6px', opacity: currentPage >= totalPages ? 0.5 : 1, cursor: currentPage >= totalPages ? 'not-allowed' : 'pointer' }}
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* MODAL */}

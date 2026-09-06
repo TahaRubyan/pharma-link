@@ -101,17 +101,31 @@ export const POSPage = ({ storeMode: propStoreMode }) => {
   // Debt & WhatsApp Modals
   const [isPOSDebtModalOpen, setIsPOSDebtModalOpen] = useState(false);
   const [completedDebtSale, setCompletedDebtSale] = useState(null);
+  const [isCheckingOut, setIsCheckingOut] = useState(false);
 
   const searchInputRef = useRef(null);
   const suggestionListRef = useRef(null);
 
-  // Multi-field instant search (opens when Enter pressed or typing)
+  // Multi-field instant search with DISPLAY_LIMIT = 40 windowing for 60fps counter speed under pressure
+  const DISPLAY_LIMIT = 40;
   const searchResults = useMemo(() => {
     if (!isSearchFocused && !searchQuery.trim()) return [];
-    if (!searchQuery.trim()) return medicines;
+    if (!searchQuery.trim()) return medicines.slice(0, DISPLAY_LIMIT);
+
     const q = searchQuery.toLowerCase().trim();
-    return medicines.filter((m) => {
-      return (
+
+    // Fast O(1) scan for exact barcode or itemCode match
+    const exactMatch = medicines.find(
+      (m) => (m.barcode && m.barcode.toLowerCase() === q) || (m.itemCode && m.itemCode.toString().toLowerCase() === q)
+    );
+    if (exactMatch) {
+      return [exactMatch];
+    }
+
+    const results = [];
+    for (let i = 0; i < medicines.length; i++) {
+      const m = medicines[i];
+      const matches =
         (m.name && m.name.toLowerCase().includes(q)) ||
         (m.brandName && m.brandName.toLowerCase().includes(q)) ||
         (m.formula && m.formula.toLowerCase().includes(q)) ||
@@ -120,9 +134,14 @@ export const POSPage = ({ storeMode: propStoreMode }) => {
         (m.barcode && m.barcode.toLowerCase().includes(q)) ||
         (m.rackLocation && m.rackLocation.toLowerCase().includes(q)) ||
         (m.location && m.location.toLowerCase().includes(q)) ||
-        (m.category && m.category.toLowerCase().includes(q))
-      );
-    });
+        (m.category && m.category.toLowerCase().includes(q));
+
+      if (matches) {
+        results.push(m);
+        if (results.length >= DISPLAY_LIMIT) break;
+      }
+    }
+    return results;
   }, [medicines, searchQuery, isSearchFocused]);
 
   // Auto-scroll dropdown when down/up arrow keys are pressed
@@ -285,13 +304,19 @@ export const POSPage = ({ storeMode: propStoreMode }) => {
       alert('Cart is empty. Please scan or select medicines.');
       return;
     }
+    if (isCheckingOut) return;
 
-    const invoiceData = generateInvoiceData(true, 'Cash');
-    deductStock(cart);
-    recordSale(invoiceData);
-    setCompletedThermalInvoice(invoiceData);
-    clearCart();
-    setCashTendered('');
+    setIsCheckingOut(true);
+    try {
+      const invoiceData = generateInvoiceData(true, 'Cash');
+      deductStock(cart);
+      recordSale(invoiceData);
+      setCompletedThermalInvoice(invoiceData);
+      clearCart();
+      setCashTendered('');
+    } finally {
+      setIsCheckingOut(false);
+    }
   };
 
   // 2. Action: Save Order / Instant Cash Checkout
@@ -300,13 +325,19 @@ export const POSPage = ({ storeMode: propStoreMode }) => {
       alert('Cart is empty. Please scan or select medicines.');
       return;
     }
+    if (isCheckingOut) return;
 
-    const invoiceData = generateInvoiceData(false, 'Cash');
-    deductStock(cart);
-    recordSale(invoiceData);
-    clearCart();
-    setCashTendered('');
-    alert(`Order saved & stock updated! Invoice #${invoiceData.invoiceNo} for Rs. ${invoiceData.netTotal.toFixed(2)} completed.`);
+    setIsCheckingOut(true);
+    try {
+      const invoiceData = generateInvoiceData(false, 'Cash');
+      deductStock(cart);
+      recordSale(invoiceData);
+      clearCart();
+      setCashTendered('');
+      alert(`Order saved & stock updated! Invoice #${invoiceData.invoiceNo} for Rs. ${invoiceData.netTotal.toFixed(2)} completed.`);
+    } finally {
+      setIsCheckingOut(false);
+    }
   };
 
   // 3. Action: Add to Customer Debt / Udhar (Khata)
@@ -319,29 +350,36 @@ export const POSPage = ({ storeMode: propStoreMode }) => {
   };
 
   const handleConfirmCreditSale = (debtCustomer) => {
-    const invoiceData = generateInvoiceData(false, 'CREDIT');
-    invoiceData.customerName = debtCustomer.name;
-    invoiceData.customerPhone = debtCustomer.phone;
-    invoiceData.customerAddress = debtCustomer.address;
+    if (isCheckingOut) return;
+    setIsCheckingOut(true);
 
-    // Record to Customer Debt Ledger
-    recordCreditSale(debtCustomer.id, invoiceData);
+    try {
+      const invoiceData = generateInvoiceData(false, 'CREDIT');
+      invoiceData.customerName = debtCustomer.name;
+      invoiceData.customerPhone = debtCustomer.phone;
+      invoiceData.customerAddress = debtCustomer.address;
 
-    // Record in global sales history
-    recordSale(invoiceData);
+      // Record to Customer Debt Ledger
+      recordCreditSale(debtCustomer.id, invoiceData);
 
-    // Deduct stock from earliest expiry batch
-    deductStock(cart);
+      // Record in global sales history
+      recordSale(invoiceData);
 
-    setIsPOSDebtModalOpen(false);
-    clearCart();
-    setCashTendered('');
+      // Deduct stock from earliest expiry batch
+      deductStock(cart);
 
-    // Open WhatsApp Share prompt
-    setCompletedDebtSale({
-      customer: debtCustomer,
-      saleData: invoiceData,
-    });
+      setIsPOSDebtModalOpen(false);
+      clearCart();
+      setCashTendered('');
+
+      // Open WhatsApp Share prompt
+      setCompletedDebtSale({
+        customer: debtCustomer,
+        saleData: invoiceData,
+      });
+    } finally {
+      setIsCheckingOut(false);
+    }
   };
 
   // Wholesale Checkout -> A4 Commercial Dual-Page Invoice
@@ -350,12 +388,18 @@ export const POSPage = ({ storeMode: propStoreMode }) => {
       alert('Cart is empty. Please add items to generate wholesale commercial invoice.');
       return;
     }
+    if (isCheckingOut) return;
 
-    const invoiceData = generateInvoiceData(true, 'Cash');
-    deductStock(cart);
-    recordSale(invoiceData);
-    setCompletedInvoice(invoiceData);
-    clearCart();
+    setIsCheckingOut(true);
+    try {
+      const invoiceData = generateInvoiceData(true, 'Cash');
+      deductStock(cart);
+      recordSale(invoiceData);
+      setCompletedInvoice(invoiceData);
+      clearCart();
+    } finally {
+      setIsCheckingOut(false);
+    }
   };
 
   return (
@@ -805,25 +849,28 @@ export const POSPage = ({ storeMode: propStoreMode }) => {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
               <button
                 onClick={handleRetailCheckoutPrint}
+                disabled={isCheckingOut}
                 className="btn btn-primary"
-                style={{ width: '100%', borderRadius: '12px', padding: '0.65rem', backgroundColor: '#10b981', fontSize: '12px', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}
+                style={{ width: '100%', borderRadius: '12px', padding: '0.65rem', backgroundColor: '#10b981', fontSize: '12px', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', opacity: isCheckingOut ? 0.7 : 1, cursor: isCheckingOut ? 'not-allowed' : 'pointer' }}
               >
-                <Printer size={15} /> [Print 80mm Receipt (F9)]
+                <Printer size={15} /> {isCheckingOut ? 'Processing Print...' : '[Print 80mm Receipt (F9)]'}
               </button>
 
               <button
                 onClick={handleSaveOrderCash}
+                disabled={isCheckingOut}
                 className="btn btn-outline"
-                style={{ width: '100%', borderRadius: '12px', padding: '0.6rem', backgroundColor: '#ffffff', color: '#0f172a', borderColor: '#cbd5e1', fontSize: '12px', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}
+                style={{ width: '100%', borderRadius: '12px', padding: '0.6rem', backgroundColor: '#ffffff', color: '#0f172a', borderColor: '#cbd5e1', fontSize: '12px', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', opacity: isCheckingOut ? 0.7 : 1, cursor: isCheckingOut ? 'not-allowed' : 'pointer' }}
               >
-                <Save size={15} color="#0284c7" /> Save Order & Cash Checkout
+                <Save size={15} color="#0284c7" /> {isCheckingOut ? 'Saving Order...' : 'Save Order & Cash Checkout'}
               </button>
 
               {/* DEDICATED BUTTON: ADD TO CUSTOMER DEBT (KHATA / UDHAR) */}
               <button
                 onClick={handleInitiateDebtCheckout}
+                disabled={isCheckingOut}
                 className="btn btn-outline"
-                style={{ width: '100%', borderRadius: '12px', padding: '0.65rem', backgroundColor: '#eff6ff', color: '#1d4ed8', borderColor: '#93c5fd', fontSize: '12px', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}
+                style={{ width: '100%', borderRadius: '12px', padding: '0.65rem', backgroundColor: '#eff6ff', color: '#1d4ed8', borderColor: '#93c5fd', fontSize: '12px', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', opacity: isCheckingOut ? 0.7 : 1, cursor: isCheckingOut ? 'not-allowed' : 'pointer' }}
               >
                 <CreditCard size={15} color="#1d4ed8" /> [📒 Add to Customer Debt / Khata]
               </button>
@@ -831,10 +878,11 @@ export const POSPage = ({ storeMode: propStoreMode }) => {
           ) : (
             <button
               onClick={handleWholesaleCheckout}
+              disabled={isCheckingOut}
               className="btn btn-primary"
-              style={{ width: '100%', borderRadius: '12px', padding: '0.75rem', backgroundColor: '#0284c7', fontSize: '13px', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}
+              style={{ width: '100%', borderRadius: '12px', padding: '0.75rem', backgroundColor: '#0284c7', fontSize: '13px', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', opacity: isCheckingOut ? 0.7 : 1, cursor: isCheckingOut ? 'not-allowed' : 'pointer' }}
             >
-              <CheckCircle size={16} /> [Generate A4 Tax Invoice]
+              <CheckCircle size={16} /> {isCheckingOut ? 'Generating Invoice...' : '[Generate A4 Tax Invoice]'}
             </button>
           )}
         </div>

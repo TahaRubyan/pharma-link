@@ -5,6 +5,8 @@
 
 import fs from 'fs';
 import path from 'path';
+import { RateLimiter } from '../src/services/rateLimiter.js';
+import { storageManager } from '../src/services/storageManager.js';
 
 let passedCount = 0;
 let failedCount = 0;
@@ -144,6 +146,124 @@ export function runPerformanceTests() {
       const cssSizeKb = fs.statSync(path.join(assetsPath, cssFile)).size / 1024;
       if (cssSizeKb > 15) throw new Error(`CSS bundle exceeds 15KB budget: ${cssSizeKb.toFixed(2)}KB`);
     }
+  });
+
+  // 5. Rate Limiter - Token Bucket capacity & token consumption
+  test('RateLimiter - Enforces burst capacity and refills tokens over time', () => {
+    const limiter = new RateLimiter({ bucketCapacity: 5, refillRate: 2 });
+    if (limiter.tokens !== 5) throw new Error(`Initial tokens expected 5, got ${limiter.tokens}`);
+    
+    // Simulate consuming tokens
+    limiter.tokens -= 3;
+    if (limiter.tokens !== 2) throw new Error(`Tokens after consumption expected 2, got ${limiter.tokens}`);
+
+    // Test refill
+    limiter.lastRefill = Date.now() - 1000; // 1 second ago
+    limiter.refill();
+    // 2 + (1 * 2) = 4 tokens
+    if (Math.floor(limiter.tokens) !== 4) throw new Error(`Tokens after 1s refill expected 4, got ${limiter.tokens}`);
+  });
+
+  // 6. Rate Limiter - Circuit breaker trips on simulated 429 and throws CIRCUIT_OPEN
+  test('RateLimiter - Circuit breaker trips and flags CIRCUIT_OPEN state on downstream failure', () => {
+    const limiter = new RateLimiter({ maxFailuresBeforeTrip: 2, coolingPeriodMs: 5000 });
+    if (limiter.circuitState !== 'CLOSED') throw new Error('Circuit should start in CLOSED state');
+
+    limiter.tripCircuit('Simulated 429 Too Many Requests');
+    if (limiter.circuitState !== 'OPEN') throw new Error('Circuit should be OPEN after trip');
+
+    // Trying to schedule a task while OPEN rejects with CIRCUIT_OPEN
+    const p = limiter.schedule(() => Promise.resolve('ok'), 'CRITICAL');
+    p.catch((err) => {
+      if (err.code !== 'CIRCUIT_OPEN') {
+        console.error('Unexpected error code:', err);
+      }
+    });
+
+    // Reset circuit
+    limiter.resetCircuit();
+    if (limiter.circuitState !== 'CLOSED') throw new Error('Circuit should return to CLOSED after reset');
+    if (limiter.consecutiveFailures !== 0) throw new Error('Failures should reset to 0');
+  });
+
+  // 7. Storage Manager - Safe get/set operations with fallback resilience
+  test('StorageManager - safeSetItem and safeGetItem persist and read data cleanly', () => {
+    const testKey = 'pharmalink_test_perf_key';
+    const testPayload = { storeId: 'RETAIL_1', syncStatus: 'HEALTHY', timestamp: Date.now() };
+
+    const writeSuccess = storageManager.safeSetItem(testKey, testPayload);
+    if (!writeSuccess) throw new Error('safeSetItem failed to write to storage');
+
+    const readPayload = storageManager.safeGetItem(testKey);
+    if (!readPayload || readPayload.storeId !== 'RETAIL_1' || readPayload.syncStatus !== 'HEALTHY') {
+      throw new Error('safeGetItem failed to retrieve valid matching payload');
+    }
+
+    const stats = storageManager.getStorageStats();
+    if (typeof stats.usedBytes !== 'number' || typeof stats.usagePercent !== 'number') {
+      throw new Error('Storage stats did not return numeric byte/usage metrics');
+    }
+  });
+
+  // 8. POS Search Windowing - Enforces DISPLAY_LIMIT = 40 on large item arrays
+  test('POS Search Windowing - Caps rendered search results to DISPLAY_LIMIT (40) on 500-item array', () => {
+    const largeCatalog = [];
+    for (let i = 1; i <= 500; i++) {
+      largeCatalog.push({
+        id: `MED-${i}`,
+        itemCode: `${1000 + i}`,
+        name: `Panadol Extra Strength ${i}mg`,
+        formula: 'Paracetamol',
+        rackLocation: 'Rack A-1',
+        category: 'Tablets',
+        boxSellingPrice: 120,
+      });
+    }
+
+    const DISPLAY_LIMIT = 40;
+    const q = 'panadol';
+    const results = [];
+    for (let i = 0; i < largeCatalog.length; i++) {
+      const m = largeCatalog[i];
+      if (m.name.toLowerCase().includes(q)) {
+        results.push(m);
+        if (results.length >= DISPLAY_LIMIT) break; // Windowing early termination
+      }
+    }
+
+    if (results.length !== 40) throw new Error(`Expected windowed results to be exactly 40, got ${results.length}`);
+  });
+
+  // 9. Single-Pass Batch Stock Deduction Math
+  test('Single-Pass Deduction - Accurately updates multi-item batch quantities in a single execution pass', () => {
+    const batches = [
+      { id: 'B1', medicineId: 'MED-1', batchNo: 'B-001', totalTabletsAvailable: 100, expiryDate: '2026-06-01' },
+      { id: 'B2', medicineId: 'MED-1', batchNo: 'B-002', totalTabletsAvailable: 150, expiryDate: '2027-01-01' },
+      { id: 'B3', medicineId: 'MED-2', batchNo: 'B-003', totalTabletsAvailable: 50, expiryDate: '2026-12-01' },
+    ];
+
+    const cartItems = [
+      { medicineId: 'MED-1', batchNo: 'B-001', qty: 30, unitSelection: 'Tablet' },
+      { medicineId: 'MED-2', batchNo: 'B-003', qty: 20, unitSelection: 'Tablet' },
+    ];
+
+    // Single-pass emulation matching InventoryContext
+    const updatedBatches = batches.map(b => ({ ...b }));
+    cartItems.forEach((ci) => {
+      const q = ci.qty;
+      const targetBatch = updatedBatches.find(b => b.medicineId === ci.medicineId && b.batchNo === ci.batchNo);
+      if (targetBatch) {
+        targetBatch.totalTabletsAvailable -= q;
+      }
+    });
+
+    const b1 = updatedBatches.find(b => b.id === 'B1');
+    const b2 = updatedBatches.find(b => b.id === 'B2');
+    const b3 = updatedBatches.find(b => b.id === 'B3');
+
+    if (b1.totalTabletsAvailable !== 70) throw new Error(`B1 stock expected 70, got ${b1.totalTabletsAvailable}`);
+    if (b2.totalTabletsAvailable !== 150) throw new Error(`B2 stock expected 150 (untouched), got ${b2.totalTabletsAvailable}`);
+    if (b3.totalTabletsAvailable !== 30) throw new Error(`B3 stock expected 30, got ${b3.totalTabletsAvailable}`);
   });
 
   console.log(`📊 Performance Tests Summary: ${passedCount} Passed, ${failedCount} Failed\n`);

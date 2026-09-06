@@ -1,6 +1,7 @@
-import React, { createContext, useContext, useState, useMemo, useEffect } from 'react';
+import React, { createContext, useContext, useState, useMemo, useEffect, useCallback } from 'react';
 import { useInventory } from './InventoryContext';
 import { useSales } from './SalesContext';
+import { storageManager } from '../services/storageManager';
 
 const CartContext = createContext();
 
@@ -24,18 +25,19 @@ export const CartProvider = ({ children }) => {
   const [paymentMode, setPaymentMode] = useState('Cash'); // 'Cash' | 'Card' | 'Mobile Banking'
   const [cashTendered, setCashTendered] = useState('');
   const [lastCompletedSale, setLastCompletedSale] = useState(null);
+  const [isProcessingCheckout, setIsProcessingCheckout] = useState(false);
 
-  // Sync cart to localStorage
+  // Sync cart to storage
   useEffect(() => {
-    localStorage.setItem('pharmalink_pos_cart', JSON.stringify(cart));
+    storageManager.safeSetItem('pharmalink_pos_cart', cart);
   }, [cart]);
 
   useEffect(() => {
-    localStorage.setItem('pharmalink_pos_cust', customerName);
+    storageManager.safeSetItem('pharmalink_pos_cust', customerName);
   }, [customerName]);
 
   useEffect(() => {
-    localStorage.setItem('pharmalink_pos_doc', doctorName);
+    storageManager.safeSetItem('pharmalink_pos_doc', doctorName);
   }, [doctorName]);
 
   const addToCart = (medicine, batch, unitSelection = 'Box') => {
@@ -194,34 +196,43 @@ export const CartProvider = ({ children }) => {
       alert('Cart is empty!');
       return false;
     }
+    if (isProcessingCheckout) {
+      console.warn('[Cart] Checkout already in progress, blocking duplicate submit');
+      return false;
+    }
 
-    const invoiceNo = `INV-${Date.now().toString().slice(-6)}`;
-    const now = new Date();
+    setIsProcessingCheckout(true);
+    try {
+      const invoiceNo = `INV-${Date.now().toString().slice(-6)}`;
+      const now = new Date();
 
-    const saleRecord = {
-      invoiceNo,
-      date: new Date().toISOString().split('T')[0],
-      time: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      saleType,
-      cashierName: 'Dr. Idrees',
-      customerName: customerName || 'Walk-in Cash Customer',
-      doctorName: doctorName || '-',
-      items: [...cart],
-      subtotal: calculations.subtotal,
-      discount: calculations.discountAmount,
-      netTotal: calculations.netTotal,
-      tendered: calculations.tendered,
-      change: calculations.change,
-      paymentMode,
-    };
+      const saleRecord = {
+        invoiceNo,
+        date: new Date().toISOString().split('T')[0],
+        time: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        saleType,
+        cashierName: 'Dr. Idrees',
+        customerName: customerName || 'Walk-in Cash Customer',
+        doctorName: doctorName || '-',
+        items: [...cart],
+        subtotal: calculations.subtotal,
+        discount: calculations.discountAmount,
+        netTotal: calculations.netTotal,
+        tendered: calculations.tendered,
+        change: calculations.change,
+        paymentMode,
+      };
 
-    deductStock(cart);
-    recordSale(saleRecord);
-    setLastCompletedSale(saleRecord);
-    clearCart();
+      deductStock(cart);
+      recordSale(saleRecord);
+      setLastCompletedSale(saleRecord);
+      clearCart();
 
-    alert(`Sale confirmed! Invoice #${invoiceNo} created.`);
-    return saleRecord;
+      alert(`Sale confirmed! Invoice #${invoiceNo} created.`);
+      return saleRecord;
+    } finally {
+      setIsProcessingCheckout(false);
+    }
   };
 
   return (
@@ -243,6 +254,7 @@ export const CartProvider = ({ children }) => {
         cashTendered,
         setCashTendered,
         lastCompletedSale,
+        isProcessingCheckout,
         rxPatient,
         setRxPatient,
         activeModal,
