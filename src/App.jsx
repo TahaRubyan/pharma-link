@@ -161,9 +161,9 @@ function AppContent() {
       case 'expiry':
         return <ExpiryRadarPage />;
       case 'controlled':
-        return isCashier ? <POSPage storeMode={storeMode} /> : <ControlledSubstancesPage />;
+        return <ControlledSubstancesPage />;
       case 'suppliers':
-        return isCashier ? <POSPage storeMode={storeMode} /> : <SuppliersPage />;
+        return <SuppliersPage />;
       case 'region-ledger':
         return isCashier ? <POSPage storeMode={storeMode} /> : <RegionLedgerPage />;
       case 'customer-ledger':

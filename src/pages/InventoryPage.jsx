@@ -15,6 +15,8 @@ import {
 import { useInventory } from '../context/InventoryContext';
 import { useAuth } from '../context/AuthContext';
 import EditPriceModal from '../components/modals/EditPriceModal';
+import RetailNewPOModal from '../components/modals/RetailNewPOModal';
+import NewPOModal from '../components/modals/NewPOModal';
 
 export const InventoryPage = () => {
   const { medicines = [], batches = [], setMedicines, updateMedicineDetails, bulkImportMedicines } = useInventory();
@@ -27,6 +29,7 @@ export const InventoryPage = () => {
   // Modals state
   const [editingMedicine, setEditingMedicine] = useState(null);
   const [isEditPriceOpen, setIsEditPriceOpen] = useState(false);
+  const [isNewPOOpen, setIsNewPOOpen] = useState(false);
 
   const handleExportCSV = () => {
     if (medicines.length === 0) {
@@ -117,6 +120,28 @@ export const InventoryPage = () => {
           <span style={{ backgroundColor: '#ffffff', color: '#0284c7', padding: '0.35rem 0.75rem', borderRadius: '8px', fontSize: '12px', fontWeight: 800 }}>
             {medicines.length} Products Registered
           </span>
+
+          <button
+            onClick={() => setIsNewPOOpen(true)}
+            className="btn btn-outline"
+            style={{ 
+              backgroundColor: '#ffffff', 
+              color: '#0284c7', 
+              border: 'none', 
+              borderRadius: '8px', 
+              fontSize: '11px', 
+              padding: '0.35rem 0.75rem', 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '0.35rem', 
+              fontWeight: 700, 
+              cursor: 'pointer',
+              boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+            }}
+            title="Inward new medicine stock / purchase order"
+          >
+            <Plus size={13} /> {isRetail ? '+ Inward New Stock' : '+ New Purchase Order'}
+          </button>
 
           <button
             onClick={handleExportCSV}
@@ -272,6 +297,21 @@ export const InventoryPage = () => {
           onClose={() => { setIsEditPriceOpen(false); setEditingMedicine(null); }}
           onSave={handleSavePrice}
         />
+      )}
+
+      {/* INWARD STOCK PO MODAL */}
+      {isNewPOOpen && (
+        isRetail ? (
+          <RetailNewPOModal
+            isOpen={isNewPOOpen}
+            onClose={() => setIsNewPOOpen(false)}
+          />
+        ) : (
+          <NewPOModal
+            isOpen={isNewPOOpen}
+            onClose={() => setIsNewPOOpen(false)}
+          />
+        )
       )}
     </div>
   );

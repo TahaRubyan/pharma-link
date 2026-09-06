@@ -26,10 +26,10 @@ export const RETAIL_NAV_ITEMS = [
   { id: 'inventory', label: 'Stock & Loose Units', icon: Package, hasBadge: 'FEFO', requiresAdmin: false },
   { id: 'customer-debt', label: 'Customer Debt (Khata)', icon: CreditCard, hasBadge: 'Udhar', requiresAdmin: false },
   { id: 'patients', label: 'Patients & Rx Logs', icon: HeartPulse, requiresAdmin: false },
-  { id: 'controlled', label: 'Narcotics Register', icon: ShieldCheck, hasBadge: 'Form 6/7', requiresAdmin: true },
+  { id: 'controlled', label: 'Narcotics Register', icon: ShieldCheck, hasBadge: 'Form 6/7', requiresAdmin: false },
   { id: 'analytics', label: 'Sales & Movement Analytics', icon: FileText, requiresAdmin: true },
   { id: 'expiry', label: 'Expiry Radar', icon: AlertTriangle, hasBadge: '<6m', requiresAdmin: false },
-  { id: 'suppliers', label: 'Suppliers & Inward POs', icon: Truck, requiresAdmin: true },
+  { id: 'suppliers', label: 'Suppliers & Inward POs', icon: Truck, requiresAdmin: false },
   { id: 'settings', label: 'Settings & Printers', icon: Settings, requiresAdmin: true },
 ];
 

@@ -41,9 +41,9 @@ const DEFAULT_ROLES = [
     id: "ROLE-02",
     name: "Cashier",
     permissions: {
-      canOverrideStock: false,
+      canOverrideStock: true,
       canViewFinancialProfit: false,
-      canCreatePurchaseOrder: false,
+      canCreatePurchaseOrder: true,
       canModifyStoreSettings: false,
       canAccessRTV: false,
       canViewTaxReports: false,
@@ -534,9 +534,9 @@ export const AuthProvider = ({ children }) => {
 
   const activeRoleObj = roles.find((r) => r.name === role) || DEFAULT_ROLES[0];
   const permissions = activeRoleObj.permissions || {
-    canOverrideStock: isAdmin,
+    canOverrideStock: true,
     canViewFinancialProfit: isAdmin,
-    canCreatePurchaseOrder: isAdmin,
+    canCreatePurchaseOrder: true,
     canModifyStoreSettings: isAdmin,
     canAccessRTV: isAdmin,
     canViewTaxReports: isAdmin,
