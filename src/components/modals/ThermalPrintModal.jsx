@@ -4,7 +4,7 @@ import { Printer, X } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
 // Pure Receipt Content component: Renders Header, Body (Items & Totals), and Footer
-const ReceiptView = ({
+const ReceiptView = React.forwardRef(({
   invoice,
   activeShopName,
   activeAddress,
@@ -20,10 +20,13 @@ const ReceiptView = ({
   netTotal,
   tendered,
   change,
-  returnPolicyNote
-}) => {
+  returnPolicyNote,
+  isPrintVersion = false
+}, ref) => {
   return (
     <div
+      ref={ref}
+      id={isPrintVersion ? 'thermal-receipt-print-box' : 'thermal-receipt-preview-box'}
       style={{
         backgroundColor: '#ffffff',
         border: '1px solid #000000',
@@ -33,13 +36,13 @@ const ReceiptView = ({
         fontSize: '11px',
         lineHeight: 1.25,
         width: '100%',
-        maxWidth: '300px',
+        maxWidth: isPrintVersion ? '72mm' : '300px',
         margin: '0 auto',
         boxSizing: 'border-box'
       }}
     >
       {/* 1. HEADER SECTION: DETAILS OF SHOP */}
-      <div style={{ textAlign: 'center', marginBottom: '5px' }}>
+      <div style={{ textAlign: 'center', marginBottom: '4px' }}>
         <div style={{ fontWeight: 800, fontSize: '15px', letterSpacing: '0.3px', textTransform: 'uppercase' }}>
           {activeShopName}
         </div>
@@ -83,31 +86,31 @@ const ReceiptView = ({
       </div>
 
       {/* 2. BODY SECTION: ITEMS DETAILS & TOTALS */}
-      {/* If item count exceeds, all items appear consecutively without clipping */}
+      {/* All items appear consecutively without clipping or page-break splits */}
       <table
         style={{
           width: '100%',
           borderCollapse: 'collapse',
           border: '1px solid #000000',
           fontSize: '10.5px',
-          tableLayout: 'fixed'
+          boxSizing: 'border-box'
         }}
       >
         <thead>
           <tr style={{ backgroundColor: '#ffffff' }}>
-            <th style={{ border: '1px solid #000000', padding: '2px 2px', width: '9%', textAlign: 'center', fontWeight: 700 }}>
+            <th style={{ border: '1px solid #000000', padding: '3px 2px', width: '8%', textAlign: 'center', fontWeight: 700 }}>
               No.
             </th>
-            <th style={{ border: '1px solid #000000', padding: '2px 4px', width: '45%', textAlign: 'left', fontWeight: 700 }}>
+            <th style={{ border: '1px solid #000000', padding: '3px 4px', width: '46%', textAlign: 'left', fontWeight: 700 }}>
               Item Name
             </th>
-            <th style={{ border: '1px solid #000000', padding: '2px 2px', width: '15%', textAlign: 'center', fontWeight: 700 }}>
+            <th style={{ border: '1px solid #000000', padding: '3px 2px', width: '15%', textAlign: 'center', fontWeight: 700 }}>
               Qty
             </th>
-            <th style={{ border: '1px solid #000000', padding: '2px 2px', width: '15%', textAlign: 'right', fontWeight: 700 }}>
+            <th style={{ border: '1px solid #000000', padding: '3px 2px', width: '15%', textAlign: 'right', fontWeight: 700 }}>
               Price
             </th>
-            <th style={{ border: '1px solid #000000', padding: '2px 2px', width: '16%', textAlign: 'right', fontWeight: 700 }}>
+            <th style={{ border: '1px solid #000000', padding: '3px 2px', width: '16%', textAlign: 'right', fontWeight: 700 }}>
               Amount
             </th>
           </tr>
@@ -127,42 +130,34 @@ const ReceiptView = ({
 
             return (
               <tr key={idx} style={{ pageBreakInside: 'avoid' }}>
-                <td style={{ border: '1px solid #000000', padding: '2px 2px', textAlign: 'center' }}>
+                <td style={{ border: '1px solid #000000', padding: '3px 2px', textAlign: 'center' }}>
                   {idx + 1}
                 </td>
-                <td style={{ border: '1px solid #000000', padding: '2px 4px', textAlign: 'left', fontWeight: 600, wordBreak: 'break-word' }}>
+                <td style={{ border: '1px solid #000000', padding: '3px 4px', textAlign: 'left', fontWeight: 600, wordBreak: 'break-word' }}>
                   {item.name || item.brandName}
                 </td>
-                <td style={{ border: '1px solid #000000', padding: '2px 2px', textAlign: 'center' }}>
+                <td style={{ border: '1px solid #000000', padding: '3px 2px', textAlign: 'center' }}>
                   {itemQty.toFixed(2)}
                 </td>
-                <td style={{ border: '1px solid #000000', padding: '2px 2px', textAlign: 'right' }}>
+                <td style={{ border: '1px solid #000000', padding: '3px 2px', textAlign: 'right' }}>
                   {Math.round(itemPrice)}
                 </td>
-                <td style={{ border: '1px solid #000000', padding: '2px 2px', textAlign: 'right', fontWeight: 600 }}>
+                <td style={{ border: '1px solid #000000', padding: '3px 2px', textAlign: 'right', fontWeight: 600 }}>
                   {Math.round(itemTotal)}
                 </td>
               </tr>
             );
           })}
         </tbody>
+        {/* Table footer aligns Quantity and Subtotal directly beneath Qty and Amount columns */}
+        <tfoot>
+          <tr>
+            <td colSpan={2} style={{ border: 'none', textAlign: 'right', fontWeight: 700, padding: '4px 2px' }}></td>
+            <td style={{ border: 'none', textAlign: 'center', fontWeight: 700, padding: '4px 2px' }}>{totalQty.toFixed(2)}</td>
+            <td colSpan={2} style={{ border: 'none', textAlign: 'right', fontWeight: 700, padding: '4px 2px' }}>Rs.{Math.round(subtotal)}</td>
+          </tr>
+        </tfoot>
       </table>
-
-      {/* SUBTOTAL & QUANTITY SUMMARY ROW */}
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'flex-end',
-          gap: '16px',
-          fontWeight: 700,
-          fontSize: '11px',
-          marginTop: '4px',
-          paddingRight: '3px'
-        }}
-      >
-        <span>{totalQty.toFixed(2)}</span>
-        <span>Rs.{Math.round(subtotal)}</span>
-      </div>
 
       {/* NET TOTAL, DISCOUNT, CASH RECEIVED, CASH RETURNED */}
       <div
@@ -170,46 +165,46 @@ const ReceiptView = ({
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'flex-end',
-          marginTop: '4px',
+          marginTop: '2px',
           fontSize: '11px',
-          fontWeight: 700,
-          gap: '2px'
+          fontWeight: 700
         }}
       >
-        <div style={{ display: 'flex', justifyContent: 'space-between', width: '190px' }}>
-          <span>Net Receivable:</span>
-          <span>{Math.round(netTotal)}</span>
-        </div>
-        {discount > 0 && (
-          <div style={{ display: 'flex', justifyContent: 'space-between', width: '190px' }}>
-            <span>Discount:</span>
-            <span>-Rs. {Math.round(discount)}</span>
+        <div style={{ width: '175px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <span>Net Receivable:</span>
+            <span>{Math.round(netTotal)}</span>
           </div>
-        )}
-        <div style={{ display: 'flex', justifyContent: 'space-between', width: '190px' }}>
-          <span>Cash Received:</span>
-          <span>Rs. {Math.round(tendered).toLocaleString()}</span>
-        </div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', width: '190px' }}>
-          <span>Cash Returned:</span>
-          <span>Rs. {Math.round(change).toLocaleString()}</span>
-        </div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', width: '190px' }}>
-          <span>Balance:</span>
-          <span>Rs. 0</span>
+          {discount > 0 && (
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span>Discount:</span>
+              <span>-Rs. {Math.round(discount)}</span>
+            </div>
+          )}
+          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <span>Cash Received:</span>
+            <span>Rs. {Math.round(tendered).toLocaleString()}</span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <span>Cash Returned:</span>
+            <span>Rs. {Math.round(change).toLocaleString()}</span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <span>Balance:</span>
+            <span>Rs. 0</span>
+          </div>
         </div>
       </div>
 
-      {/* 3. FOOTER SECTION: TAX, FBR VERIFICATION, THANK YOU & RETURN POLICY */}
-      {/* Placed immediately after body section when all items finish */}
-      <div style={{ pageBreakInside: 'avoid' }}>
+      {/* 3. FOOTER SECTION: TAX, RETURN POLICY & THANK YOU NOTE */}
+      <div style={{ pageBreakInside: 'avoid', marginTop: '6px' }}>
         {/* TAX INCLUSIVE NOTICE */}
         <div
           style={{
             textAlign: 'center',
             fontWeight: 700,
             fontSize: '10px',
-            margin: '6px 0 3px 0',
+            margin: '4px 0',
             letterSpacing: '0.2px'
           }}
         >
@@ -221,7 +216,7 @@ const ReceiptView = ({
           style={{
             textAlign: 'center',
             fontSize: '8.5px',
-            marginTop: '6px',
+            marginTop: '4px',
             lineHeight: 1.3,
             fontWeight: 600
           }}
@@ -230,18 +225,20 @@ const ReceiptView = ({
         </div>
 
         {/* THANK YOU NOTE */}
-        <div style={{ textAlign: 'center', fontWeight: 700, fontSize: '11.5px', marginTop: '6px' }}>
+        <div style={{ textAlign: 'center', fontWeight: 700, fontSize: '11px', marginTop: '5px' }}>
           Thank you for Visiting us!
         </div>
       </div>
     </div>
   );
-};
+});
 
 export const ThermalPrintModal = ({ invoice, onClose }) => {
   const { currentShop, user } = useAuth();
   const [mountReady, setMountReady] = useState(false);
+  const [pageHeightMm, setPageHeightMm] = useState(115);
   const mountElRef = useRef(null);
+  const previewRef = useRef(null);
 
   if (!invoice) return null;
 
@@ -294,6 +291,23 @@ export const ThermalPrintModal = ({ invoice, onClose }) => {
   const returnPolicyNote = (typeof window !== 'undefined' && localStorage.getItem('pharmalink_receipt_footer')) ||
     '* Medicines once sold can be returned/exchanged within 7 days with original receipt. *';
 
+  // Measure receipt height and calculate exact page height in millimeters
+  useEffect(() => {
+    const updateHeight = () => {
+      if (previewRef.current) {
+        const px = previewRef.current.offsetHeight;
+        if (px > 0) {
+          // Convert pixels to mm (1px = 0.264583mm) + 6mm safe padding
+          const calculatedMm = Math.ceil(px * 0.264583) + 6;
+          setPageHeightMm(Math.max(65, calculatedMm));
+        }
+      }
+    };
+    updateHeight();
+    const timer = setTimeout(updateHeight, 100);
+    return () => clearTimeout(timer);
+  }, [invoice, items]);
+
   // Mount dedicated portal container outside root and activate printing-thermal class
   useEffect(() => {
     let mountEl = document.getElementById('thermal-print-mount');
@@ -344,9 +358,33 @@ export const ThermalPrintModal = ({ invoice, onClose }) => {
 
   return (
     <>
+      {/* Dynamic @page sizing: Forces Chromium to match the EXACT receipt height without 200mm blank overflow */}
+      <style>{`
+        @media print {
+          @page {
+            size: 80mm ${pageHeightMm}mm !important;
+            margin: 0mm !important;
+          }
+          html, body {
+            width: 80mm !important;
+            max-width: 80mm !important;
+            height: ${pageHeightMm}mm !important;
+            max-height: ${pageHeightMm}mm !important;
+            overflow: hidden !important;
+          }
+          #thermal-print-mount {
+            width: 72mm !important;
+            max-width: 72mm !important;
+            height: auto !important;
+            margin: 0 auto !important;
+            padding: 0 !important;
+          }
+        }
+      `}</style>
+
       {/* 1. PORTAL RENDER: Renders strictly outside #root into #thermal-print-mount for 100% isolated print */}
       {mountReady && mountElRef.current && ReactDOM.createPortal(
-        <ReceiptView {...receiptProps} />,
+        <ReceiptView {...receiptProps} isPrintVersion={true} />,
         mountElRef.current
       )}
 
@@ -401,7 +439,7 @@ export const ThermalPrintModal = ({ invoice, onClose }) => {
 
           {/* Screen Preview Container */}
           <div style={{ overflowY: 'auto', maxHeight: '70vh' }}>
-            <ReceiptView {...receiptProps} />
+            <ReceiptView ref={previewRef} {...receiptProps} isPrintVersion={false} />
           </div>
 
           {/* Action Buttons */}

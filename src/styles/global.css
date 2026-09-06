@@ -318,7 +318,6 @@ button, input, select, textarea {
 /* Print View: Enforce strict 80mm roll dimensions and hide #root */
 @media print {
   @page {
-    size: 80mm auto;
     margin: 0mm !important;
   }
 
