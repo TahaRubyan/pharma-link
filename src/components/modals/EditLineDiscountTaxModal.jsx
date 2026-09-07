@@ -2,13 +2,21 @@ import React, { useState, useEffect } from 'react';
 import { X, Edit3, Percent, DollarSign, CheckCircle } from 'lucide-react';
 
 export const EditLineDiscountTaxModal = ({ isOpen, item, onClose, onSave }) => {
-  if (!isOpen || !item) return null;
+  const [qty, setQty] = useState(item?.qty || item?.quantity || 1);
+  const [rate, setRate] = useState(item?.boxPrice || item?.price || item?.unitPrice || 600);
+  const [discPercent, setDiscPercent] = useState(item?.discountPercent || 0);
+  const [saleTaxPercent, setSaleTaxPercent] = useState(item?.saleTaxPercent !== undefined ? item.saleTaxPercent : 18);
+  const [advTaxPercent, setAdvTaxPercent] = useState(item?.advTaxPercent !== undefined ? item.advTaxPercent : 0.5);
 
-  const [qty, setQty] = useState(item.qty || item.quantity || 1);
-  const [rate, setRate] = useState(item.boxPrice || item.price || item.unitPrice || 600);
-  const [discPercent, setDiscPercent] = useState(item.discountPercent || 0);
-  const [saleTaxPercent, setSaleTaxPercent] = useState(item.saleTaxPercent !== undefined ? item.saleTaxPercent : 18);
-  const [advTaxPercent, setAdvTaxPercent] = useState(item.advTaxPercent !== undefined ? item.advTaxPercent : 0.5);
+  useEffect(() => {
+    if (item) {
+      setQty(item.qty || item.quantity || 1);
+      setRate(item.boxPrice || item.price || item.unitPrice || 600);
+      setDiscPercent(item.discountPercent || 0);
+      setSaleTaxPercent(item.saleTaxPercent !== undefined ? item.saleTaxPercent : 18);
+      setAdvTaxPercent(item.advTaxPercent !== undefined ? item.advTaxPercent : 0.5);
+    }
+  }, [item, isOpen]);
 
   const parsedQty = Math.max(1, Number(qty) || 1);
   const parsedRate = Number(rate) || 0;
@@ -39,6 +47,8 @@ export const EditLineDiscountTaxModal = ({ isOpen, item, onClose, onSave }) => {
     });
     onClose();
   };
+
+  if (!isOpen || !item) return null;
 
   return (
     <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.45)', backdropFilter: 'blur(3px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, fontFamily: 'var(--font-sans)', padding: '1rem' }}>

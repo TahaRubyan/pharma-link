@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { INITIAL_MEDICINES, INITIAL_BATCHES, INITIAL_VENDOR_RETURNS } from '../data/mockData';
-import { useAuth } from './AuthContext';
+import { AuthContext, useAuth } from './AuthContext';
 import { storageManager } from '../services/storageManager';
 import { loadRetailMockData, clearRetailMockData } from '../services/mockDataManager';
 
@@ -10,13 +10,8 @@ const INITIAL_AUDIT_LOGS = [];
 const INITIAL_PO_TAX_LOGS = [];
 
 export const InventoryProvider = ({ children }) => {
-  let isRetail = false;
-  try {
-    const auth = useAuth();
-    isRetail = auth?.currentShop?.mode === 'RETAIL';
-  } catch (e) {
-    isRetail = false;
-  }
+  const auth = useContext(AuthContext);
+  const isRetail = auth?.currentShop?.mode === 'RETAIL';
 
   // Wholesale Medicines: Pre-stocked with master catalog
   const [wholesaleMedicines, setWholesaleMedicines] = useState(() => {
@@ -660,4 +655,5 @@ export const useInventory = () => {
   return context;
 };
 
+export { InventoryContext };
 export default InventoryContext;

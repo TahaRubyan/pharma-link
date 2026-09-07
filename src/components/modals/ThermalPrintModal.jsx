@@ -238,32 +238,30 @@ export const ThermalPrintModal = ({ invoice, onClose }) => {
   const mountElRef = useRef(null);
   const previewRef = useRef(null);
 
-  if (!invoice) return null;
-
-  const items = invoice.items || [];
-  const subtotal = Number(invoice.subtotal || invoice.grossTotal || 0);
-  const discount = Number(invoice.discount || invoice.discountAmount || 0);
-  const netTotal = Number(invoice.netTotal || invoice.grandTotal || (subtotal - discount));
-  const tendered = Number(invoice.cashTendered || invoice.tendered || netTotal);
-  const change = Number(invoice.changeDue || invoice.change || Math.max(0, tendered - netTotal));
+  const items = invoice?.items || [];
+  const subtotal = Number(invoice?.subtotal || invoice?.grossTotal || 0);
+  const discount = Number(invoice?.discount || invoice?.discountAmount || 0);
+  const netTotal = Number(invoice?.netTotal || invoice?.grandTotal || (subtotal - discount));
+  const tendered = Number(invoice?.cashTendered || invoice?.tendered || netTotal);
+  const change = Number(invoice?.changeDue || invoice?.change || Math.max(0, tendered - netTotal));
 
   // Dynamic Store Data with exact sample defaults
-  const activeShopName = currentShop?.shopName || invoice.shopName || 'IDREES MEDICAL STORE';
-  const activeAddress = currentShop?.address || invoice.shopAddress || 'NEAR HBL BANK MAIN BAZAR JALAL PUR JATTAN,\nGUJRAT';
-  const activePhone = currentShop?.phone || invoice.shopPhone || '03126262942';
-  const activeEmail = currentShop?.email || invoice.shopEmail || 'Company@gmail.com';
-  const activeCashier = invoice.cashierName || user?.name || 'Dr. Idrees (Retail Admin)';
+  const activeShopName = currentShop?.shopName || invoice?.shopName || 'IDREES MEDICAL STORE';
+  const activeAddress = currentShop?.address || invoice?.shopAddress || 'NEAR HBL BANK MAIN BAZAR JALAL PUR JATTAN,\nGUJRAT';
+  const activePhone = currentShop?.phone || invoice?.shopPhone || '03126262942';
+  const activeEmail = currentShop?.email || invoice?.shopEmail || 'Company@gmail.com';
+  const activeCashier = invoice?.cashierName || user?.name || 'Dr. Idrees (Retail Admin)';
 
   // Format Invoice Number: 8 digits formatted
   const formattedNo = useMemo(() => {
-    const rawNo = String(invoice.invoiceNo || '00416960');
+    const rawNo = String(invoice?.invoiceNo || '00416960');
     const digits = rawNo.replace(/[^0-9]/g, '');
     return digits ? digits.padStart(8, '0').slice(-8) : rawNo;
-  }, [invoice.invoiceNo]);
+  }, [invoice?.invoiceNo]);
 
   // Format Date & Time: 06-Sep-2026 1:26 am
   const formattedDateTime = useMemo(() => {
-    if (!invoice.date) return '06-Sep-2026 1:26 am';
+    if (!invoice?.date) return '06-Sep-2026 1:26 am';
     try {
       const dt = new Date(`${invoice.date} ${invoice.time || ''}`);
       if (!isNaN(dt.getTime())) {
@@ -279,7 +277,7 @@ export const ThermalPrintModal = ({ invoice, onClose }) => {
       }
     } catch (e) {}
     return `${invoice.date} ${invoice.time || ''}`.trim();
-  }, [invoice.date, invoice.time]);
+  }, [invoice?.date, invoice?.time]);
 
   // Calculate Total Quantity
   const totalQty = useMemo(() => {
@@ -347,6 +345,7 @@ export const ThermalPrintModal = ({ invoice, onClose }) => {
   };
 
   useEffect(() => {
+    if (!invoice) return;
     measureAndSync();
     const timer = setTimeout(measureAndSync, 50);
 
@@ -373,6 +372,7 @@ export const ThermalPrintModal = ({ invoice, onClose }) => {
 
   // Mount dedicated portal container outside root and activate printing-thermal class
   useEffect(() => {
+    if (!invoice) return;
     let mountEl = document.getElementById('thermal-print-mount');
     if (!mountEl && typeof document !== 'undefined') {
       mountEl = document.createElement('div');
@@ -390,7 +390,7 @@ export const ThermalPrintModal = ({ invoice, onClose }) => {
         mountEl.innerHTML = '';
       }
     };
-  }, []);
+  }, [invoice]);
 
   const receiptProps = {
     invoice,
@@ -419,6 +419,8 @@ export const ThermalPrintModal = ({ invoice, onClose }) => {
       window.print();
     }, 50);
   };
+
+  if (!invoice) return null;
 
   return (
     <>

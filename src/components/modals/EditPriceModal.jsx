@@ -1,16 +1,24 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Edit, DollarSign, CheckCircle } from 'lucide-react';
 
 export const EditPriceModal = ({ isOpen, medicine, onClose, onSave }) => {
-  if (!isOpen || !medicine) return null;
+  const [itemCode, setItemCode] = useState(medicine?.itemCode || '');
+  const [boxSellingPrice, setBoxSellingPrice] = useState(medicine?.boxSellingPrice || medicine?.boxPrice || medicine?.price || '');
+  const [purchaseCost, setPurchaseCost] = useState(medicine?.purchaseCost || medicine?.purchasePriceBox || '');
+  const [rackLocation, setRackLocation] = useState(medicine?.rackLocation || '');
 
-  const [itemCode, setItemCode] = useState(medicine.itemCode || '');
-  const [boxSellingPrice, setBoxSellingPrice] = useState(medicine.boxSellingPrice || medicine.boxPrice || medicine.price || '');
-  const [purchaseCost, setPurchaseCost] = useState(medicine.purchaseCost || medicine.purchasePriceBox || '');
-  const [rackLocation, setRackLocation] = useState(medicine.rackLocation || '');
+  useEffect(() => {
+    if (medicine) {
+      setItemCode(medicine.itemCode || '');
+      setBoxSellingPrice(medicine.boxSellingPrice || medicine.boxPrice || medicine.price || '');
+      setPurchaseCost(medicine.purchaseCost || medicine.purchasePriceBox || '');
+      setRackLocation(medicine.rackLocation || '');
+    }
+  }, [medicine, isOpen]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    if (!medicine) return;
     onSave(medicine.id, {
       itemCode: itemCode.trim() || medicine.itemCode,
       boxSellingPrice: Number(boxSellingPrice) || 0,
@@ -22,6 +30,8 @@ export const EditPriceModal = ({ isOpen, medicine, onClose, onSave }) => {
     });
     onClose();
   };
+
+  if (!isOpen || !medicine) return null;
 
   return (
     <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.45)', backdropFilter: 'blur(3px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, fontFamily: 'var(--font-sans)', padding: '1rem' }}>

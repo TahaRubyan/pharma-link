@@ -1,9 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, UserCheck, MapPin, Phone, FileText, CheckCircle } from 'lucide-react';
 
 export const WholesaleCustomerModal = ({ isOpen, customerData, onClose, onSave }) => {
-  if (!isOpen) return null;
-
   const [customerName, setCustomerName] = useState(customerData?.customerName || customerData?.shopName || '');
   const [region, setRegion] = useState(customerData?.region || 'Gujrat');
   const [address, setAddress] = useState(customerData?.customerAddress || '');
@@ -15,6 +13,22 @@ export const WholesaleCustomerModal = ({ isOpen, customerData, onClose, onSave }
   const [bookingMan, setBookingMan] = useState(customerData?.bookingMan || '');
   const [refNo, setRefNo] = useState(customerData?.refNo || '');
   const [deliveryMan, setDeliveryMan] = useState(customerData?.deliveryMan || '');
+
+  useEffect(() => {
+    if (customerData) {
+      setCustomerName(customerData.customerName || customerData.shopName || '');
+      setRegion(customerData.region || 'Gujrat');
+      setAddress(customerData.customerAddress || '');
+      setLicenseNo(customerData.licenseNo || '');
+      setNtn(customerData.customerNtn || '');
+      setGst(customerData.customerStrn || '');
+      setFilerStatus(customerData.filerStatus || 'FILER');
+      setPhone(customerData.customerPhone || '');
+      setBookingMan(customerData.bookingMan || '');
+      setRefNo(customerData.refNo || '');
+      setDeliveryMan(customerData.deliveryMan || '');
+    }
+  }, [customerData, isOpen]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -34,6 +48,8 @@ export const WholesaleCustomerModal = ({ isOpen, customerData, onClose, onSave }
     });
     onClose();
   };
+
+  if (!isOpen) return null;
 
   return (
     <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.45)', backdropFilter: 'blur(3px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, fontFamily: 'var(--font-sans)', padding: '1rem' }}>

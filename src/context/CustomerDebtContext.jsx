@@ -1,17 +1,12 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { INITIAL_DEBT_CUSTOMERS } from '../data/mockData';
-import { useAuth } from './AuthContext';
+import { AuthContext, useAuth } from './AuthContext';
 
 const CustomerDebtContext = createContext();
 
 export const CustomerDebtProvider = ({ children }) => {
-  let isRetail = false;
-  try {
-    const auth = useAuth();
-    isRetail = auth?.currentShop?.mode === 'RETAIL';
-  } catch (e) {
-    isRetail = false;
-  }
+  const auth = useContext(AuthContext);
+  const isRetail = auth?.currentShop?.mode === 'RETAIL';
 
   const [wholesaleDebtCustomers, setWholesaleDebtCustomers] = useState(() => {
     const saved = localStorage.getItem('pharmalink_debt_customers');

@@ -1,18 +1,13 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { INITIAL_INVOICES } from '../data/mockData';
-import { useAuth } from './AuthContext';
+import { AuthContext, useAuth } from './AuthContext';
 import { storageManager } from '../services/storageManager';
 
 const SalesContext = createContext();
 
 export const SalesProvider = ({ children }) => {
-  let isRetail = false;
-  try {
-    const auth = useAuth();
-    isRetail = auth?.currentShop?.mode === 'RETAIL';
-  } catch (e) {
-    isRetail = false;
-  }
+  const auth = useContext(AuthContext);
+  const isRetail = auth?.currentShop?.mode === 'RETAIL';
 
   const [wholesaleInvoices, setWholesaleInvoices] = useState(() => {
     const saved = localStorage.getItem('pharmalink_pk_invoices');

@@ -4,7 +4,8 @@ import { UserPlus, Edit3 } from 'lucide-react';
 import { useCart } from '../../context/CartContext';
 
 export const StaffModal = ({ isOpen, onClose, onSave, staffToEdit = null }) => {
-  const { addToast } = useCart() || {};
+  const cartContext = useCart();
+  const addToast = cartContext?.addToast;
 
   const [name, setName] = useState('');
   const [username, setUsername] = useState('');

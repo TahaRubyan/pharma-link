@@ -20,7 +20,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { usePWA } from '../context/PWAContext';
-import { useInventory } from '../context/InventoryContext';
+import { useInventory, InventoryContext } from '../context/InventoryContext';
 import { ThermalPrintModal } from '../components/modals/ThermalPrintModal';
 import { MOCK_STAFF_ACCOUNTS } from '../data/mockData';
 import { loadRetailMockData, clearRetailMockData } from '../services/mockDataManager';
@@ -69,12 +69,7 @@ export const SettingsPage = ({ storeMode }) => {
   // Tab: PWA State & Hooks
   const { isInstallable, isInstalled, swRegistered, triggerInstall, updateCache } = usePWA();
 
-  let inventoryContext = null;
-  try {
-    inventoryContext = useInventory();
-  } catch (e) {
-    inventoryContext = null;
-  }
+  const inventoryContext = React.useContext(InventoryContext);
   const medicines = inventoryContext?.medicines || [];
   const batches = inventoryContext?.batches || [];
   const [cacheUpdating, setCacheUpdating] = useState(false);
