@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import ReactDOM from 'react-dom';
 import { X, Printer, ShieldCheck } from 'lucide-react';
 import { useAuth, formatDateDDMMYYYY } from '../../context/AuthContext';
 
@@ -28,12 +29,17 @@ function numberToRupeesWords(num) {
 
 export const A4InvoicePrintModal = ({ invoice, onClose }) => {
   const { currentShop } = useAuth();
-  if (!invoice) return null;
+  const [mountReady, setMountReady] = useState(false);
+  const mountElRef = useRef(null);
 
-  React.useEffect(() => {
-    document.body.classList.add('printing-a4');
+  useEffect(() => {
+    const el = document.getElementById('a4-print-mount');
+    if (el) {
+      mountElRef.current = el;
+      setMountReady(true);
+    }
     const handleAfterPrint = () => {
-      // Completed
+      document.body.classList.remove('printing-a4');
     };
     window.addEventListener('afterprint', handleAfterPrint);
     return () => {
@@ -41,6 +47,8 @@ export const A4InvoicePrintModal = ({ invoice, onClose }) => {
       window.removeEventListener('afterprint', handleAfterPrint);
     };
   }, []);
+
+  if (!invoice) return null;
 
   const handlePrint = () => {
     document.body.classList.add('printing-a4');
@@ -74,35 +82,19 @@ export const A4InvoicePrintModal = ({ invoice, onClose }) => {
   const storePhone = currentShop?.phone || '053-3724601, 053-3724602';
   const depotDsl = currentShop?.dlNumber || '09-342-0139-045748D';
 
-  return (
-    <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.5)', backdropFilter: 'blur(3px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, fontFamily: 'var(--font-sans)', padding: '1rem' }}>
-      <div className="card" style={{ width: '100%', maxWidth: '920px', padding: '1.75rem', backgroundColor: '#ffffff', borderRadius: '20px', position: 'relative', maxHeight: '94vh', overflowY: 'auto', boxShadow: '0 20px 40px -15px rgba(15, 23, 42, 0.25)' }}>
-        <button onClick={onClose} className="a4-no-print" style={{ position: 'absolute', right: '1.25rem', top: '1.25rem', background: 'none', border: 'none', cursor: 'pointer', padding: '0.2rem', borderRadius: '50%', backgroundColor: '#f8fafc' }}>
-          <X size={20} color="#64748B" />
-        </button>
-
-        {/* Action Header */}
-        <div className="flex-between a4-no-print" style={{ marginBottom: '1.25rem', borderBottom: '1px solid #f1f5f9', paddingBottom: '0.75rem' }}>
-          <div>
-            <h3 className="section-title" style={{ fontSize: '18px', color: '#0284c7' }}>
-              A4 Commercial Dual-Page Tax Invoice (Form 2A / Section 23 Compliant)
-            </h3>
-            <p className="subtext" style={{ marginTop: '0.15rem' }}>
-              Invoice #{invoice.invoiceNo} • {pageChunks.length} Page(s) • DRAP & Pakistan Drugs Act 1976
-            </p>
-          </div>
-
-          <button onClick={handlePrint} className="btn btn-primary" style={{ borderRadius: '10px', fontSize: '12px', backgroundColor: '#0284c7' }}>
-            <Printer size={15} /> Print Commercial Invoice
-          </button>
-        </div>
-
-        {/* PRINT CONTENT PAGES (EXACT 100% RECREATION OF PDF 2) */}
-        <div id="printable-a4-invoice" style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-          {pageChunks.map((chunkItems, pageIdx) => (
-            <div
-              key={pageIdx}
-              className="a4-page-container"
+  const renderA4Pages = (isPrint = false) => (
+    <div
+      id={isPrint ? 'printable-a4-invoice' : undefined}
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: isPrint ? '0' : '2rem'
+      }}
+    >
+      {pageChunks.map((chunkItems, pageIdx) => (
+        <div
+          key={pageIdx}
+          className="a4-page-container"
               style={{
                 backgroundColor: '#ffffff',
                 border: '2px solid #111827',
@@ -348,8 +340,85 @@ export const A4InvoicePrintModal = ({ invoice, onClose }) => {
             </div>
           ))}
         </div>
+      );
+
+  return (
+    <>
+      {/* 1. ISOLATED A4 PRINT PORTAL: Renders outside #root into #a4-print-mount */}
+      {mountReady && mountElRef.current && ReactDOM.createPortal(
+        renderA4Pages(true),
+        mountElRef.current
+      )}
+
+      {/* 2. ON-SCREEN USER PREVIEW MODAL (Inside #root, hidden during print) */}
+      <div
+        className="a4-no-print"
+        style={{
+          position: 'fixed',
+          inset: 0,
+          backgroundColor: 'rgba(15, 23, 42, 0.5)',
+          backdropFilter: 'blur(3px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000,
+          fontFamily: 'var(--font-sans)',
+          padding: '1rem'
+        }}
+      >
+        <div
+          className="card"
+          style={{
+            width: '100%',
+            maxWidth: '920px',
+            padding: '1.75rem',
+            backgroundColor: '#ffffff',
+            borderRadius: '20px',
+            position: 'relative',
+            maxHeight: '94vh',
+            overflowY: 'auto',
+            boxShadow: '0 20px 40px -15px rgba(15, 23, 42, 0.25)'
+          }}
+        >
+          <button
+            onClick={onClose}
+            className="a4-no-print"
+            style={{
+              position: 'absolute',
+              right: '1.25rem',
+              top: '1.25rem',
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              padding: '0.2rem',
+              borderRadius: '50%',
+              backgroundColor: '#f8fafc'
+            }}
+          >
+            <X size={20} color="#64748B" />
+          </button>
+
+          {/* Action Header */}
+          <div className="flex-between a4-no-print" style={{ marginBottom: '1.25rem', borderBottom: '1px solid #f1f5f9', paddingBottom: '0.75rem' }}>
+            <div>
+              <h3 className="section-title" style={{ fontSize: '18px', color: '#0284c7' }}>
+                A4 Commercial Dual-Page Tax Invoice (Form 2A / Section 23 Compliant)
+              </h3>
+              <p className="subtext" style={{ marginTop: '0.15rem' }}>
+                Invoice #{invoice.invoiceNo} • {pageChunks.length} Page(s) • DRAP & Pakistan Drugs Act 1976
+              </p>
+            </div>
+
+            <button onClick={handlePrint} className="btn btn-primary" style={{ borderRadius: '10px', fontSize: '12px', backgroundColor: '#0284c7' }}>
+              <Printer size={15} /> Print Commercial Invoice
+            </button>
+          </div>
+
+          {/* ON-SCREEN PREVIEW */}
+          {renderA4Pages(false)}
+        </div>
       </div>
-    </div>
+    </>
   );
 };
 

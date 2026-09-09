@@ -9,13 +9,26 @@ import {
   ShieldAlert
 } from 'lucide-react';
 import { useInventory } from '../context/InventoryContext';
+import { useAuth } from '../context/AuthContext';
 import PrintExpiryReportModal from '../components/modals/PrintExpiryReportModal';
 
 export const ExpiryRadarPage = () => {
-  const { batches = [], medicines = [] } = useInventory();
+  const { batches = [], medicines = [], markItemAsRTV } = useInventory();
+  const { user } = useAuth();
   const [filterTab, setFilterTab] = useState('ALL'); // 'ALL' | 'NEAR' | 'EXPIRED'
   const [searchQuery, setSearchQuery] = useState('');
   const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
+
+  const handleReturnToVendor = (item) => {
+    const defaultTabs = (item.boxStock || 1) * 200;
+    const confirmMsg = `Return Batch ${item.batchNo} of "${item.tradeName}" to Vendor (RTV)?\n\nExpiry: ${item.expiryDate} (<= 6 Months Wholesale Rule)\nStock: ${item.boxStock} Boxes\n\nThis will remove it from active stock and queue an RTV claim in the Vendor Returns ledger.`;
+    if (window.confirm(confirmMsg)) {
+      if (typeof markItemAsRTV === 'function') {
+        markItemAsRTV(item.id || item.batchNo, defaultTabs, `Wholesale Expiry Rule: ${item.expiryDate} (<= 6 Months)`, user?.name || 'Testing Admin');
+      }
+      alert(`Success! Batch ${item.batchNo} has been quarantined and dispatched to Vendor RTV queue.`);
+    }
+  };
 
   const atRiskItems = useMemo(() => {
     const now = new Date();
@@ -182,12 +195,13 @@ export const ExpiryRadarPage = () => {
                 <th>Status / Days Left</th>
                 <th style={{ textAlign: 'center' }}>Box Stock</th>
                 <th style={{ textAlign: 'right' }}>Box MRP (Rs.)</th>
+                <th style={{ textAlign: 'center' }}>Vendor Return Action</th>
               </tr>
             </thead>
             <tbody>
               {displayedItems.length === 0 ? (
                 <tr>
-                  <td colSpan="9" style={{ textAlign: 'center', padding: '3rem', color: '#64748b' }}>
+                  <td colSpan="10" style={{ textAlign: 'center', padding: '3rem', color: '#64748b' }}>
                     No matching items found.
                   </td>
                 </tr>
@@ -207,6 +221,27 @@ export const ExpiryRadarPage = () => {
                     </td>
                     <td style={{ textAlign: 'center', fontWeight: 700 }}>{item.boxStock} Boxes</td>
                     <td style={{ textAlign: 'right', fontWeight: 700 }}>Rs. {item.boxPrice.toFixed(2)}</td>
+                    <td style={{ textAlign: 'center' }}>
+                      <button
+                        type="button"
+                        onClick={() => handleReturnToVendor(item)}
+                        className="btn btn-outline"
+                        style={{
+                          fontSize: '10.5px',
+                          padding: '0.25rem 0.55rem',
+                          color: '#dc2626',
+                          borderColor: '#fca5a5',
+                          borderRadius: '6px',
+                          fontWeight: 700,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.3rem'
+                        }}
+                        title="Quarantine batch and return to vendor"
+                      >
+                        <RotateCcw size={12} /> Return to Vendor (RTV)
+                      </button>
+                    </td>
                   </tr>
                 ))
               )}

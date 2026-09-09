@@ -136,6 +136,7 @@ export const Sidebar = ({ currentScreen, onNavigate, storeMode, onSwitchMode }) 
             <div style={{ display: 'flex', backgroundColor: '#f1f5f9', padding: '0.2rem', borderRadius: '8px', gap: '0.2rem' }}>
               <button
                 type="button"
+                className="sidebar-action-btn"
                 onClick={() => onSwitchMode('WHOLESALE')}
                 style={{
                   flex: 1,
@@ -155,6 +156,7 @@ export const Sidebar = ({ currentScreen, onNavigate, storeMode, onSwitchMode }) 
               </button>
               <button
                 type="button"
+                className="sidebar-action-btn"
                 onClick={() => onSwitchMode('RETAIL')}
                 style={{
                   flex: 1,
@@ -201,6 +203,7 @@ export const Sidebar = ({ currentScreen, onNavigate, storeMode, onSwitchMode }) 
             return (
               <li key={item.id}>
                 <button
+                  className={`sidebar-nav-btn ${isActive ? 'active' : ''}`}
                   onClick={() => onNavigate(item.id)}
                   title={isCollapsed ? item.label : undefined}
                   style={{
@@ -211,26 +214,13 @@ export const Sidebar = ({ currentScreen, onNavigate, storeMode, onSwitchMode }) 
                     padding: isCollapsed ? '0.65rem 0' : '0.55rem 0.75rem',
                     borderRadius: '10px',
                     border: 'none',
-                    borderLeft: isActive && !isCollapsed ? '3px solid #0284c7' : 'none',
+                    borderLeft: isActive && !isCollapsed ? '3px solid #0284c7' : '3px solid transparent',
                     backgroundColor: isActive ? '#e0f2fe' : 'transparent',
                     color: isActive ? '#0284c7' : '#475569',
                     fontWeight: isActive ? 800 : 500,
                     fontSize: '12px',
                     cursor: 'pointer',
-                    transition: 'all 0.15s ease',
                     position: 'relative'
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!isActive) {
-                      e.currentTarget.style.backgroundColor = '#f1f5f9';
-                      e.currentTarget.style.color = '#0284c7';
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (!isActive) {
-                      e.currentTarget.style.backgroundColor = 'transparent';
-                      e.currentTarget.style.color = '#475569';
-                    }
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>

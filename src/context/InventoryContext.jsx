@@ -235,12 +235,56 @@ export const InventoryProvider = ({ children }) => {
     setAuditLogs((prev) => [newLog, ...prev]);
   };
 
+  const parseExpiryDate = (expiryDateStr) => {
+    if (!expiryDateStr) return null;
+    const str = String(expiryDateStr).trim();
+    let d = null;
+    if (str.includes('-')) {
+      const parts = str.split('-');
+      if (parts.length === 2) {
+        if (parts[0].length === 4) {
+          d = new Date(Number(parts[0]), Number(parts[1]) - 1, 28);
+        } else {
+          d = new Date(Number(parts[1]), Number(parts[0]) - 1, 28);
+        }
+      } else if (parts.length === 3) {
+        if (parts[0].length === 4) {
+          d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+        } else {
+          d = new Date(Number(parts[2]), Number(parts[1]) - 1, Number(parts[0]));
+        }
+      }
+    } else if (str.includes('/')) {
+      const parts = str.split('/');
+      if (parts.length === 2) {
+        if (parts[0].length === 4) {
+          d = new Date(Number(parts[0]), Number(parts[1]) - 1, 28);
+        } else {
+          d = new Date(Number(parts[1]), Number(parts[0]) - 1, 28);
+        }
+      } else if (parts.length === 3) {
+        if (parts[0].length === 4) {
+          d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+        } else {
+          d = new Date(Number(parts[2]), Number(parts[1]) - 1, Number(parts[0]));
+        }
+      }
+    } else {
+      d = new Date(str);
+    }
+    return (d && !isNaN(d.getTime())) ? d : null;
+  };
+
   const isExpiryGreaterThan6Months = (expiryDateStr) => {
-    if (!expiryDateStr) return false;
-    const exp = new Date(expiryDateStr);
+    const exp = parseExpiryDate(expiryDateStr);
+    if (!exp) return false;
     const today = new Date();
-    const diffDays = Math.ceil((exp - today) / (1000 * 60 * 60 * 24));
+    const diffDays = Math.ceil((exp.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
     return diffDays > 180;
+  };
+
+  const isExpiryWithin6Months = (expiryDateStr) => {
+    return !isExpiryGreaterThan6Months(expiryDateStr);
   };
 
   const togglePrescriptionRequirement = (medicineId) => {
@@ -270,6 +314,7 @@ export const InventoryProvider = ({ children }) => {
       totalInwardCost += boxCost * boxesCount;
 
       let matchedMedId = item.medicineId || null;
+      const isShortExpiry = !isRetail && item.expiryDate && isExpiryWithin6Months(item.expiryDate);
 
       // 1. Update Master Medicine catalog price to new rates, increment stock, and update itemCode if provided
       setMedicines((prevMeds) => {
@@ -298,7 +343,7 @@ export const InventoryProvider = ({ children }) => {
                 purchasePriceBox: boxCost,
                 pricePerTablet: Number(tabPrice.toFixed(2)),
                 stripPrice: Number(stripPrice.toFixed(2)),
-                boxStock: (m.boxStock || 0) + boxesCount,
+                boxStock: isShortExpiry ? (m.boxStock || 0) : ((m.boxStock || 0) + boxesCount),
                 expiryDate: item.expiryDate || m.expiryDate || '2028-12-31',
                 rackLocation: cleanShelf || m.rackLocation || '',
               };
@@ -323,7 +368,7 @@ export const InventoryProvider = ({ children }) => {
             purchasePriceBox: boxCost,
             pricePerTablet: Number(tabPrice.toFixed(2)),
             stripPrice: Number(stripPrice.toFixed(2)),
-            boxStock: boxesCount,
+            boxStock: isShortExpiry ? 0 : boxesCount,
             stripsPerBox,
             tabletsPerStrip,
             tabletsPerBox: stripsPerBox * tabletsPerStrip,
@@ -361,18 +406,36 @@ export const InventoryProvider = ({ children }) => {
           medicineId: matchedMedId || item.medicineId || item.tradeName,
           distributorName: poRecord.supplierName || 'Pharma Distributor',
           expiryDate: item.expiryDate || '2028-12-31',
-          totalTabletsAvailable: totalTabs,
+          totalTabletsAvailable: isShortExpiry ? 0 : totalTabs,
           boxPrice: boxMrp,
           purchasePriceBox: boxCost,
           pricePerTablet: Number(tabPrice.toFixed(2)),
-          status: 'Active Stock',
+          status: isShortExpiry ? 'Quarantined RTV' : 'Active Stock',
           rackLocation: cleanShelf,
         };
 
         return [newBatch, ...updatedPrevious];
       });
 
-      addAuditLog('PO Inward Stock', item.tradeName, `Inwarded ${boxesCount} Boxes (${totalTabs} Tabs) @ Rs. ${boxCost}/box (MRP Rs. ${boxMrp}) from ${poRecord.supplierName}. Previous stock updated to new price.`, 'ADD');
+      if (isShortExpiry) {
+        const newRtv = {
+          id: `RTV-${Date.now().toString().slice(-6)}-${Math.floor(Math.random() * 1000)}`,
+          batchNumber: item.batchNo || `B26-RTV`,
+          brandName: item.tradeName || 'Medicine',
+          supplierName: poRecord.supplierName || 'Pharma Distributor',
+          expiryDate: item.expiryDate || 'N/A',
+          tabletsReturned: totalTabs,
+          claimAmount: Math.round(boxCost * boxesCount),
+          status: 'Pending Reimbursement',
+          returnDate: new Date().toISOString().split('T')[0],
+          loggedBy: 'Wholesale Policy (<6m Expiry)',
+          reimbursementLog: [],
+        };
+        setVendorReturns((prev) => [newRtv, ...prev]);
+        addAuditLog('Wholesale Inward Quarantined', item.tradeName, `Inward batch expiry <= 6 months (${item.expiryDate}). Blocked from active stock & moved to Vendor RTV queue.`, 'WARN', 'DRAP Compliance');
+      } else {
+        addAuditLog('PO Inward Stock', item.tradeName, `Inwarded ${boxesCount} Boxes (${totalTabs} Tabs) @ Rs. ${boxCost}/box (MRP Rs. ${boxMrp}) from ${poRecord.supplierName}. Previous stock updated to new price.`, 'ADD');
+      }
     });
 
     // 4. Dynamic Taxes Logging (Sales Tax, Adv Tax, AWH Tax, Custom Tax)
@@ -489,14 +552,16 @@ export const InventoryProvider = ({ children }) => {
     });
   };
 
-  const getEarliestValidBatch = (medicineId) => {
+  const getEarliestValidBatch = (medicineId, isWholesale = false) => {
     const available = batches
       .filter((b) => {
         if ((b.medicineId !== medicineId && b.id !== medicineId) || (b.totalTabletsAvailable !== undefined && b.totalTabletsAvailable <= 0) || b.status === 'Quarantined RTV') return false;
+        if (isWholesale && !isExpiryGreaterThan6Months(b.expiryDate)) return false;
         return true;
       })
       .sort((a, b) => new Date(a.expiryDate || '2028-01-01') - new Date(b.expiryDate || '2028-01-01'));
     if (available.length > 0) return available[0];
+    if (isWholesale) return null;
     return {
       batchNo: 'B-9481',
       batchNumber: 'B-9481',
@@ -675,6 +740,8 @@ export const InventoryProvider = ({ children }) => {
         recordVendorReimbursement,
         getEarliestValidBatch,
         isExpiryGreaterThan6Months,
+        isExpiryWithin6Months,
+        parseExpiryDate,
         togglePrescriptionRequirement,
         loadRetailMockData,
         clearRetailMockData,

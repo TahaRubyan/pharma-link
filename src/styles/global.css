@@ -72,25 +72,74 @@ button, input, select, textarea {
 
 /* Key Success Indicators (KSI) & KPI Cards — Exclusively Retain Smooth Hover & Active States */
 .ksi-card,
-.kpi-card {
-  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), 
-              box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1), 
-              border-color 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+.kpi-card,
+.card-kpi {
+  transition: transform 0.22s cubic-bezier(0.4, 0, 0.2, 1), 
+              box-shadow 0.22s cubic-bezier(0.4, 0, 0.2, 1), 
+              border-color 0.22s cubic-bezier(0.4, 0, 0.2, 1),
+              background-color 0.22s cubic-bezier(0.4, 0, 0.2, 1);
   cursor: pointer;
+  position: relative;
 }
 
 .ksi-card:hover,
-.kpi-card:hover {
-  transform: translateY(-2px);
+.kpi-card:hover,
+.card-kpi:hover {
+  transform: translateY(-4px) !important;
   border-color: #0284c7 !important;
-  box-shadow: 0 10px 20px -3px rgba(2, 132, 199, 0.12), 0 4px 6px -2px rgba(15, 23, 42, 0.04) !important;
+  box-shadow: 0 12px 24px -4px rgba(2, 132, 199, 0.18), 0 4px 8px -2px rgba(15, 23, 42, 0.06) !important;
 }
 
 .ksi-card:active,
-.kpi-card:active {
-  transform: translateY(0px) scale(0.99);
-  box-shadow: 0 2px 6px -1px rgba(2, 132, 199, 0.18) !important;
+.kpi-card:active,
+.card-kpi:active {
+  transform: translateY(-1px) scale(0.995) !important;
+  box-shadow: 0 4px 10px -2px rgba(2, 132, 199, 0.2) !important;
   border-color: #0284c7 !important;
+}
+
+/* Sidebar Navigation Interactive & Hover States */
+.sidebar-nav-btn {
+  display: flex;
+  align-items: center;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  position: relative;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.sidebar-nav-btn:hover {
+  transform: translateX(4px) !important;
+  background-color: #f0f9ff !important;
+  color: #0284c7 !important;
+}
+
+.sidebar-nav-btn:hover svg {
+  color: #0284c7 !important;
+  transform: scale(1.12);
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.sidebar-nav-btn.active {
+  background-color: #e0f2fe !important;
+  color: #0284c7 !important;
+  font-weight: 800 !important;
+  border-left: 3px solid #0284c7 !important;
+}
+
+.sidebar-nav-btn:active {
+  transform: translateX(2px) scale(0.98) !important;
+}
+
+/* Sidebar Action Buttons Hover */
+.sidebar-action-btn {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.sidebar-action-btn:hover {
+  background-color: #e0f2fe !important;
+  color: #0284c7 !important;
+  transform: translateY(-1px);
 }
 
 /* Interactive & Clickable Cards across the system (Clean flat pointer) */
@@ -339,9 +388,9 @@ button, input, select, textarea {
   /* -------------------------------------------------------------
      2. A4 COMMERCIAL TAX INVOICE & DOCUMENT PRINT ENGINE (FBR / FORM 2A)
      ------------------------------------------------------------- */
-  /* Isolated A4 Mount (guarantees zero sidebar or web layout bleed) */
-  body.printing-a4 #root,
-  body:has(#a4-print-mount > *) #root {
+  /* Isolated A4 Mount (guarantees zero sidebar or web layout bleed when portal is active) */
+  body:has(#a4-print-mount > *) #root,
+  body.printing-a4:has(#a4-print-mount > *) #root {
     display: none !important;
     height: 0 !important;
     max-height: 0 !important;
@@ -349,8 +398,8 @@ button, input, select, textarea {
     visibility: hidden !important;
   }
 
-  body.printing-a4 > *:not(#a4-print-mount),
-  body:has(#a4-print-mount > *) > *:not(#a4-print-mount) {
+  body:has(#a4-print-mount > *) > *:not(#a4-print-mount),
+  body.printing-a4:has(#a4-print-mount > *) > *:not(#a4-print-mount) {
     display: none !important;
   }
 

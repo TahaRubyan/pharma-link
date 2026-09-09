@@ -23,7 +23,7 @@ import { useInventory } from '../../context/InventoryContext';
 
 export const NewPOModal = ({ isOpen, onClose }) => {
   const { suppliers = [], addSupplier, createPurchaseOrder, generatePONumber } = useSupplier();
-  const { medicines = [], inwardPOStock } = useInventory();
+  const { medicines = [], inwardPOStock, isExpiryWithin6Months } = useInventory();
 
   // Wizard Step: 1 = Company & Dates, 2 = Items, 3 = Payment & Confirmation
   const [currentStep, setCurrentStep] = useState(1);
@@ -242,8 +242,12 @@ export const NewPOModal = ({ isOpen, onClose }) => {
   // Step 1 Validation
   const canProceedFromStep1 = Boolean(selectedDistributor.trim() && poCode.trim() && inwardDate);
 
-  // Step 2 Validation
-  const canProceedFromStep2 = items.length > 0 && items.every(it => 
+  // Step 2 Validation: Wholesale rule blocks PO inward if any item has expiry <= 6 months
+  const hasShortExpiryItems = items.some(it => 
+    it.expiryDate && typeof isExpiryWithin6Months === 'function' && isExpiryWithin6Months(it.expiryDate)
+  );
+
+  const canProceedFromStep2 = items.length > 0 && !hasShortExpiryItems && items.every(it => 
     it.tradeName.trim() && Number(it.inwardBoxes) > 0 && Number(it.purchaseCost) >= 0
   );
 
@@ -690,9 +694,25 @@ export const NewPOModal = ({ isOpen, onClose }) => {
                             placeholder="12-2028"
                             value={it.expiryDate}
                             onChange={(e) => handleItemChange(idx, 'expiryDate', e.target.value)}
-                            style={{ width: '75px', padding: '0.35rem 0.5rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '11px' }}
+                            style={{
+                              width: '80px',
+                              padding: '0.35rem 0.5rem',
+                              borderRadius: '6px',
+                              border: (it.expiryDate && typeof isExpiryWithin6Months === 'function' && isExpiryWithin6Months(it.expiryDate))
+                                ? '2px solid #ef4444'
+                                : '1px solid #cbd5e1',
+                              backgroundColor: (it.expiryDate && typeof isExpiryWithin6Months === 'function' && isExpiryWithin6Months(it.expiryDate))
+                                ? '#fef2f2'
+                                : '#ffffff',
+                              fontSize: '11px'
+                            }}
                             required
                           />
+                          {it.expiryDate && typeof isExpiryWithin6Months === 'function' && isExpiryWithin6Months(it.expiryDate) && (
+                            <div style={{ color: '#dc2626', fontSize: '8.5px', fontWeight: 800, marginTop: '2px', lineHeight: 1.1 }}>
+                              ⛔ &le;6m (Blocked)
+                            </div>
+                          )}
                         </td>
                         <td>
                           <input
@@ -754,6 +774,27 @@ export const NewPOModal = ({ isOpen, onClose }) => {
                 </tbody>
               </table>
             </div>
+
+            {/* WHOLESALE EXPIRY COMPLIANCE WARNING BANNER */}
+            {hasShortExpiryItems && (
+              <div style={{
+                padding: '0.65rem 0.85rem',
+                backgroundColor: '#fef2f2',
+                border: '1.5px solid #f87171',
+                borderRadius: '10px',
+                color: '#991b1b',
+                fontSize: '11.5px',
+                fontWeight: 700,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem'
+              }}>
+                <span style={{ fontSize: '15px' }}>⚠️</span>
+                <div>
+                  <strong>Wholesale Compliance Warning:</strong> One or more items have an expiry date &le; 6 months. Under DRAP Wholesale Distribution Rules, medicines expiring within 6 months cannot be added to Purchase Orders. Please update the expiry date or reject these batches.
+                </div>
+              </div>
+            )}
 
             {/* DEDICATED DISTRIBUTOR TAX ASSESSMENT PANEL (As Defined by Seller on Invoice) */}
             <div style={{

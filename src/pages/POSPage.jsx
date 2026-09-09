@@ -42,7 +42,7 @@ import POSDebtCustomerModal from '../components/modals/POSDebtCustomerModal';
 import WhatsAppCreditModal from '../components/modals/WhatsAppCreditModal';
 
 export const POSPage = ({ storeMode: propStoreMode }) => {
-  const { medicines = [], batches = [], getEarliestValidBatch, deductStock } = useInventory();
+  const { medicines = [], batches = [], getEarliestValidBatch, deductStock, isExpiryGreaterThan6Months, isExpiryWithin6Months } = useInventory();
   const { cart, addToCart, updateQty, updateCartItem, updateUnitType, removeFromCart, clearCart, rxPatient, setRxPatient, openModal } = useCart();
   const { recordSale } = useSales();
   const { currentShop, user } = useAuth();
@@ -205,9 +205,18 @@ export const POSPage = ({ storeMode: propStoreMode }) => {
   }, [searchResults, selectedHighlightIndex, isRetail, cart, isSearchFocused]);
 
   const handleSelectMedicine = (medicine) => {
-    const earliestBatch = getEarliestValidBatch(medicine.id || medicine.itemCode);
-    const defaultUnit = isRetail ? 'Tablet' : 'Box';
-    addToCart(medicine, earliestBatch, defaultUnit);
+    if (!isRetail) {
+      // Wholesale mode: check if earliest valid batch has expiry > 6 months
+      const earliestBatch = getEarliestValidBatch(medicine.id || medicine.itemCode, true);
+      if (!earliestBatch || (typeof isExpiryGreaterThan6Months === 'function' && !isExpiryGreaterThan6Months(earliestBatch.expiryDate))) {
+        alert(`⚠️ Wholesale Compliance Violation:\n\nCannot sell "${medicine.brandName || medicine.name}".\nBatch expiry (${earliestBatch?.expiryDate || medicine.expiryDate || 'N/A'}) is within 6 months.\n\nUnder Wholesale Pharmaceutical regulations (DRAP), medicines expiring within 6 months cannot be sold from stock and are transferred to Expiry & Vendor Returns (RTV).`);
+        return;
+      }
+      addToCart(medicine, earliestBatch, 'Box');
+    } else {
+      const earliestBatch = getEarliestValidBatch(medicine.id || medicine.itemCode, false);
+      addToCart(medicine, earliestBatch, 'Tablet');
+    }
     setSearchQuery('');
     setSelectedHighlightIndex(0);
     setIsSearchFocused(false);
@@ -631,6 +640,8 @@ export const POSPage = ({ storeMode: propStoreMode }) => {
                   const isSelected = idx === selectedHighlightIndex;
                   const price = Number(m.boxSellingPrice || m.boxPrice || m.price || 600);
                   const tabPrice = Number(m.pricePerTablet || (price / 200) || 3.0);
+                  const wholesaleBatch = !isRetail ? getEarliestValidBatch(m.id || m.itemCode, true) : null;
+                  const isShortExpiryWholesale = !isRetail && (!wholesaleBatch || (typeof isExpiryGreaterThan6Months === 'function' && !isExpiryGreaterThan6Months(wholesaleBatch.expiryDate)));
 
                   return (
                     <div
@@ -642,7 +653,7 @@ export const POSPage = ({ storeMode: propStoreMode }) => {
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'space-between',
-                        backgroundColor: isSelected ? '#0284c7' : '#ffffff',
+                        backgroundColor: isSelected ? (isShortExpiryWholesale ? '#dc2626' : '#0284c7') : '#ffffff',
                         color: isSelected ? '#ffffff' : '#0f172a',
                         cursor: 'pointer',
                         borderBottom: '1px solid #f1f5f9'
@@ -650,23 +661,29 @@ export const POSPage = ({ storeMode: propStoreMode }) => {
                       onMouseEnter={() => setSelectedHighlightIndex(idx)}
                     >
                       <div>
-                        <div style={{ fontWeight: 700, fontSize: '13px', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                        <div style={{ fontWeight: 700, fontSize: '13px', display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
                           <span>{m.name || m.brandName}</span>
                           {isRetail && m.controlledType === 'Narcotic' && <span style={{ fontSize: '9px', backgroundColor: '#dc2626', color: '#fff', padding: '0.1rem 0.35rem', borderRadius: '4px', fontWeight: 800 }}>NARCOTIC</span>}
                           {isRetail && m.requiresPrescription && m.controlledType !== 'Narcotic' && <span style={{ fontSize: '9px', backgroundColor: '#d97706', color: '#fff', padding: '0.1rem 0.35rem', borderRadius: '4px', fontWeight: 800 }}>Rx</span>}
+                          {isShortExpiryWholesale && (
+                            <span style={{ fontSize: '9px', backgroundColor: isSelected ? '#7f1d1d' : '#fee2e2', color: isSelected ? '#fecaca' : '#dc2626', border: '1px solid #f87171', padding: '0.1rem 0.35rem', borderRadius: '4px', fontWeight: 800 }}>
+                              ⛔ &le;6M EXPIRY (RTV)
+                            </span>
+                          )}
                         </div>
                         <div style={{ fontSize: '11px', color: isSelected ? '#e0f2fe' : '#64748b', marginTop: '0.15rem' }}>
                           Code: {m.itemCode || m.id} • Formula: {m.formula || m.genericFormula} • 📍 Shelf: {m.rackLocation || 'Rack A-01'}
                           {isRetail && <span style={{ marginLeft: '0.5rem', color: '#16a34a', fontWeight: 700 }}>• Exp: {m.expiryDate || '10/2026'}</span>}
+                          {!isRetail && wholesaleBatch && <span style={{ marginLeft: '0.5rem', color: isSelected ? '#ffffff' : '#0284c7', fontWeight: 700 }}>• Batch: {wholesaleBatch.batchNumber || wholesaleBatch.batchNo} ({wholesaleBatch.expiryDate})</span>}
                         </div>
                       </div>
 
                       <div style={{ textAlign: 'right' }}>
-                        <div style={{ fontSize: '13px', fontWeight: 800, color: isSelected ? '#ffffff' : '#16a34a' }}>
-                          {isRetail ? `Rs. ${tabPrice.toFixed(2)}/tab` : `Rs. ${price.toFixed(2)}/box`}
+                        <div style={{ fontSize: '13px', fontWeight: 800, color: isSelected ? '#ffffff' : (isShortExpiryWholesale ? '#dc2626' : '#16a34a') }}>
+                          {isShortExpiryWholesale ? '⛔ Quarantined' : (isRetail ? `Rs. ${tabPrice.toFixed(2)}/tab` : `Rs. ${price.toFixed(2)}/box`)}
                         </div>
                         <div style={{ fontSize: '10px', color: isSelected ? '#e0f2fe' : '#64748b' }}>
-                          Stock: {m.boxStock !== undefined ? m.boxStock : 10} Boxes
+                          {isShortExpiryWholesale ? 'RTV Return Only' : `Stock: ${m.boxStock !== undefined ? m.boxStock : 10} Boxes`}
                         </div>
                       </div>
                     </div>

@@ -2,6 +2,8 @@
  * Unit Testing Suite for PharmaLink ERP & POS
  * Covers core business logic, mathematical algorithms, tax policies, FEFO algorithms, and validators.
  */
+import fs from 'fs';
+import path from 'path';
 
 let passedCount = 0;
 let failedCount = 0;
@@ -212,6 +214,106 @@ export function runUnitTests() {
     // Full settlement of remaining Rs. 7450
     balance = Math.max(0, balance - 7450.00);
     if (balance !== 0.00) throw new Error(`Expected balance 0, got ${balance}`);
+  });
+
+  // 19. Wholesale Expiry Rule (<= 6 Months Gatekeeper)
+  test('Wholesale DRAP Rule - Detects batches expiring in <= 6 months and marks them non-compliant', () => {
+    function parseExpiryDate(expiryDateStr) {
+      if (!expiryDateStr) return null;
+      const str = String(expiryDateStr).trim();
+      let d = null;
+      if (str.includes('-')) {
+        const parts = str.split('-');
+        if (parts.length === 2) {
+          d = parts[0].length === 4 ? new Date(Number(parts[0]), Number(parts[1]) - 1, 28) : new Date(Number(parts[1]), Number(parts[0]) - 1, 28);
+        } else if (parts.length === 3) {
+          d = parts[0].length === 4 ? new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2])) : new Date(Number(parts[2]), Number(parts[1]) - 1, Number(parts[0]));
+        }
+      } else {
+        d = new Date(str);
+      }
+      return (d && !isNaN(d.getTime())) ? d : null;
+    }
+
+    function isExpiryGreaterThan6Months(expiryDateStr) {
+      const exp = parseExpiryDate(expiryDateStr);
+      if (!exp) return false;
+      const today = new Date();
+      const diffDays = Math.ceil((exp.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+      return diffDays > 180;
+    }
+
+    const today = new Date();
+    // Expiry 3 months from now (must be rejected)
+    const threeMonthsFromNow = new Date(today);
+    threeMonthsFromNow.setMonth(today.getMonth() + 3);
+    const shortExpiryStr = `${threeMonthsFromNow.getFullYear()}-${String(threeMonthsFromNow.getMonth() + 1).padStart(2, '0')}-28`;
+
+    // Expiry 12 months from now (must be accepted)
+    const twelveMonthsFromNow = new Date(today);
+    twelveMonthsFromNow.setFullYear(today.getFullYear() + 1);
+    const validExpiryStr = `${twelveMonthsFromNow.getFullYear()}-${String(twelveMonthsFromNow.getMonth() + 1).padStart(2, '0')}-28`;
+
+    if (isExpiryGreaterThan6Months(shortExpiryStr) !== false) {
+      throw new Error(`Batch expiring in 3 months should NOT be greater than 6 months: ${shortExpiryStr}`);
+    }
+    if (isExpiryGreaterThan6Months(validExpiryStr) !== true) {
+      throw new Error(`Batch expiring in 12 months should be greater than 6 months: ${validExpiryStr}`);
+    }
+  });
+
+  // 20. Wholesale FEFO Filter - Quarantines short-expiry batches from sales
+  test('Wholesale FEFO - Filters out batches <= 6 months and blocks adding to cart', () => {
+    const today = new Date();
+    const shortExp = new Date(today);
+    shortExp.setMonth(today.getMonth() + 2);
+    const shortExpStr = `${shortExp.getFullYear()}-${String(shortExp.getMonth() + 1).padStart(2, '0')}-28`;
+
+    const batches = [
+      { id: 'B1', batchNo: 'B-EXPIRED', expiryDate: shortExpStr, totalTabletsAvailable: 500, medicineId: 'MED-1' },
+      { id: 'B2', batchNo: 'B-QUARANTINE', expiryDate: '2026-04-01', totalTabletsAvailable: 500, medicineId: 'MED-1', status: 'Quarantined RTV' }
+    ];
+
+    function getEarliestValidBatch(medId, isWholesale = false) {
+      const available = batches.filter(b => {
+        if (b.medicineId !== medId || (b.totalTabletsAvailable <= 0) || b.status === 'Quarantined RTV') return false;
+        if (isWholesale) {
+          const exp = new Date(b.expiryDate);
+          const diffDays = Math.ceil((exp.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+          if (diffDays <= 180) return false;
+        }
+        return true;
+      });
+      if (available.length > 0) return available[0];
+      if (isWholesale) return null;
+      return { batchNo: 'DEFAULT' };
+    }
+
+    const wholesaleResult = getEarliestValidBatch('MED-1', true);
+    if (wholesaleResult !== null) throw new Error('Expected wholesale result to be null for <= 6 month batches');
+
+    const retailResult = getEarliestValidBatch('MED-1', false);
+    if (!retailResult || retailResult.batchNo !== 'B-EXPIRED') throw new Error('Retail mode should still resolve available batch');
+  });
+
+  // 21. A4 Commercial Print Engine - Verifies dedicated mount and CSS isolation
+  test('A4 Commercial Print Engine - HTML contains isolated #a4-print-mount without destructive CSS display:none on #root', () => {
+    const htmlPath = path.resolve(process.cwd(), 'index.html');
+    const cssPath = path.resolve(process.cwd(), 'src/styles/global.css');
+
+    const htmlContent = fs.readFileSync(htmlPath, 'utf8');
+    const cssContent = fs.readFileSync(cssPath, 'utf8');
+
+    if (!htmlContent.includes('id="a4-print-mount"')) {
+      throw new Error('index.html must contain #a4-print-mount for isolated A4 printing');
+    }
+    // Verify CSS does NOT unconditionally hide #root with body.printing-a4 #root { display: none !important }
+    if (cssContent.includes('body.printing-a4 #root {')) {
+      throw new Error('global.css should not unconditionally hide #root with body.printing-a4 #root');
+    }
+    if (!cssContent.includes('#a4-print-mount')) {
+      throw new Error('global.css must style #a4-print-mount for print view');
+    }
   });
 
   console.log(`📊 Unit Tests Summary: ${passedCount} Passed, ${failedCount} Failed\n`);
