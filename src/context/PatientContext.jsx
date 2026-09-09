@@ -9,6 +9,9 @@ export const PatientProvider = ({ children }) => {
   const isRetail = auth?.currentShop?.mode === 'RETAIL';
 
   const [wholesalePatients, setWholesalePatients] = useState(() => {
+    const isCleared = typeof localStorage !== 'undefined' && localStorage.getItem('pharmalink_wholesale_cleared') === 'true';
+    if (isCleared) return [];
+
     const saved = localStorage.getItem('pharmalink_pk_patients');
     if (saved) {
       try {

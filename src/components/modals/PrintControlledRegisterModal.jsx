@@ -12,7 +12,7 @@ export const PrintControlledRegisterModal = ({ isOpen, onClose, records = [], ac
 
   // Group records by Dispensed By (Cashier / User) for easy tallying
   const groupedByUser = records.reduce((acc, r) => {
-    const cashier = r.cashierName || 'Dr. Idrees (Pharmacist)';
+    const cashier = r.cashierName || 'Testing Shop Admin';
     if (!acc[cashier]) {
       acc[cashier] = [];
     }
@@ -56,7 +56,7 @@ export const PrintControlledRegisterModal = ({ isOpen, onClose, records = [], ac
           <div style={{ borderBottom: '2px solid #000000', paddingBottom: '0.75rem', marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <div>
               <div style={{ fontSize: '18px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '-0.02em', color: '#0f172a' }}>
-                {currentShop?.shopName || 'Idrees Medical Store'}
+                {currentShop?.shopName || 'Testing Shop'}
               </div>
               <div style={{ fontSize: '11px', color: '#334155', fontWeight: 600 }}>
                 {currentShop?.address || 'F-7 Markaz, Islamabad, Pakistan'} | Phone: {currentShop?.phone || '051-2345678'}

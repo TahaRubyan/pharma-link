@@ -84,7 +84,7 @@ export const Topbar = ({ currentScreen, onNavigate }) => {
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '11px', color: '#6b7280', paddingLeft: '0.75rem', borderLeft: '1px solid #e5e7eb' }}>
             <Store size={13} color="#0284c7" />
-            <span style={{ fontWeight: 700, color: '#0284c7' }}>{currentShop ? currentShop.shopName : 'Idrees Medical Store'}</span>
+            <span style={{ fontWeight: 700, color: '#0284c7' }}>{currentShop ? currentShop.shopName : 'Testing Shop'}</span>
           </div>
         </div>
 

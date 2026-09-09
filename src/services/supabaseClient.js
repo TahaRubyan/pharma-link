@@ -1,52 +1,38 @@
-import { rateLimiter } from './rateLimiter';
+import { createClient } from '@supabase/supabase-js';
 
-const SUPABASE_URL = typeof import.meta !== 'undefined' && import.meta.env?.VITE_SUPABASE_URL || '';
-const SUPABASE_ANON_KEY = typeof import.meta !== 'undefined' && import.meta.env?.VITE_SUPABASE_ANON_KEY || '';
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://rwauhobqpegxmaztxbnd.supabase.co';
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ3YXVob2JxcGVneG1henR4Ym5kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg5NDg2NTksImV4cCI6MjEwNDUyNDY1OX0.MfJXXeM3b-xwbQxqS6dLaKQuXnQVGrLfHJ9F0bUsN7s';
 
-export const isSupabaseConfigured = Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
+export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey && !supabaseUrl.includes('your-project-ref'));
 
-export const supabaseClient = {
-  isConfigured: isSupabaseConfigured,
-  url: SUPABASE_URL,
+export const supabase = isSupabaseConfigured
+  ? createClient(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+      },
+      db: {
+        schema: 'public',
+      },
+    })
+  : null;
 
-  // Helper to query with tenant header protected by token bucket rate limiter
-  queryWithTenant: async (table, tenantId, options = {}) => {
-    const priority = options.priority || 'NORMAL';
-
-    if (!isSupabaseConfigured) {
-      // Fallback to local storage
-      const localKey = `pharmalink_${table}`;
-      const data = JSON.parse(localStorage.getItem(localKey) || '[]');
-      return { data, error: null };
+/**
+ * Health check to verify live connectivity with Supabase Postgres
+ */
+export async function checkSupabaseHealth() {
+  if (!supabase) return { connected: false, reason: 'Client not configured' };
+  try {
+    const { data, error } = await supabase.from('tenants').select('tenant_id').limit(1);
+    if (error) {
+      console.warn('[Supabase] Health check returned error:', error.message);
+      return { connected: false, error: error.message };
     }
-
-    try {
-      // Schedule query through RateLimiter to protect free tier from 429 bursts
-      return await rateLimiter.schedule(async () => {
-        const response = await fetch(`${SUPABASE_URL}/rest/v1/${table}?tenant_id=eq.${tenantId}`, {
-          headers: {
-            'apikey': SUPABASE_ANON_KEY,
-            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-            'Content-Type': 'application/json',
-            'X-Tenant-ID': tenantId
-          }
-        });
-
-        if (response.status === 429) {
-          const err = new Error('HTTP 429: Supabase Free Tier Rate Limit Exceeded');
-          err.status = 429;
-          throw err;
-        }
-
-        const data = await response.json();
-        return { data, error: null };
-      }, priority);
-    } catch (err) {
-      // Seamless local fallback if circuit tripped or network failed
-      console.warn(`[SupabaseClient] Network or rate limit fallback on ${table}:`, err.message);
-      const localKey = `pharmalink_${table}`;
-      const data = JSON.parse(localStorage.getItem(localKey) || '[]');
-      return { data, error: null, isFallback: true };
-    }
+    return { connected: true, data };
+  } catch (err) {
+    console.warn('[Supabase] Health check network error:', err);
+    return { connected: false, error: err.message };
   }
-};
+}
+
+export default supabase;

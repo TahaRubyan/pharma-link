@@ -5,9 +5,9 @@
 
 -- 1. TENANTS REGISTRY (Master SaaS Directory)
 CREATE TABLE IF NOT EXISTS public.tenants (
-    id TEXT PRIMARY KEY,                       -- e.g. 'TEN-IDREES-WS', 'TEN-IDREES-RT'
-    name TEXT NOT NULL,                        -- e.g. 'Idrees Pharma Distributor'
-    mode TEXT NOT NULL CHECK (mode IN ('RETAIL', 'WHOLESALE')),
+    id TEXT PRIMARY KEY,                       -- e.g. 'TEN-TESTING-SHOP'
+    name TEXT NOT NULL,                        -- e.g. 'Testing Shop'
+    mode TEXT NOT NULL CHECK (mode IN ('RETAIL', 'WHOLESALE', 'HYBRID')),
     tier TEXT NOT NULL DEFAULT 'FREE_TRIAL' CHECK (tier IN ('FREE_TRIAL', 'ACTIVE_PRO', 'SUSPENDED')),
     trial_ends_at TIMESTAMP WITH TIME ZONE,
     city TEXT,
@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS public.tenants (
 CREATE TABLE IF NOT EXISTS public.tenant_users (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id TEXT NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
-    username TEXT UNIQUE NOT NULL,             -- e.g. 'idrees.wholesale', 'idrees.retail'
+    username TEXT UNIQUE NOT NULL,             -- e.g. 'testing.admin'
     password_hash TEXT NOT NULL,
     full_name TEXT NOT NULL,
     role TEXT NOT NULL CHECK (role IN ('ADMIN', 'CASHIER', 'DELIVERY_STAFF')),
@@ -176,9 +176,8 @@ CREATE POLICY IF NOT EXISTS tenant_isolation_suppliers ON public.suppliers
 CREATE POLICY IF NOT EXISTS tenant_isolation_patients ON public.patients
     FOR ALL USING (tenant_id = current_setting('request.headers', true)::json->>'x-tenant-id');
 
--- Initial Seed for Idrees Wholesale Depot and Retail Sandbox
+-- Initial Seed for Testing Shop (Hybrid Mode)
 INSERT INTO public.tenants (id, name, mode, tier, city, dl_number, gstin, ntn, address, phone)
 VALUES 
-    ('TEN-IDREES-WS', 'Idrees Pharma Distributor', 'WHOLESALE', 'ACTIVE_PRO', 'Gujrat', '09-342-0139-045748D', '3277876174544', '4442705-7', 'Jalal Pur Jattan, Gujrat', '053-3724601'),
-    ('TEN-IDREES-RT', 'Idrees Retail Medical Store', 'RETAIL', 'FREE_TRIAL', 'Gujrat', 'PK-DL-20-45812 & Form 21', 'PK-1234567-8', '0792320-1', 'Circular Road, Gujrat', '053-3724600')
+    ('TEN-TESTING-SHOP', 'Testing Shop', 'HYBRID', 'ACTIVE_PRO', 'Lahore', 'PK-DL-20-45812', '3277876174544', '1234567-8', 'Mall Road, Commercial Area, Lahore', '0300-1234567')
 ON CONFLICT (id) DO NOTHING;

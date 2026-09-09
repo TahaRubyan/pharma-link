@@ -33,6 +33,20 @@ export const A4InvoiceModal = () => {
 
   const isOpen = activeModal === 'a4';
 
+  React.useEffect(() => {
+    if (isOpen) {
+      document.body.classList.add('printing-a4');
+      const handleAfterPrint = () => {
+        // print done
+      };
+      window.addEventListener('afterprint', handleAfterPrint);
+      return () => {
+        document.body.classList.remove('printing-a4');
+        window.removeEventListener('afterprint', handleAfterPrint);
+      };
+    }
+  }, [isOpen]);
+
   // Use last completed sale if available, otherwise construct preview from active cart
   const sale = lastCompletedSale || {
     invoiceNo: 'TAX-2026-PREVIEW',
@@ -52,7 +66,10 @@ export const A4InvoiceModal = () => {
 
   const handlePrint = () => {
     addToast('Printing', 'A4 Tax Invoice dispatched to system printer.', 'success');
-    window.print();
+    document.body.classList.add('printing-a4');
+    setTimeout(() => {
+      window.print();
+    }, 50);
   };
 
   return (

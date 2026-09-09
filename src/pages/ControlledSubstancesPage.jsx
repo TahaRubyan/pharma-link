@@ -48,7 +48,7 @@ export const ControlledSubstancesPage = () => {
           invoiceNo: inv.invoiceNo,
           date: inv.date,
           time: inv.time,
-          cashierName: inv.cashierName || 'Dr. Idrees (Pharmacist)',
+          cashierName: inv.cashierName || 'Testing Shop Admin',
           customerName: inv.customerName || (inv.patient ? inv.patient.name : 'Walk-in Customer'),
           doctorName: inv.doctorName || (inv.patient ? inv.patient.prescribingDoctor : 'Dr. Aamir Khan (PMC-45812)'),
           brandName: item.brandName || item.name,

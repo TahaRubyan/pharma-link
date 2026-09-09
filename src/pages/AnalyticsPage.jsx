@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   TrendingUp, 
   DollarSign, 
@@ -7,28 +7,30 @@ import {
   Printer, 
   ShieldCheck, 
   Search, 
-  CheckCircle,
-  Eye,
-  Activity,
-  Package,
-  Layers,
-  Percent,
-  ArrowUpRight,
-  ArrowDownRight,
-  Truck,
-  ChevronDown,
-  ChevronRight
+  CheckCircle, 
+  Eye, 
+  Activity, 
+  Package, 
+  Layers, 
+  Percent, 
+  ArrowUpRight, 
+  ArrowDownRight, 
+  Truck, 
+  ChevronDown, 
+  ChevronRight,
+  ClipboardList,
+  BarChart3,
+  UserCheck
 } from 'lucide-react';
 import { useSales } from '../context/SalesContext';
 import { useInventory } from '../context/InventoryContext';
 import { useAuth, formatDateDDMMYYYY } from '../context/AuthContext';
-import FBRLawyerReportModal from '../components/modals/FBRLawyerReportModal';
 import AnalyticsReportModal from '../components/modals/AnalyticsReportModal';
 import A4InvoicePrintModal from '../components/modals/A4InvoicePrintModal';
 
 export const AnalyticsPage = () => {
   const { invoices = [] } = useSales();
-  const { medicines = [], poTaxLogs = [] } = useInventory();
+  const { medicines = [] } = useInventory();
   const { currentShop } = useAuth();
   const isRetail = currentShop?.mode === 'RETAIL';
 
@@ -43,7 +45,8 @@ export const AnalyticsPage = () => {
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
   const sevenDaysAgoStr = sevenDaysAgo.toISOString().split('T')[0];
 
-  const [activeTab, setActiveTab] = useState('SALES_LOGS'); // 'SALES_LOGS' | 'MEDICINE_MOVEMENT' | 'TAX_RECONCILIATION'
+  const [activeTab, setActiveTab] = useState('SALES_LOGS'); // 'SALES_LOGS' | 'MEDICINE_MOVEMENT'
+  const [movementViewMode, setMovementViewMode] = useState('TRACEABILITY'); // 'TRACEABILITY' | 'VELOCITY'
   const [selectedPeriod, setSelectedPeriod] = useState('30_DAYS'); // 'TODAY' | '7_DAYS' | '30_DAYS' | 'CUSTOM'
   const [startDate, setStartDate] = useState(thirtyDaysAgoStr);
   const [endDate, setEndDate] = useState(todayStr);
@@ -51,13 +54,25 @@ export const AnalyticsPage = () => {
   const [movementSearch, setMovementSearch] = useState('');
 
   // Modals state
-  const [isFBRLawyerModalOpen, setIsFBRLawyerModalOpen] = useState(false);
   const [isAnalyticsReportOpen, setIsAnalyticsReportOpen] = useState(false);
   const [viewInvoice, setViewInvoice] = useState(null);
 
+  const round2 = (num) => Math.round((Number(num || 0) + Number.EPSILON) * 100) / 100;
+
   // 1. FILTERED SALES TRANSACTIONS
   const filteredInvoices = useMemo(() => {
+    const q = searchLogQuery.toLowerCase().trim();
     return invoices.filter((inv) => {
+      // If user is searching by invoice # or customer/shop query, search all historical invoices
+      if (q.length > 0) {
+        return (
+          (inv.invoiceNo && inv.invoiceNo.toLowerCase().includes(q)) ||
+          (inv.customerName && inv.customerName.toLowerCase().includes(q)) ||
+          (inv.shopName && inv.shopName.toLowerCase().includes(q)) ||
+          (inv.paymentMode && inv.paymentMode.toLowerCase().includes(q))
+        );
+      }
+
       if (selectedPeriod === 'TODAY') {
         if (inv.date !== todayStr) return false;
       } else if (selectedPeriod === '7_DAYS') {
@@ -69,27 +84,36 @@ export const AnalyticsPage = () => {
         if (endDate && inv.date > endDate) return false;
       }
 
-      if (searchLogQuery.trim().length > 0) {
-        const q = searchLogQuery.toLowerCase().trim();
-        return (
-          (inv.invoiceNo && inv.invoiceNo.toLowerCase().includes(q)) ||
-          (inv.customerName && inv.customerName.toLowerCase().includes(q)) ||
-          (inv.shopName && inv.shopName.toLowerCase().includes(q)) ||
-          (inv.paymentMode && inv.paymentMode.toLowerCase().includes(q))
-        );
-      }
       return true;
     });
-  }, [invoices, selectedPeriod, startDate, endDate, searchLogQuery, todayStr]);
+  }, [invoices, selectedPeriod, startDate, endDate, searchLogQuery, todayStr, sevenDaysAgoStr, thirtyDaysAgoStr]);
 
-  // Turnover Metrics
-  const grossTurnover = filteredInvoices.reduce((sum, inv) => sum + Number(inv.subtotal || inv.grossTotal || inv.netTotal || 0), 0);
-  const totalDiscounts = filteredInvoices.reduce((sum, inv) => sum + Number(inv.discount || 0), 0);
-  const netTurnover = filteredInvoices.reduce((sum, inv) => sum + Number(inv.netTotal || inv.subtotal || 0), 0);
-  const estProfit = netTurnover * 0.22;
+  // Turnover Metrics with strict 2-decimal precision
+  const grossTurnover = round2(filteredInvoices.reduce((sum, inv) => sum + Number(inv.subtotal || inv.grossTotal || inv.netTotal || 0), 0));
+  const totalDiscounts = round2(filteredInvoices.reduce((sum, inv) => sum + Number(inv.discount || 0), 0));
+  const netTurnover = round2(filteredInvoices.reduce((sum, inv) => sum + Number(inv.netTotal || inv.subtotal || 0), 0));
+  const estProfit = round2(netTurnover * 0.22);
 
   // Accordion State for Daily Logs
   const [expandedDates, setExpandedDates] = useState({ [todayStr]: true });
+
+  // Auto-expand all dates that contain search query matches
+  useEffect(() => {
+    if (searchLogQuery.trim().length > 0) {
+      const q = searchLogQuery.toLowerCase().trim();
+      const matchMap = {};
+      invoices.forEach((inv) => {
+        if (
+          (inv.invoiceNo && inv.invoiceNo.toLowerCase().includes(q)) ||
+          (inv.customerName && inv.customerName.toLowerCase().includes(q)) ||
+          (inv.shopName && inv.shopName.toLowerCase().includes(q))
+        ) {
+          matchMap[inv.date || todayStr] = true;
+        }
+      });
+      setExpandedDates((prev) => ({ ...prev, ...matchMap }));
+    }
+  }, [searchLogQuery, invoices, todayStr]);
 
   const toggleDateAccordion = (dateKey) => {
     setExpandedDates((prev) => ({
@@ -116,11 +140,57 @@ export const AnalyticsPage = () => {
     }));
   }, [filteredInvoices, todayStr]);
 
-  // 2. MEDICINE MOVEMENT CALCULATIONS
+  // 2. ITEMIZED MEDICINE MOVEMENT & TRACEABILITY LOGS
+  const itemizedMovementLogs = useMemo(() => {
+    const logs = [];
+    invoices.forEach((inv) => {
+      const invDate = inv.date || '';
+      const customer = inv.shopName || inv.customerName || 'Walk-in Client';
+      const paymentMode = inv.paymentMode || inv.paymentMethod || 'Cash';
+      const invoiceNo = inv.invoiceNo;
+
+      (inv.items || []).forEach((item, itemIdx) => {
+        const tradeName = item.name || item.brandName || 'Medicine';
+        const generic = item.formula || item.genericFormula || '-';
+        const batchNo = item.batchNo || item.batchNumber || item.batch || 'B26-BATCH-01';
+        const qty = Number(item.qty || item.quantity || 1);
+        const unitPrice = Number(item.boxPrice || item.price || item.unitPrice || 0);
+        const total = Number(item.total !== undefined ? item.total : (qty * unitPrice));
+
+        logs.push({
+          id: `${invoiceNo}-${itemIdx}`,
+          invoiceNo,
+          date: invDate,
+          customer,
+          paymentMode,
+          tradeName,
+          generic,
+          batchNo,
+          qty,
+          unitPrice,
+          total
+        });
+      });
+    });
+
+    if (movementSearch.trim()) {
+      const q = movementSearch.toLowerCase().trim();
+      return logs.filter(
+        (log) =>
+          log.tradeName.toLowerCase().includes(q) ||
+          log.generic.toLowerCase().includes(q) ||
+          log.batchNo.toLowerCase().includes(q) ||
+          log.customer.toLowerCase().includes(q) ||
+          log.invoiceNo.toLowerCase().includes(q)
+      );
+    }
+    return logs;
+  }, [invoices, movementSearch]);
+
+  // 3. MEDICINE VELOCITY CALCULATIONS (Aggregated Catalog View)
   const medicineMovementData = useMemo(() => {
     const movementMap = new Map();
 
-    // Seed master catalog
     medicines.forEach((med) => {
       const key = (med.name || med.brandName).toLowerCase().trim();
       movementMap.set(key, {
@@ -137,7 +207,6 @@ export const AnalyticsPage = () => {
       });
     });
 
-    // Populate from sales invoices
     invoices.forEach((inv) => {
       const isCredit = inv.saleType?.includes('Credit') || inv.paymentMode === 'CREDIT';
       (inv.items || []).forEach((item) => {
@@ -183,21 +252,19 @@ export const AnalyticsPage = () => {
     return list.sort((a, b) => b.totalTabsSold - a.totalTabsSold);
   }, [medicines, invoices, movementSearch]);
 
-  // 3. TAX RECONCILIATION CALCULATIONS (Input PO Tax vs Output Sales Tax)
-  const totalInputTaxPaid = poTaxLogs.reduce((sum, log) => sum + (Number(log.totalInputTaxPaid) || 0), 0);
-  const totalPOPurchases = poTaxLogs.reduce((sum, log) => sum + (Number(log.totalPurchaseCost) || 0), 0);
-
-  const totalOutputSalesTax = invoices.reduce((sum, inv) => {
-    return sum + Number(inv.totalTax || inv.totalSalesTax18 || (Number(inv.netTotal || 0) * 0.05));
-  }, 0);
-
-  const netTaxBalance = totalOutputSalesTax - totalInputTaxPaid;
+  // Movement KPI Totals
+  const movementStats = useMemo(() => {
+    const totalDispatched = itemizedMovementLogs.reduce((sum, l) => sum + l.qty, 0);
+    const totalBilled = itemizedMovementLogs.reduce((sum, l) => sum + l.total, 0);
+    const uniqueBuyers = new Set(itemizedMovementLogs.map(l => l.customer)).size;
+    return { totalDispatched, totalBilled, uniqueBuyers };
+  }, [itemizedMovementLogs]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', fontFamily: 'var(--font-sans)' }}>
-      {/* 3 TOP TAB CONTROLS */}
+      {/* 2 PRIMARY TOP TAB CONTROLS */}
       <div className="card" style={{ padding: '0.65rem 1rem', backgroundColor: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem', border: '1px solid #e2e8f0' }}>
-        <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
           <button
             onClick={() => setActiveTab('SALES_LOGS')}
             className={`btn ${activeTab === 'SALES_LOGS' ? 'btn-primary' : 'btn-outline'}`}
@@ -211,22 +278,14 @@ export const AnalyticsPage = () => {
             className={`btn ${activeTab === 'MEDICINE_MOVEMENT' ? 'btn-primary' : 'btn-outline'}`}
             style={{ fontSize: '12px', borderRadius: '10px' }}
           >
-            <Activity size={14} /> Medicine Movement & Velocity ({medicineMovementData.length})
-          </button>
-
-          <button
-            onClick={() => setActiveTab('TAX_RECONCILIATION')}
-            className={`btn ${activeTab === 'TAX_RECONCILIATION' ? 'btn-primary' : 'btn-outline'}`}
-            style={{ fontSize: '12px', borderRadius: '10px' }}
-          >
-            <ShieldCheck size={14} /> FBR Tax Reconciliation (PO Tax vs Sales Tax)
+            <Activity size={14} /> Medicine Movement & Traceability ({itemizedMovementLogs.length} Records)
           </button>
         </div>
 
         <button
           onClick={() => setIsAnalyticsReportOpen(true)}
           className="btn btn-primary"
-          style={{ fontSize: '12px', borderRadius: '10px', backgroundColor: '#0284c7' }}
+          style={{ fontSize: '12px', borderRadius: '10px', backgroundColor: '#0284c7', display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
         >
           <Printer size={14} /> Export Analytics PDF
         </button>
@@ -260,178 +319,195 @@ export const AnalyticsPage = () => {
               <div style={{ fontSize: '20px', fontWeight: 900, color: '#0284c7', marginTop: '0.2rem' }}>
                 Rs. {estProfit.toLocaleString('en-PK', { minimumFractionDigits: 2 })}
               </div>
-              <div style={{ fontSize: '10px', color: '#0284c7' }}>Retail Dispensary Margin</div>
+              <div style={{ fontSize: '10px', color: '#0284c7' }}>Gross margin on net billing</div>
             </div>
 
             <div className="card" style={{ padding: '0.85rem 1rem', backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px' }}>
-              <div style={{ fontSize: '10px', color: '#64748b', fontWeight: 700, textTransform: 'uppercase' }}>Average Bill Size</div>
+              <div style={{ fontSize: '10px', color: '#64748b', fontWeight: 700, textTransform: 'uppercase' }}>Average Order Value</div>
               <div style={{ fontSize: '20px', fontWeight: 900, color: '#0f172a', marginTop: '0.2rem' }}>
                 Rs. {filteredInvoices.length > 0 ? (netTurnover / filteredInvoices.length).toFixed(2) : '0.00'}
               </div>
-              <div style={{ fontSize: '10px', color: '#64748b' }}>Per Patient Transaction</div>
+              <div style={{ fontSize: '10px', color: '#64748b' }}>Per counter transaction</div>
             </div>
           </div>
 
-          {/* CALENDAR FILTER TOOLBAR */}
-          <div className="card" style={{ padding: '0.85rem 1.25rem', backgroundColor: '#ffffff', border: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
-            <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center' }}>
-              <Calendar size={15} color="#0284c7" />
-              {['TODAY', '7_DAYS', '30_DAYS', 'CUSTOM'].map((period) => (
+          {/* DEDICATED PREVIOUS INVOICE SEARCH BAR */}
+          <div className="card" style={{ padding: '1rem 1.25rem', backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+            <div className="flex-between" style={{ flexWrap: 'wrap', gap: '0.5rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                <Search size={16} color="#0284c7" />
+                <span style={{ fontSize: '13px', fontWeight: 800, color: '#0f172a' }}>
+                  Search Previous Invoice by Invoice #:
+                </span>
+              </div>
+              {searchLogQuery && (
                 <button
-                  key={period}
-                  onClick={() => setSelectedPeriod(period)}
-                  style={{
-                    padding: '0.35rem 0.75rem',
-                    borderRadius: '8px',
-                    border: '1px solid #cbd5e1',
-                    backgroundColor: selectedPeriod === period ? '#0284c7' : '#ffffff',
-                    color: selectedPeriod === period ? '#ffffff' : '#475569',
-                    fontSize: '11.5px',
-                    fontWeight: 700,
-                    cursor: 'pointer'
-                  }}
+                  onClick={() => setSearchLogQuery('')}
+                  style={{ background: 'none', border: 'none', fontSize: '11px', color: '#ef4444', fontWeight: 700, cursor: 'pointer', padding: 0 }}
                 >
-                  {period === 'TODAY' ? 'Today' : period === '7_DAYS' ? 'Last 7 Days' : period === '30_DAYS' ? 'Last 30 Days' : 'Custom Calendar'}
+                  ✕ Clear Search
+                </button>
+              )}
+            </div>
+
+            <div style={{ position: 'relative', width: '100%' }}>
+              <Search size={16} style={{ position: 'absolute', left: '0.85rem', top: '50%', transform: 'translateY(-50%)', color: '#64748b' }} />
+              <input
+                type="text"
+                placeholder="Type Invoice Number (e.g. INV-20260822-320791 or 320791) to locate previous invoices across all dates..."
+                value={searchLogQuery}
+                onChange={(e) => setSearchLogQuery(e.target.value)}
+                style={{ width: '100%', padding: '0.55rem 0.85rem 0.55rem 2.4rem', borderRadius: '10px', border: searchLogQuery ? '2px solid #0284c7' : '1px solid #cbd5e1', fontSize: '12.5px', fontWeight: 600, outline: 'none', backgroundColor: searchLogQuery ? '#f0f9ff' : '#ffffff' }}
+              />
+            </div>
+
+            {searchLogQuery && (
+              <div style={{ fontSize: '11.5px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#e0f2fe', padding: '0.45rem 0.85rem', borderRadius: '8px', flexWrap: 'wrap', gap: '0.5rem' }}>
+                <span style={{ color: '#0369a1', fontWeight: 700 }}>
+                  ✓ Found {filteredInvoices.length} matching invoice(s) • Date group(s) auto-expanded below
+                </span>
+                {filteredInvoices.length === 1 && (
+                  <button
+                    onClick={() => setViewInvoice(filteredInvoices[0])}
+                    className="btn btn-primary"
+                    style={{ fontSize: '11px', padding: '0.25rem 0.65rem', borderRadius: '6px', backgroundColor: '#0284c7' }}
+                  >
+                    <FileText size={13} /> View A4 Commercial Invoice
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* DATE RANGE FILTER CONTROLS */}
+          <div className="card" style={{ padding: '0.85rem 1.25rem', backgroundColor: '#ffffff', border: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+              <span style={{ fontSize: '12px', fontWeight: 700, color: '#334155' }}>Filter Period:</span>
+              {[
+                { id: 'TODAY', label: "Today's Sales" },
+                { id: '7_DAYS', label: 'Past 7 Days' },
+                { id: '30_DAYS', label: 'Past 30 Days' },
+                { id: 'CUSTOM', label: 'Custom Date Range' }
+              ].map((btn) => (
+                <button
+                  key={btn.id}
+                  onClick={() => setSelectedPeriod(btn.id)}
+                  className={`btn ${selectedPeriod === btn.id ? 'btn-primary' : 'btn-outline'}`}
+                  style={{ fontSize: '11px', padding: '0.35rem 0.65rem', borderRadius: '6px' }}
+                >
+                  {btn.label}
                 </button>
               ))}
 
               {selectedPeriod === 'CUSTOM' && (
-                <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center', marginLeft: '0.5rem' }}>
-                  <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} style={{ padding: '0.3rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '11px' }} />
-                  <span style={{ fontSize: '11px' }}>to</span>
-                  <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} style={{ padding: '0.3rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '11px' }} />
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', marginLeft: '0.5rem' }}>
+                  <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} style={{ padding: '0.3rem 0.5rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '11px' }} />
+                  <span style={{ fontSize: '11px', color: '#64748b' }}>to</span>
+                  <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} style={{ padding: '0.3rem 0.5rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '11px' }} />
                 </div>
               )}
             </div>
 
-            <div style={{ position: 'relative', width: '300px' }}>
-              <Search size={14} style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: '#0284c7' }} />
-              <input
-                type="text"
-                placeholder="Search Invoice #, Customer, Payment..."
-                value={searchLogQuery}
-                onChange={(e) => setSearchLogQuery(e.target.value)}
-                style={{ width: '100%', padding: '0.4rem 0.65rem 0.4rem 2.2rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '11px', outline: 'none' }}
-              />
-            </div>
+            <span style={{ fontSize: '11px', color: '#64748b' }}>
+              Showing {filteredInvoices.length} transactions
+            </span>
           </div>
 
-          {/* DAILY COLLAPSIBLE SALES LOG ACCORDIONS */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+          {/* DAILY COLLAPSIBLE SALES ACCORDIONS */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
             {dateGroupedInvoices.length === 0 ? (
-              <div className="card" style={{ padding: '3rem', textAlign: 'center', color: '#94a3b8', backgroundColor: '#ffffff', borderRadius: '14px' }}>
-                No sales transactions recorded for this selected time period.
+              <div className="card" style={{ padding: '2rem', textAlign: 'center', backgroundColor: '#ffffff' }}>
+                <p className="subtext">No transactions found for the selected period.</p>
               </div>
             ) : (
               dateGroupedInvoices.map((group) => {
-                const isExpanded = Boolean(expandedDates[group.date]);
-
+                const isOpen = !!expandedDates[group.date];
                 return (
-                  <div
-                    key={group.date}
-                    className="card"
-                    style={{
-                      backgroundColor: '#ffffff',
-                      border: group.isToday ? '2px solid #0284c7' : '1px solid #cbd5e1',
-                      borderRadius: '14px',
-                      overflow: 'hidden',
-                      padding: 0
-                    }}
-                  >
-                    {/* ACCORDION HEADER CARD */}
+                  <div key={group.date} className="card" style={{ padding: '0', backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px', overflow: 'hidden' }}>
                     <div
                       onClick={() => toggleDateAccordion(group.date)}
                       style={{
                         padding: '0.85rem 1.25rem',
-                        backgroundColor: group.isToday ? '#f0f9ff' : '#f8fafc',
+                        backgroundColor: group.isToday ? '#f0fdf4' : '#f8fafc',
+                        borderBottom: isOpen ? '1px solid #e2e8f0' : 'none',
                         cursor: 'pointer',
                         display: 'flex',
                         justifyContent: 'space-between',
-                        alignItems: 'center',
-                        borderBottom: isExpanded ? '1px solid #e2e8f0' : 'none',
-                        userSelect: 'none'
+                        alignItems: 'center'
                       }}
                     >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-                        {isExpanded ? <ChevronDown size={18} color="#0284c7" /> : <ChevronRight size={18} color="#64748b" />}
-                        <div>
-                          <div style={{ fontWeight: 800, fontSize: '13.5px', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
-                            <span>📅 Sales Date: {group.date}</span>
-                            {group.isToday && (
-                              <span style={{ backgroundColor: '#0284c7', color: '#ffffff', fontSize: '9.5px', padding: '0.1rem 0.45rem', borderRadius: '9999px', fontWeight: 800 }}>
-                                TODAY (ACTIVE SHIFT)
-                              </span>
-                            )}
-                          </div>
-                          <div style={{ fontSize: '11px', color: '#64748b', marginTop: '0.1rem' }}>
-                            {group.invoices.length} Sales Invoices Completed
-                          </div>
-                        </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                        {isOpen ? <ChevronDown size={16} color="#0284c7" /> : <ChevronRight size={16} color="#64748b" />}
+                        <Calendar size={15} color={group.isToday ? '#16a34a' : '#0284c7'} />
+                        <span style={{ fontWeight: 800, fontSize: '13px', color: '#0f172a' }}>
+                          {formatDateDDMMYYYY(group.date)} {group.isToday && '(Today)'}
+                        </span>
+                        <span className="badge badge-otc" style={{ fontSize: '10px' }}>
+                          {group.invoices.length} Invoices
+                        </span>
                       </div>
 
-                      <div style={{ textAlign: 'right', display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
-                        <div>
-                          <div style={{ fontSize: '10px', color: '#64748b' }}>Shift Net Sales:</div>
-                          <div style={{ fontSize: '14px', fontWeight: 900, color: '#16a34a' }}>
-                            Rs. {group.dayNet.toFixed(2)}
-                          </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
+                        <div style={{ textAlign: 'right' }}>
+                          <span style={{ fontSize: '10px', color: '#64748b' }}>Day Gross: </span>
+                          <span style={{ fontWeight: 700, fontSize: '12px', color: '#0f172a' }}>Rs. {group.dayGross.toFixed(2)}</span>
                         </div>
-                        <span style={{ fontSize: '11px', color: '#0284c7', fontWeight: 700 }}>
-                          {isExpanded ? '▲ Collapse' : '▼ Click to Expand'}
-                        </span>
+                        <div style={{ textAlign: 'right' }}>
+                          <span style={{ fontSize: '10px', color: '#166534' }}>Net: </span>
+                          <span style={{ fontWeight: 800, fontSize: '13px', color: '#16a34a' }}>Rs. {group.dayNet.toFixed(2)}</span>
+                        </div>
                       </div>
                     </div>
 
-                    {/* EXPANDABLE BILLS TABLE */}
-                    {isExpanded && (
-                      <div style={{ padding: '0.75rem 1.25rem' }}>
-                        <div className="table-container" style={{ maxHeight: '360px', overflowY: 'auto' }}>
+                    {isOpen && (
+                      <div style={{ padding: '0.85rem 1.25rem' }}>
+                        <div className="table-container">
                           <table className="table" style={{ fontSize: '11px' }}>
                             <thead>
                               <tr>
-                                <th>Inv #</th>
+                                <th>Invoice #</th>
                                 <th>Time</th>
-                                <th>Customer Name</th>
-                                <th>Channel</th>
-                                <th style={{ textAlign: 'center' }}>Items</th>
+                                <th>Customer / Shop</th>
+                                <th>Payment Mode</th>
                                 <th style={{ textAlign: 'right' }}>Subtotal</th>
-                                <th style={{ textAlign: 'right' }}>Disc</th>
+                                <th style={{ textAlign: 'right' }}>Discount</th>
                                 <th style={{ textAlign: 'right' }}>Net Total</th>
-                                <th style={{ textAlign: 'center' }}>Payment</th>
+                                <th style={{ textAlign: 'center' }}>Status</th>
                                 <th style={{ textAlign: 'center' }}>Action</th>
                               </tr>
                             </thead>
                             <tbody>
-                              {group.invoices.map((inv, idx) => (
-                                <tr key={idx}>
-                                  <td style={{ fontWeight: 700, fontFamily: 'var(--font-mono)' }}>{inv.invoiceNo}</td>
-                                  <td style={{ color: '#475569' }}>{inv.time}</td>
-                                  <td style={{ fontWeight: 700 }}>{inv.customerName || inv.shopName || 'Walk-in'}</td>
-                                  <td>
-                                    <span className={`badge ${inv.saleType?.includes('Credit') ? 'badge-warning' : 'badge-otc'}`}>
-                                      {inv.saleType || 'Retail'}
-                                    </span>
-                                  </td>
-                                  <td style={{ textAlign: 'center', fontWeight: 600 }}>{(inv.items || []).length} items</td>
-                                  <td style={{ textAlign: 'right' }}>Rs. {Number(inv.subtotal || inv.grossTotal || 0).toFixed(2)}</td>
-                                  <td style={{ textAlign: 'right', color: '#dc2626' }}>{Number(inv.discount || 0) > 0 ? `-Rs. ${Number(inv.discount).toFixed(2)}` : '-'}</td>
-                                  <td style={{ textAlign: 'right', fontWeight: 800, color: '#0f172a' }}>Rs. {Number(inv.netTotal || 0).toFixed(2)}</td>
-                                  <td style={{ textAlign: 'center' }}>
-                                    <span className={`badge ${inv.paymentStatus === 'PAID' ? 'badge-success' : 'badge-danger'}`}>
-                                      {inv.paymentStatus || 'PAID'}
-                                    </span>
-                                  </td>
-                                  <td style={{ textAlign: 'center' }}>
-                                    <button
-                                      onClick={() => setViewInvoice(inv)}
-                                      className="btn btn-outline"
-                                      style={{ fontSize: '10px', padding: '0.2rem 0.45rem', borderRadius: '6px' }}
-                                    >
-                                      <Eye size={11} /> View
-                                    </button>
-                                  </td>
-                                </tr>
-                              ))}
+                              {group.invoices.map((inv) => {
+                                const isMatched = searchLogQuery.trim().length > 0 && inv.invoiceNo && inv.invoiceNo.toLowerCase().includes(searchLogQuery.toLowerCase().trim());
+                                return (
+                                  <tr key={inv.invoiceNo} style={{ backgroundColor: isMatched ? '#eff6ff' : undefined }}>
+                                    <td style={{ fontWeight: 700, fontFamily: 'var(--font-mono)', color: isMatched ? '#0284c7' : 'inherit' }}>
+                                      {inv.invoiceNo}
+                                    </td>
+                                    <td>{inv.time || '-'}</td>
+                                    <td style={{ fontWeight: 700 }}>{inv.shopName || inv.customerName || 'Walk-in'}</td>
+                                    <td><span className="badge badge-success">{inv.paymentMode || 'Cash'}</span></td>
+                                    <td style={{ textAlign: 'right' }}>Rs. {Number(inv.subtotal || inv.grossTotal || inv.netTotal || 0).toFixed(2)}</td>
+                                    <td style={{ textAlign: 'right', color: '#dc2626' }}>Rs. {Number(inv.discount || 0).toFixed(2)}</td>
+                                    <td style={{ textAlign: 'right', fontWeight: 800, color: '#0f172a' }}>Rs. {Number(inv.netTotal || 0).toFixed(2)}</td>
+                                    <td style={{ textAlign: 'center' }}>
+                                      <span className={`badge ${inv.paymentStatus === 'PAID' ? 'badge-success' : 'badge-danger'}`}>
+                                        {inv.paymentStatus || 'PAID'}
+                                      </span>
+                                    </td>
+                                    <td style={{ textAlign: 'center' }}>
+                                      <button
+                                        onClick={() => setViewInvoice(inv)}
+                                        className="btn btn-outline"
+                                        style={{ fontSize: '10px', padding: '0.2rem 0.5rem', borderRadius: '6px', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}
+                                        title="View Commercial A4 Tax Invoice (Form 2A)"
+                                      >
+                                        <FileText size={11} color="#0284c7" /> A4 Invoice
+                                      </button>
+                                    </td>
+                                  </tr>
+                                );
+                              })}
                             </tbody>
                           </table>
                         </div>
@@ -446,26 +522,62 @@ export const AnalyticsPage = () => {
       )}
 
       {/* ========================================================================= */}
-      {/* TAB 2: MEDICINE MOVEMENT & SALES VELOCITY */}
+      {/* TAB 2: MEDICINE MOVEMENT & TRACEABILITY */}
       {/* ========================================================================= */}
       {activeTab === 'MEDICINE_MOVEMENT' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-          {/* SEARCH & FILTERS */}
-          <div className="card" style={{ padding: '0.85rem 1.25rem', backgroundColor: '#ffffff', border: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
-            <div>
-              <h3 style={{ fontSize: '15px', fontWeight: 800, color: '#0f172a', margin: 0 }}>
-                Medicine Sales Velocity & Movement Register
-              </h3>
-              <div style={{ fontSize: '11px', color: '#64748b' }}>
-                Track total units sold, channel distribution (Walk-in vs Credit), and stock consumption
+          {/* TRACEABILITY KPI METRICS */}
+          <div className="grid-3" style={{ gap: '0.75rem' }}>
+            <div className="card" style={{ padding: '1rem', backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '12px' }}>
+              <div style={{ fontSize: '10.5px', color: '#64748b', fontWeight: 700, textTransform: 'uppercase' }}>Total Traceable Dispatches</div>
+              <div style={{ fontSize: '20px', fontWeight: 900, color: '#0284c7', marginTop: '0.2rem' }}>
+                {movementStats.totalDispatched.toLocaleString()} Units / Packs
               </div>
+              <div style={{ fontSize: '10.5px', color: '#64748b' }}>Across {itemizedMovementLogs.length} Sale Item Lines</div>
+            </div>
+
+            <div className="card" style={{ padding: '1rem', backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '12px' }}>
+              <div style={{ fontSize: '10.5px', color: '#166534', fontWeight: 700, textTransform: 'uppercase' }}>Dispatched Product Volume</div>
+              <div style={{ fontSize: '20px', fontWeight: 900, color: '#16a34a', marginTop: '0.2rem' }}>
+                Rs. {movementStats.totalBilled.toLocaleString('en-PK', { minimumFractionDigits: 2 })}
+              </div>
+              <div style={{ fontSize: '10.5px', color: '#16a34a' }}>B2B & Counter Movement Revenue</div>
+            </div>
+
+            <div className="card" style={{ padding: '1rem', backgroundColor: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '12px' }}>
+              <div style={{ fontSize: '10.5px', color: '#1e40af', fontWeight: 700, textTransform: 'uppercase' }}>Verified Destination Buyers</div>
+              <div style={{ fontSize: '20px', fontWeight: 900, color: '#0f172a', marginTop: '0.2rem' }}>
+                {movementStats.uniqueBuyers} Distinct Pharmacies / Clients
+              </div>
+              <div style={{ fontSize: '10.5px', color: '#0284c7' }}>Complete DRAP-compliant batch custody</div>
+            </div>
+          </div>
+
+          {/* VIEW SWITCHER & SEARCH CONTROLS */}
+          <div className="card" style={{ padding: '0.85rem 1.25rem', backgroundColor: '#ffffff', border: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
+            <div style={{ display: 'flex', gap: '0.4rem' }}>
+              <button
+                onClick={() => setMovementViewMode('TRACEABILITY')}
+                className={`btn ${movementViewMode === 'TRACEABILITY' ? 'btn-primary' : 'btn-outline'}`}
+                style={{ fontSize: '11.5px', borderRadius: '8px' }}
+              >
+                <ClipboardList size={13} /> Itemized Sales Traceability Ledger (Audit Trail)
+              </button>
+
+              <button
+                onClick={() => setMovementViewMode('VELOCITY')}
+                className={`btn ${movementViewMode === 'VELOCITY' ? 'btn-primary' : 'btn-outline'}`}
+                style={{ fontSize: '11.5px', borderRadius: '8px' }}
+              >
+                <BarChart3 size={13} /> Catalog Velocity & Stock Aggregates
+              </button>
             </div>
 
             <div style={{ position: 'relative', width: '320px' }}>
               <Search size={14} style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: '#0284c7' }} />
               <input
                 type="text"
-                placeholder="Search by Trade Name, Formula, Category, Rack..."
+                placeholder="Search Medicine, Batch #, Buyer Shop, Invoice..."
                 value={movementSearch}
                 onChange={(e) => setMovementSearch(e.target.value)}
                 style={{ width: '100%', padding: '0.45rem 0.65rem 0.45rem 2.2rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '11.5px', outline: 'none' }}
@@ -473,165 +585,153 @@ export const AnalyticsPage = () => {
             </div>
           </div>
 
-          {/* MOVEMENT TABLE */}
-          <div className="card" style={{ padding: '1.25rem', backgroundColor: '#ffffff', border: '1px solid #e2e8f0' }}>
-            <div className="table-container">
-              <table className="table" style={{ fontSize: '11px' }}>
-                <thead>
-                  <tr>
-                    <th>Medicine Trade Name</th>
-                    <th>Generic Formula</th>
-                    <th>Category</th>
-                    <th>Shelf Location</th>
-                    <th style={{ textAlign: 'center' }}>Total Units Sold</th>
-                    <th style={{ textAlign: 'center' }}>Counter vs Debt</th>
-                    <th style={{ textAlign: 'right' }}>Total Revenue</th>
-                    <th style={{ textAlign: 'center' }}>Remaining Stock</th>
-                    <th style={{ textAlign: 'center' }}>Movement Velocity</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {medicineMovementData.map((item, idx) => {
-                    const isFast = item.totalTabsSold >= 30;
-                    const isModerate = item.totalTabsSold > 0 && item.totalTabsSold < 30;
+          {/* VIEW 1: ITEMIZED SALES TRACEABILITY LEDGER */}
+          {movementViewMode === 'TRACEABILITY' && (
+            <div className="card" style={{ padding: '1.25rem', backgroundColor: '#ffffff', border: '1px solid #e2e8f0' }}>
+              <div className="flex-between" style={{ marginBottom: '0.85rem' }}>
+                <div>
+                  <h3 style={{ fontSize: '14px', fontWeight: 800, color: '#0f172a', margin: 0 }}>
+                    Itemized Medicine Traceability Log (Sold To Destination Audit)
+                  </h3>
+                  <div style={{ fontSize: '11px', color: '#64748b' }}>
+                    DRAP-compliant batch tracking: identifies exact shop/person, date, batch number, quantity, and unit price for every sold medicine
+                  </div>
+                </div>
+                <span className="badge badge-success">{itemizedMovementLogs.length} Line Items Traced</span>
+              </div>
 
-                    return (
-                      <tr key={idx}>
-                        <td style={{ fontWeight: 800, color: '#0f172a' }}>{item.tradeName}</td>
-                        <td style={{ color: '#475569' }}>{item.genericFormula}</td>
-                        <td><span className="badge badge-otc">{item.category}</span></td>
-                        <td><strong>📍 {item.rackLocation}</strong></td>
-                        <td style={{ textAlign: 'center', fontWeight: 800, fontSize: '12px', color: '#0284c7' }}>
-                          {item.totalTabsSold} Units
-                        </td>
-                        <td style={{ textAlign: 'center', fontSize: '10.5px' }}>
-                          <span style={{ color: '#16a34a', fontWeight: 700 }}>{item.retailWalkinCount} Cash</span> / <span style={{ color: '#dc2626', fontWeight: 700 }}>{item.creditDebtCount} Debt</span>
-                        </td>
-                        <td style={{ textAlign: 'right', fontWeight: 800, color: '#16a34a' }}>
-                          Rs. {item.totalRevenue.toFixed(2)}
-                        </td>
-                        <td style={{ textAlign: 'center', fontWeight: 700 }}>
-                          {item.boxStock} Boxes
-                        </td>
-                        <td style={{ textAlign: 'center' }}>
-                          <span className={`badge ${isFast ? 'badge-success' : isModerate ? 'badge-warning' : 'badge-danger'}`}>
-                            {isFast ? '⚡ Fast Moving' : isModerate ? '⏳ Moderate' : '🛑 Slow / Dead'}
-                          </span>
+              <div className="table-container">
+                <table className="table" style={{ fontSize: '11px' }}>
+                  <thead>
+                    <tr>
+                      <th>Date</th>
+                      <th>Medicine Name & Formula</th>
+                      <th>Batch Number</th>
+                      <th>Sold To (Customer / Pharmacy)</th>
+                      <th>Invoice #</th>
+                      <th style={{ textAlign: 'center' }}>Quantity Sold</th>
+                      <th style={{ textAlign: 'right' }}>Unit Price</th>
+                      <th style={{ textAlign: 'right' }}>Line Total</th>
+                      <th style={{ textAlign: 'center' }}>Payment Mode</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {itemizedMovementLogs.length === 0 ? (
+                      <tr>
+                        <td colSpan={9} style={{ textAlign: 'center', padding: '2rem', color: '#64748b' }}>
+                          No medicine movements match the search criteria.
                         </td>
                       </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ========================================================================= */}
-      {/* TAB 3: FBR & DRAP TAX RECONCILIATION (PO INWARD vs SALES OUTWARD) */}
-      {/* ========================================================================= */}
-      {activeTab === 'TAX_RECONCILIATION' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-          {/* TAX RECONCILIATION KPI SUMMARY */}
-          <div className="grid-3" style={{ gap: '0.85rem' }}>
-            <div className="card" style={{ padding: '1.25rem', backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '14px' }}>
-              <div style={{ fontSize: '10.5px', color: '#166534', fontWeight: 800, textTransform: 'uppercase' }}>
-                1. Input Tax Paid on POs (Distributor Purchases)
-              </div>
-              <div style={{ fontSize: '22px', fontWeight: 900, color: '#16a34a', marginTop: '0.35rem' }}>
-                Rs. {totalInputTaxPaid.toLocaleString('en-PK', { minimumFractionDigits: 2 })}
-              </div>
-              <div style={{ fontSize: '11px', color: '#166534', marginTop: '0.2rem' }}>
-                Paid on Rs. {totalPOPurchases.toLocaleString('en-PK')} PO Inward Invoices
-              </div>
-            </div>
-
-            <div className="card" style={{ padding: '1.25rem', backgroundColor: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '14px' }}>
-              <div style={{ fontSize: '10.5px', color: '#1e40af', fontWeight: 800, textTransform: 'uppercase' }}>
-                2. Output Tax Collected on Sales (Customer Bills)
-              </div>
-              <div style={{ fontSize: '22px', fontWeight: 900, color: '#0284c7', marginTop: '0.35rem' }}>
-                Rs. {totalOutputSalesTax.toLocaleString('en-PK', { minimumFractionDigits: 2 })}
-              </div>
-              <div style={{ fontSize: '11px', color: '#0284c7', marginTop: '0.2rem' }}>
-                Collected across {invoices.length} Sales Transactions
-              </div>
-            </div>
-
-            <div className="card" style={{ padding: '1.25rem', backgroundColor: '#ffffff', border: '2px solid #0284c7', borderRadius: '14px' }}>
-              <div style={{ fontSize: '10.5px', color: '#0f172a', fontWeight: 800, textTransform: 'uppercase' }}>
-                3. Net Tax Adjustment / Liability Balance
-              </div>
-              <div style={{ fontSize: '22px', fontWeight: 900, color: netTaxBalance >= 0 ? '#16a34a' : '#0284c7', marginTop: '0.35rem' }}>
-                Rs. {Math.abs(netTaxBalance).toLocaleString('en-PK', { minimumFractionDigits: 2 })}
-              </div>
-              <div style={{ fontSize: '11px', color: '#64748b', marginTop: '0.2rem' }}>
-                {netTaxBalance >= 0 ? 'Net Payable to FBR' : 'Input Tax Credit Carried Forward'}
+                    ) : (
+                      itemizedMovementLogs.map((log) => (
+                        <tr key={log.id}>
+                          <td style={{ fontFamily: 'var(--font-mono)', fontSize: '11px' }}>{formatDateDDMMYYYY(log.date)}</td>
+                          <td>
+                            <div style={{ fontWeight: 800, color: '#0f172a' }}>{log.tradeName}</div>
+                            <div style={{ fontSize: '10px', color: '#64748b' }}>{log.generic}</div>
+                          </td>
+                          <td>
+                            <span className="badge badge-otc" style={{ fontFamily: 'var(--font-mono)', fontSize: '10.5px' }}>
+                              {log.batchNo}
+                            </span>
+                          </td>
+                          <td style={{ fontWeight: 700, color: '#0284c7' }}>
+                            {log.customer}
+                          </td>
+                          <td style={{ fontFamily: 'var(--font-mono)', fontWeight: 700 }}>
+                            {log.invoiceNo}
+                          </td>
+                          <td style={{ textAlign: 'center', fontWeight: 800, color: '#0f172a', fontSize: '12px' }}>
+                            {log.qty}
+                          </td>
+                          <td style={{ textAlign: 'right', fontWeight: 600 }}>
+                            Rs. {log.unitPrice.toFixed(2)}
+                          </td>
+                          <td style={{ textAlign: 'right', fontWeight: 800, color: '#16a34a' }}>
+                            Rs. {log.total.toFixed(2)}
+                          </td>
+                          <td style={{ textAlign: 'center' }}>
+                            <span className="badge badge-success">{log.paymentMode}</span>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
               </div>
             </div>
-          </div>
+          )}
 
-          {/* PO INPUT TAX AUDIT TABLE */}
-          <div className="card" style={{ padding: '1.25rem', backgroundColor: '#ffffff', border: '1px solid #e2e8f0' }}>
-            <div className="flex-between" style={{ marginBottom: '0.85rem' }}>
-              <div style={{ fontSize: '13px', fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                <Truck size={16} color="#0284c7" /> Distributor Purchase Invoices & Input Taxes Paid (FBR Form)
+          {/* VIEW 2: CATALOG VELOCITY & STOCK AGGREGATES */}
+          {movementViewMode === 'VELOCITY' && (
+            <div className="card" style={{ padding: '1.25rem', backgroundColor: '#ffffff', border: '1px solid #e2e8f0' }}>
+              <div className="flex-between" style={{ marginBottom: '0.85rem' }}>
+                <div>
+                  <h3 style={{ fontSize: '14px', fontWeight: 800, color: '#0f172a', margin: 0 }}>
+                    Medicine Sales Velocity & Stock Consumption Register
+                  </h3>
+                  <div style={{ fontSize: '11px', color: '#64748b' }}>
+                    Aggregated consumption velocity, channel distribution (Counter vs Credit), and warehouse shelf location
+                  </div>
+                </div>
+                <span className="badge badge-otc">{medicineMovementData.length} Catalog Items</span>
               </div>
-              <button
-                onClick={() => setIsFBRLawyerModalOpen(true)}
-                className="btn btn-primary"
-                style={{ fontSize: '11.5px', backgroundColor: '#0284c7', borderRadius: '8px' }}
-              >
-                <Printer size={13} /> Print FBR Tax Statement
-              </button>
-            </div>
 
-            <div className="table-container">
-              <table className="table" style={{ fontSize: '11px' }}>
-                <thead>
-                  <tr>
-                    <th>PO Ref #</th>
-                    <th>Date</th>
-                    <th>Distributor / Supplier</th>
-                    <th style={{ textAlign: 'right' }}>Total Purchase Cost</th>
-                    <th style={{ textAlign: 'right' }}>Sales Tax 18%</th>
-                    <th style={{ textAlign: 'right' }}>Adv Tax 0.5%</th>
-                    <th style={{ textAlign: 'right' }}>FBR Tax 1%</th>
-                    <th style={{ textAlign: 'right' }}>Total Tax Paid</th>
-                    <th style={{ textAlign: 'center' }}>FBR Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {poTaxLogs.map((log, idx) => (
-                    <tr key={idx}>
-                      <td style={{ fontWeight: 700, fontFamily: 'var(--font-mono)' }}>{log.poNumber}</td>
-                      <td>{log.date}</td>
-                      <td style={{ fontWeight: 700 }}>{log.supplierName}</td>
-                      <td style={{ textAlign: 'right' }}>Rs. {Number(log.totalPurchaseCost).toLocaleString('en-PK', { minimumFractionDigits: 2 })}</td>
-                      <td style={{ textAlign: 'right', color: '#0284c7' }}>Rs. {Number(log.salesTax18).toFixed(2)}</td>
-                      <td style={{ textAlign: 'right', color: '#16a34a' }}>Rs. {Number(log.advTax05).toFixed(2)}</td>
-                      <td style={{ textAlign: 'right' }}>Rs. {Number(log.fbrTax01).toFixed(2)}</td>
-                      <td style={{ textAlign: 'right', fontWeight: 800, color: '#16a34a' }}>Rs. {Number(log.totalInputTaxPaid).toFixed(2)}</td>
-                      <td style={{ textAlign: 'center' }}><span className="badge badge-success">Paid ✓</span></td>
+              <div className="table-container">
+                <table className="table" style={{ fontSize: '11px' }}>
+                  <thead>
+                    <tr>
+                      <th>Medicine Trade Name</th>
+                      <th>Generic Formula</th>
+                      <th>Category</th>
+                      <th>Shelf Location</th>
+                      <th style={{ textAlign: 'center' }}>Total Units Sold</th>
+                      <th style={{ textAlign: 'center' }}>Counter vs Debt</th>
+                      <th style={{ textAlign: 'right' }}>Total Revenue</th>
+                      <th style={{ textAlign: 'center' }}>Remaining Stock</th>
+                      <th style={{ textAlign: 'center' }}>Movement Velocity</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {medicineMovementData.map((item, idx) => {
+                      const isFast = item.totalTabsSold >= 30;
+                      const isModerate = item.totalTabsSold > 0 && item.totalTabsSold < 30;
+
+                      return (
+                        <tr key={idx}>
+                          <td style={{ fontWeight: 800, color: '#0f172a' }}>{item.tradeName}</td>
+                          <td style={{ color: '#475569' }}>{item.genericFormula}</td>
+                          <td><span className="badge badge-otc">{item.category}</span></td>
+                          <td><strong>📍 {item.rackLocation}</strong></td>
+                          <td style={{ textAlign: 'center', fontWeight: 800, fontSize: '12px', color: '#0284c7' }}>
+                            {item.totalTabsSold} Units
+                          </td>
+                          <td style={{ textAlign: 'center', fontSize: '10.5px' }}>
+                            <span style={{ color: '#16a34a', fontWeight: 700 }}>{item.retailWalkinCount} Cash</span> / <span style={{ color: '#dc2626', fontWeight: 700 }}>{item.creditDebtCount} Debt</span>
+                          </td>
+                          <td style={{ textAlign: 'right', fontWeight: 800, color: '#16a34a' }}>
+                            Rs. {item.totalRevenue.toFixed(2)}
+                          </td>
+                          <td style={{ textAlign: 'center', fontWeight: 700 }}>
+                            {item.boxStock} Boxes
+                          </td>
+                          <td style={{ textAlign: 'center' }}>
+                            <span className={`badge ${isFast ? 'badge-success' : isModerate ? 'badge-warning' : 'badge-danger'}`}>
+                              {isFast ? '⚡ Fast Moving' : isModerate ? '⏳ Moderate' : '🛑 Slow / Dead'}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       )}
 
       {/* MODALS */}
-      {isFBRLawyerModalOpen && (
-        <FBRLawyerReportModal
-          isOpen={isFBRLawyerModalOpen}
-          invoices={filteredInvoices}
-          onClose={() => setIsFBRLawyerModalOpen(false)}
-        />
-      )}
-
       {isAnalyticsReportOpen && (
         <AnalyticsReportModal
           isOpen={isAnalyticsReportOpen}

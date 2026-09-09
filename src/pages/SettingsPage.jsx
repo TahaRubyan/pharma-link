@@ -16,14 +16,18 @@ import {
   Laptop,
   CheckCircle2,
   HelpCircle,
-  Sparkles
+  Sparkles,
+  KeyRound
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { usePWA } from '../context/PWAContext';
 import { useInventory, InventoryContext } from '../context/InventoryContext';
 import { ThermalPrintModal } from '../components/modals/ThermalPrintModal';
+import { StaffCredentialModal } from '../components/modals/StaffCredentialModal';
 import { MOCK_STAFF_ACCOUNTS } from '../data/mockData';
 import { loadRetailMockData, clearRetailMockData } from '../services/mockDataManager';
+import { dbSyncService } from '../services/dbSyncService';
+import { hashPassword } from '../utils/cryptoUtils';
 
 const SAMPLE_TEST_INVOICE = {
   invoiceNo: '00000137',
@@ -31,7 +35,7 @@ const SAMPLE_TEST_INVOICE = {
   time: '2:57 am',
   customerName: 'Customer Copy',
   cashierName: 'HASSAN SALEEM',
-  shopName: 'IDREES PHARMACY',
+  shopName: 'TESTING SHOP',
   shopAddress: 'NEAR HBL BANK MAIN BAZAR JALAL PUR JATTAN,\nGUJRAT',
   shopPhone: '03126262942',
   shopEmail: 'Company@gmail.com',
@@ -52,7 +56,7 @@ const SAMPLE_TEST_INVOICE = {
 };
 
 export const SettingsPage = ({ storeMode }) => {
-  const { currentShop, updateStoreProfile } = useAuth();
+  const { currentShop, updateStoreProfile, user } = useAuth();
   const isRetail = (storeMode || currentShop?.mode || 'RETAIL') === 'RETAIL';
   const [activeTab, setActiveTab] = useState('PROFILE'); // 'PROFILE' | 'PRINTER_PWA' | 'TAXES' | 'WARRANTY' | 'STAFF' | 'BACKUP'
 
@@ -91,7 +95,7 @@ export const SettingsPage = ({ storeMode }) => {
   };
 
   // Tab 1: Profile State
-  const [storeName, setStoreName] = useState(currentShop?.shopName || 'Idrees Medical Store');
+  const [storeName, setStoreName] = useState(currentShop?.shopName || 'Testing Shop');
   const [storePhone, setStorePhone] = useState(currentShop?.phone || '');
   const [storeAddress, setStoreAddress] = useState(currentShop?.address || '');
   const [stnReg, setStnReg] = useState(currentShop?.gstin || '');
@@ -101,7 +105,7 @@ export const SettingsPage = ({ storeMode }) => {
   const [dslForm21, setDslForm21] = useState(currentShop?.dlNumber || '');
 
   // Digital Signature
-  const [signatoryName, setSignatoryName] = useState(isRetail ? '' : (currentShop?.signatoryName || 'Dr. Idrees'));
+  const [signatoryName, setSignatoryName] = useState(isRetail ? '' : (currentShop?.signatoryName || 'Testing Administrator'));
   const [signatoryRole, setSignatoryRole] = useState(isRetail ? '' : (currentShop?.signatoryRole || 'Managing Pharmacist & Owner'));
   const [signatureImage, setSignatureImage] = useState(() => localStorage.getItem('pharmalink_sig_image') || '');
 
@@ -138,6 +142,161 @@ export const SettingsPage = ({ storeMode }) => {
   useEffect(() => {
     localStorage.setItem('pharmalink_staff_list', JSON.stringify(staffAccounts));
   }, [staffAccounts]);
+
+  useEffect(() => {
+    const tenantId = currentShop?.shopId || 'TEN-TESTING-SHOP';
+    dbSyncService.fetchStaffAccounts(tenantId).then((cloudStaff) => {
+      if (cloudStaff && cloudStaff.length > 0) {
+        setStaffAccounts((prev) => {
+          const map = new Map();
+          prev.forEach((s) => map.set(s.id, s));
+          cloudStaff.forEach((s) => map.set(s.id, { ...(map.get(s.id) || {}), ...s }));
+          return Array.from(map.values());
+        });
+      }
+    }).catch(() => {});
+  }, [currentShop?.shopId, isRetail]);
+
+  // Change Password state for currently logged-in user
+  const [currentPasswordInput, setCurrentPasswordInput] = useState('');
+  const [newPasswordInput, setNewPasswordInput] = useState('');
+  const [confirmPasswordInput, setConfirmPasswordInput] = useState('');
+  const [pwdMsg, setPwdMsg] = useState({ type: '', text: '' });
+  const [isUpdatingPwd, setIsUpdatingPwd] = useState(false);
+  const [editingStaff, setEditingStaff] = useState(null);
+  const [isCredentialModalOpen, setIsCredentialModalOpen] = useState(false);
+
+  const handleOpenStaffCredentials = (staffMember) => {
+    setEditingStaff(staffMember);
+    setIsCredentialModalOpen(true);
+  };
+
+  const handleSaveStaffCredentials = (updatedStaff) => {
+    setStaffAccounts((prev) => {
+      const next = prev.map((s) => (s.id === updatedStaff.id ? updatedStaff : s));
+      try {
+        localStorage.setItem('pharmalink_staff_list', JSON.stringify(next));
+        localStorage.setItem('pharmalink_staff_accounts', JSON.stringify(next));
+      } catch (e) {}
+      return next;
+    });
+    try {
+      dbSyncService.saveStaffAccount({
+        id: updatedStaff.id,
+        tenantId: currentShop?.shopId || 'TEN-TESTING-SHOP',
+        name: updatedStaff.name,
+        username: updatedStaff.username,
+        password: updatedStaff.password,
+        role: updatedStaff.role,
+        status: updatedStaff.status,
+        storeMode: updatedStaff.storeMode || (isRetail ? 'RETAIL' : 'WHOLESALE')
+      });
+    } catch (e) {}
+  };
+
+  const handleChangeMyPassword = async (e) => {
+    e.preventDefault();
+    setPwdMsg({ type: '', text: '' });
+
+    if (!newPasswordInput || newPasswordInput.length < 6) {
+      setPwdMsg({ type: 'error', text: 'New password must be at least 6 characters long.' });
+      return;
+    }
+    if (newPasswordInput !== confirmPasswordInput) {
+      setPwdMsg({ type: 'error', text: 'New password and confirm password do not match.' });
+      return;
+    }
+
+    setIsUpdatingPwd(true);
+    try {
+      const encryptedHash = await hashPassword(newPasswordInput);
+      const activeUsername = (user?.username || 'testing.admin').toLowerCase().replace(/\s+/g, '');
+
+      const nextStaff = staffAccounts.map((s) => {
+        if ((s.username || '').toLowerCase().replace(/\s+/g, '') === activeUsername) {
+          return { ...s, password: encryptedHash, pin: encryptedHash };
+        }
+        return s;
+      });
+      setStaffAccounts(nextStaff);
+      localStorage.setItem('pharmalink_staff_list', JSON.stringify(nextStaff));
+      localStorage.setItem('pharmalink_staff_accounts', JSON.stringify(nextStaff));
+
+      await dbSyncService.saveStaffAccount({
+        id: user?.staffId || `EMP-${Date.now().toString().slice(-3)}`,
+        tenantId: currentShop?.shopId || 'TEN-TESTING-SHOP',
+        name: user?.name || 'Store Admin',
+        username: activeUsername,
+        password: encryptedHash,
+        role: user?.role || 'Admin',
+        status: 'Active',
+        storeMode: isRetail ? 'RETAIL' : 'WHOLESALE'
+      });
+
+      setPwdMsg({ type: 'success', text: 'Password successfully encrypted and updated!' });
+      setCurrentPasswordInput('');
+      setNewPasswordInput('');
+      setConfirmPasswordInput('');
+    } catch (err) {
+      setPwdMsg({ type: 'error', text: 'Failed to encrypt and update password.' });
+    } finally {
+      setIsUpdatingPwd(false);
+    }
+  };
+
+  const handlePurgeMockDataCleanSlate = async () => {
+    const confirmWipe = window.confirm(
+      '⚠️ PURGE ALL TEST DATA & RESET TO CLEAN SLATE?\n\n' +
+      'This will remove all cached sample medicines, batches, invoices, suppliers, customer debts, and purchase orders from both local storage AND Supabase cloud database.\n\n' +
+      'Your store profile and staff login credentials will be preserved.\n\n' +
+      'Proceed with clean slate initialization?'
+    );
+    if (!confirmWipe) return;
+
+    try {
+      await dbSyncService.factoryResetSystemData();
+    } catch (err) {
+      console.warn('Cloud sync wipe warning:', err);
+    }
+
+    const keysToRemove = [
+      'pharmalink_medicines',
+      'pharmalink_pk_medicines',
+      'pharmalink_batches',
+      'pharmalink_pk_batches',
+      'pharmalink_invoices',
+      'pharmalink_pk_invoices',
+      'pharmalink_suppliers',
+      'pharmalink_pk_suppliers',
+      'pharmalink_purchase_orders',
+      'pharmalink_pk_purchase_orders',
+      'pharmalink_returns',
+      'pharmalink_pk_returns',
+      'pharmalink_pk_vendor_returns',
+      'pharmalink_debt_customers',
+      'pharmalink_retail_medicines',
+      'pharmalink_retail_batches',
+      'pharmalink_retail_invoices',
+      'pharmalink_retail_suppliers',
+      'pharmalink_retail_purchase_orders',
+      'pharmalink_retail_returns',
+      'pharmalink_retail_debt_customers',
+      'pharmalink_retail_patients',
+      'pharmalink_retail_cleared',
+      'pharmalink_wholesale_cleared'
+    ];
+    keysToRemove.forEach((k) => {
+      try {
+        localStorage.removeItem(k);
+        localStorage.setItem(k, JSON.stringify([]));
+      } catch (e) {}
+    });
+    localStorage.setItem('pharmalink_retail_cleared', 'true');
+    localStorage.setItem('pharmalink_wholesale_cleared', 'true');
+
+    alert('✅ All mock data has been purged from local storage and Supabase cloud! The system will now reload with clean empty tables ready for production data.');
+    window.location.reload();
+  };
 
   const handleImageUpload = (e) => {
     const file = e.target.files[0];
@@ -178,6 +337,9 @@ export const SettingsPage = ({ storeMode }) => {
     if (typeof updateStoreProfile === 'function') {
       updateStoreProfile(updated);
     }
+    if (typeof document !== 'undefined') {
+      document.title = `${storeName.trim()} | PharmaLink ERP & POS`;
+    }
     alert(`Store Profile & Digital Signature successfully updated! Shop name "${storeName}" and Signatory "${signatoryName}" will now appear on all invoices.`);
   };
 
@@ -185,15 +347,32 @@ export const SettingsPage = ({ storeMode }) => {
     e.preventDefault();
     if (!newStaffName.trim()) return;
 
+    const generatedUser = newStaffName.toLowerCase().replace(/[^a-z0-9]/g, '') + Math.floor(10 + Math.random() * 90);
     const newStaff = {
       id: `EMP-${Date.now().toString().slice(-3)}`,
       name: newStaffName,
+      username: generatedUser,
+      password: 'cashier123',
       role: newStaffRole.includes('Admin') ? 'Admin' : newStaffRole.includes('Delivery') ? 'Delivery Staff' : 'Cashier',
       phone: newStaffPhone || '+92 300 1234567',
       status: 'Active',
+      storeMode: isRetail ? 'RETAIL' : 'WHOLESALE',
     };
 
     setStaffAccounts((prev) => [...prev, newStaff]);
+    try {
+      dbSyncService.saveStaffAccount({
+        id: newStaff.id,
+        tenantId: currentShop?.shopId || 'TEN-TESTING-SHOP',
+        name: newStaff.name,
+        username: newStaff.username,
+        password: newStaff.password,
+        role: newStaff.role,
+        status: newStaff.status,
+        storeMode: newStaff.storeMode,
+      });
+    } catch (e) {}
+
     setNewStaffName('');
     setNewStaffPhone('');
     alert(`New staff member ${newStaff.name} created!`);
@@ -304,10 +483,15 @@ export const SettingsPage = ({ storeMode }) => {
     }
   };
 
-  const handleFactoryReset = () => {
-    if (window.confirm('⚠️ FULL FACTORY RESET:\\n\\nThis will completely wipe all local data (medicines, batches, invoices, debts, settings) back to an absolute clean slate.\\n\\nAre you sure you want to proceed?')) {
+  const handleFactoryReset = async () => {
+    if (window.confirm('⚠️ FULL FACTORY RESET:\n\nThis will completely wipe all local data and Supabase cloud operational records (medicines, batches, invoices, debts) back to an absolute clean slate.\n\nAre you sure you want to proceed?')) {
+      try {
+        await dbSyncService.factoryResetSystemData();
+      } catch (err) {
+        console.warn('Cloud sync wipe warning:', err);
+      }
       localStorage.clear();
-      alert('All local data cleared. System reset to factory clean slate.');
+      alert('All system data cleared. System reset to factory clean slate.');
       window.location.reload();
     }
   };
@@ -315,7 +499,7 @@ export const SettingsPage = ({ storeMode }) => {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', fontFamily: 'var(--font-sans)' }}>
       {/* TOP TABS (DYNAMIC RETAIL VS WHOLESALE) */}
-      <div className="card" style={{ padding: '0.5rem', backgroundColor: '#ffffff', display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+      <div className="card" style={{ padding: '0.5rem', backgroundColor: '#ffffff', display: 'flex', gap: '0.4rem', flexWrap: 'wrap', alignItems: 'center' }}>
         <button
           onClick={() => setActiveTab('PROFILE')}
           className={`btn ${activeTab === 'PROFILE' ? 'btn-primary' : 'btn-outline'}`}
@@ -366,6 +550,29 @@ export const SettingsPage = ({ storeMode }) => {
           style={{ fontSize: '12px', borderRadius: '10px' }}
         >
           <Database size={14} /> Backup & Restore Data
+        </button>
+
+        {/* PROMINENT DIRECT CLEAR / RESET SYSTEM DATA BUTTON */}
+        <button
+          type="button"
+          onClick={handlePurgeMockDataCleanSlate}
+          className="btn btn-outline"
+          style={{
+            fontSize: '12px',
+            borderRadius: '10px',
+            marginLeft: 'auto',
+            backgroundColor: '#fef2f2',
+            color: '#dc2626',
+            border: '1px solid #fca5a5',
+            fontWeight: 800,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.35rem',
+            cursor: 'pointer'
+          }}
+          title="Clear all mock/sample data across local storage and cloud database to start 100% clean"
+        >
+          <Trash2 size={14} /> Clear / Reset System Data
         </button>
       </div>
 
@@ -925,6 +1132,69 @@ export const SettingsPage = ({ storeMode }) => {
       {/* TAB 4: CASHIER & STAFF ACCOUNTS (PDF PAGE 7 MATCH) */}
       {activeTab === 'STAFF' && (
         <div className="card" style={{ padding: '1.5rem', backgroundColor: '#ffffff', border: '1px solid #e2e8f0' }}>
+          {/* CHANGE MY PASSWORD SECTION (Current Logged-in User) */}
+          <div style={{ border: '1.5px solid #bfdbfe', padding: '1.15rem', borderRadius: '12px', backgroundColor: '#eff6ff', marginBottom: '1.25rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.25rem' }}>
+              <KeyRound size={16} color="#0284c7" />
+              <span style={{ fontSize: '13px', fontWeight: 800, color: '#0369a1' }}>
+                Change My Account Password (SHA-256 Encrypted)
+              </span>
+            </div>
+            <div style={{ fontSize: '11px', color: '#475569', marginBottom: '0.75rem' }}>
+              Logged in as: <strong>{user?.name || 'Testing Shop Admin'}</strong> ({user?.role || 'Admin'}) • Enter a new password to encrypt and update your system credentials.
+            </div>
+
+            {pwdMsg.text && (
+              <div style={{
+                padding: '0.5rem 0.75rem',
+                borderRadius: '8px',
+                fontSize: '11.5px',
+                fontWeight: 600,
+                marginBottom: '0.75rem',
+                backgroundColor: pwdMsg.type === 'success' ? '#dcfce7' : '#fee2e2',
+                color: pwdMsg.type === 'success' ? '#166534' : '#991b1b',
+                border: `1px solid ${pwdMsg.type === 'success' ? '#86efac' : '#fca5a5'}`
+              }}>
+                {pwdMsg.text}
+              </div>
+            )}
+
+            <form onSubmit={handleChangeMyPassword} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: '0.75rem', alignItems: 'flex-end' }}>
+              <div>
+                <label className="subtext" style={{ fontWeight: 600, display: 'block', marginBottom: '0.2rem' }}>New Password (min 6 chars) *:</label>
+                <input
+                  type="password"
+                  placeholder="Enter new password"
+                  value={newPasswordInput}
+                  onChange={(e) => setNewPasswordInput(e.target.value)}
+                  style={{ width: '100%', padding: '0.5rem 0.65rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '12px', outline: 'none', backgroundColor: '#ffffff' }}
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="subtext" style={{ fontWeight: 600, display: 'block', marginBottom: '0.2rem' }}>Confirm New Password *:</label>
+                <input
+                  type="password"
+                  placeholder="Re-enter new password"
+                  value={confirmPasswordInput}
+                  onChange={(e) => setConfirmPasswordInput(e.target.value)}
+                  style={{ width: '100%', padding: '0.5rem 0.65rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '12px', outline: 'none', backgroundColor: '#ffffff' }}
+                  required
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={isUpdatingPwd}
+                className="btn btn-primary"
+                style={{ borderRadius: '8px', backgroundColor: '#0284c7', fontSize: '11.5px', padding: '0.55rem 1rem', display: 'flex', alignItems: 'center', gap: '0.35rem', fontWeight: 700 }}
+              >
+                <CheckCircle size={14} /> {isUpdatingPwd ? 'Encrypting...' : 'Update & Encrypt Password'}
+              </button>
+            </form>
+          </div>
+
           {/* CREATE STAFF FORM */}
           <div style={{ border: '1px solid #cbd5e1', padding: '1rem', borderRadius: '12px', backgroundColor: '#f8fafc', marginBottom: '1.25rem' }}>
             <div style={{ fontSize: '12px', fontWeight: 800, color: '#0284c7', marginBottom: '0.2rem' }}>
@@ -972,6 +1242,7 @@ export const SettingsPage = ({ storeMode }) => {
                   <tr>
                     <th>Employee ID</th>
                     <th>Staff Name</th>
+                    <th>Username</th>
                     <th>Phone</th>
                     <th>Role</th>
                     <th>Status</th>
@@ -983,13 +1254,27 @@ export const SettingsPage = ({ storeMode }) => {
                     <tr key={s.id || idx}>
                       <td style={{ fontFamily: 'var(--font-mono)', fontWeight: 700 }}>{s.id}</td>
                       <td style={{ fontWeight: 700 }}>{s.name}</td>
-                      <td style={{ fontFamily: 'var(--font-mono)' }}>{s.phone}</td>
+                      <td style={{ fontFamily: 'var(--font-mono)', color: '#0284c7' }}>{s.username || '-'}</td>
+                      <td style={{ fontFamily: 'var(--font-mono)' }}>{s.phone || '-'}</td>
                       <td><span className="badge badge-otc">{s.role}</span></td>
                       <td><span className="badge badge-success">{s.status || 'Active'}</span></td>
                       <td style={{ textAlign: 'center' }}>
-                        <button onClick={() => handleDeleteStaff(s.id)} style={{ background: 'none', border: 'none', color: '#dc2626', cursor: 'pointer' }}>
-                          <Trash2 size={13} />
-                        </button>
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+                          <button
+                            onClick={() => handleOpenStaffCredentials(s)}
+                            title="Manage Credentials & Reset Password"
+                            style={{ background: 'none', border: 'none', color: '#0284c7', cursor: 'pointer', padding: '0.2rem' }}
+                          >
+                            <KeyRound size={14} />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteStaff(s.id)}
+                            title="Delete Staff Account"
+                            style={{ background: 'none', border: 'none', color: '#dc2626', cursor: 'pointer', padding: '0.2rem' }}
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -1094,6 +1379,15 @@ export const SettingsPage = ({ storeMode }) => {
 
             <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
               <button
+                type="button"
+                onClick={handlePurgeMockDataCleanSlate}
+                className="btn btn-outline"
+                style={{ backgroundColor: '#dc2626', color: '#ffffff', border: 'none', fontSize: '11.5px', borderRadius: '8px', padding: '0.55rem 1rem', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
+              >
+                <Trash2 size={14} /> Purge All Mock Data & Initialize Clean Store
+              </button>
+
+              <button
                 onClick={handlePurgeTransactionsOnly}
                 className="btn btn-outline"
                 style={{ backgroundColor: '#ffffff', color: '#b91c1c', border: '1px solid #f87171', fontSize: '11px', borderRadius: '8px', padding: '0.45rem 0.85rem', fontWeight: 700 }}
@@ -1104,13 +1398,23 @@ export const SettingsPage = ({ storeMode }) => {
               <button
                 onClick={handleFactoryReset}
                 className="btn btn-outline"
-                style={{ backgroundColor: '#dc2626', color: '#ffffff', border: 'none', fontSize: '11px', borderRadius: '8px', padding: '0.45rem 0.85rem', fontWeight: 700 }}
+                style={{ backgroundColor: '#ffffff', color: '#64748b', border: '1px solid #cbd5e1', fontSize: '11px', borderRadius: '8px', padding: '0.45rem 0.85rem', fontWeight: 700 }}
               >
                 Factory Reset (Blank Slate)
               </button>
             </div>
           </div>
         </div>
+      )}
+
+      {/* STAFF CREDENTIAL & PASSWORD MANAGEMENT MODAL */}
+      {isCredentialModalOpen && (
+        <StaffCredentialModal
+          isOpen={isCredentialModalOpen}
+          staff={editingStaff}
+          onSave={handleSaveStaffCredentials}
+          onClose={() => setIsCredentialModalOpen(false)}
+        />
       )}
 
       {/* 80MM THERMAL RECEIPT TEST MODAL */}

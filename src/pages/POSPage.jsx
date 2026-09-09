@@ -21,7 +21,8 @@ import {
   Send,
   Sparkles,
   HeartPulse,
-  Save
+  Save,
+  Truck
 } from 'lucide-react';
 import { useInventory } from '../context/InventoryContext';
 import { useCart } from '../context/CartContext';
@@ -42,7 +43,7 @@ import WhatsAppCreditModal from '../components/modals/WhatsAppCreditModal';
 
 export const POSPage = ({ storeMode: propStoreMode }) => {
   const { medicines = [], batches = [], getEarliestValidBatch, deductStock } = useInventory();
-  const { cart, addToCart, updateQty, updateUnitType, removeFromCart, clearCart, rxPatient, setRxPatient, openModal } = useCart();
+  const { cart, addToCart, updateQty, updateCartItem, updateUnitType, removeFromCart, clearCart, rxPatient, setRxPatient, openModal } = useCart();
   const { recordSale } = useSales();
   const { currentShop, user } = useAuth();
   const { recordCreditSale } = useCustomerDebt();
@@ -73,8 +74,8 @@ export const POSPage = ({ storeMode: propStoreMode }) => {
   // Wholesale Customer State (Clean Slate - No Mock Data)
   const [customerData, setCustomerData] = useState({
     customerName: isRetail ? 'Walk-in Retail Customer' : 'Walk-in / Cash Customer',
-    shopName: isRetail ? 'Idrees Medical Store' : 'Idrees Pharma Distributor',
-    region: isRetail ? '' : 'Gujrat',
+    shopName: isRetail ? '' : (currentShop?.shopName || 'Testing Shop'),
+    region: currentShop?.city || 'Lahore',
     customerAddress: '',
     licenseNo: '',
     customerNtn: '',
@@ -83,8 +84,11 @@ export const POSPage = ({ storeMode: propStoreMode }) => {
     customerPhone: '',
     bookingMan: '',
     refNo: '',
-    deliveryMan: '',
+    deliveryMan: 'Express Delivery / Rider',
   });
+
+  // Wholesale Payment Terms: 'DUE' (Territory Delivery Due) | 'CASH' (Immediate Cash)
+  const [wholesalePaymentTerms, setWholesalePaymentTerms] = useState('DUE');
 
   // Wholesale & Retail Discounts (% percentage)
   const [discountPercent, setDiscountPercent] = useState('0');
@@ -215,7 +219,9 @@ export const POSPage = ({ storeMode: propStoreMode }) => {
     (i) => i.requiresPrescription || i.controlledType === 'Narcotic' || i.controlledType === 'Steroid'
   );
 
-  const grossSubtotal = cart.reduce((sum, item) => {
+  const round2 = (num) => Math.round((Number(num || 0) + Number.EPSILON) * 100) / 100;
+
+  const grossSubtotal = round2(cart.reduce((sum, item) => {
     const q = Number(item.qty || item.quantity || 1);
     let unitPrice = Number(item.boxSellingPrice || item.boxPrice || item.price || 600);
 
@@ -228,29 +234,72 @@ export const POSPage = ({ storeMode: propStoreMode }) => {
     }
 
     return sum + unitPrice * q;
-  }, 0);
+  }, 0));
 
-  const totalLineDiscounts = cart.reduce((sum, item) => sum + Number(item.discount || 0), 0);
-  const totalSalesTax18 = cart.reduce((sum, item) => {
+  const totalLineDiscounts = round2(cart.reduce((sum, item) => {
     const q = Number(item.qty || item.quantity || 1);
     const rate = Number(item.boxSellingPrice || item.boxPrice || item.price || 600);
-    const gross = rate * q - Number(item.discount || 0);
-    return sum + (item.salesTax18 !== undefined ? Number(item.salesTax18) : gross * 0.18);
-  }, 0);
+    const gross = rate * q;
+    const disc = item.discount !== undefined ? Number(item.discount) : (gross * (Number(item.discountPercent || 0) / 100));
+    return sum + disc;
+  }, 0));
 
-  const totalAdvTax05 = cart.reduce((sum, item) => {
+  const totalSalesTax18 = round2(cart.reduce((sum, item) => {
     const q = Number(item.qty || item.quantity || 1);
     const rate = Number(item.boxSellingPrice || item.boxPrice || item.price || 600);
-    const gross = rate * q - Number(item.discount || 0);
-    return sum + (item.advTax05 !== undefined ? Number(item.advTax05) : gross * 0.005);
-  }, 0);
+    const gross = rate * q;
+    const disc = item.discount !== undefined ? Number(item.discount) : (gross * (Number(item.discountPercent || 0) / 100));
+    const taxable = Math.max(0, gross - disc);
+    const tr = Number(item.saleTaxPercent !== undefined ? item.saleTaxPercent : 18);
+    if (tr === 18) {
+      return sum + (item.salesTax18 !== undefined && item.salesTax18 !== null ? Number(item.salesTax18) : (taxable * 0.18));
+    }
+    return sum;
+  }, 0));
 
-  const totalTaxes = isRetail ? 0 : (totalSalesTax18 + totalAdvTax05);
-  const orderDiscountAmount = (grossSubtotal * (Number(discountPercent) || 0)) / 100;
-  const finalBillAmount = Math.max(0, grossSubtotal - totalLineDiscounts - orderDiscountAmount + totalTaxes);
+  const totalSalesTax19 = round2(cart.reduce((sum, item) => {
+    const q = Number(item.qty || item.quantity || 1);
+    const rate = Number(item.boxSellingPrice || item.boxPrice || item.price || 600);
+    const gross = rate * q;
+    const disc = item.discount !== undefined ? Number(item.discount) : (gross * (Number(item.discountPercent || 0) / 100));
+    const taxable = Math.max(0, gross - disc);
+    const tr = Number(item.saleTaxPercent !== undefined ? item.saleTaxPercent : 18);
+    if (tr === 19) {
+      return sum + (item.salesTax18 !== undefined && item.salesTax18 !== null ? Number(item.salesTax18) : (taxable * 0.19));
+    }
+    return sum;
+  }, 0));
+
+  const totalOtherSalesTax = round2(cart.reduce((sum, item) => {
+    const q = Number(item.qty || item.quantity || 1);
+    const rate = Number(item.boxSellingPrice || item.boxPrice || item.price || 600);
+    const gross = rate * q;
+    const disc = item.discount !== undefined ? Number(item.discount) : (gross * (Number(item.discountPercent || 0) / 100));
+    const taxable = Math.max(0, gross - disc);
+    const tr = Number(item.saleTaxPercent !== undefined ? item.saleTaxPercent : 18);
+    if (tr !== 18 && tr !== 19 && tr > 0) {
+      return sum + (item.salesTax18 !== undefined && item.salesTax18 !== null ? Number(item.salesTax18) : (taxable * (tr / 100)));
+    }
+    return sum;
+  }, 0));
+
+  const totalSalesTaxAll = round2(totalSalesTax18 + totalSalesTax19 + totalOtherSalesTax);
+
+  const totalAdvTax05 = round2(cart.reduce((sum, item) => {
+    const q = Number(item.qty || item.quantity || 1);
+    const rate = Number(item.boxSellingPrice || item.boxPrice || item.price || 600);
+    const gross = rate * q;
+    const disc = item.discount !== undefined ? Number(item.discount) : (gross * (Number(item.discountPercent || 0) / 100));
+    const taxable = Math.max(0, gross - disc);
+    return sum + (item.advTax05 !== undefined && item.advTax05 !== null ? Number(item.advTax05) : (taxable * 0.005));
+  }, 0));
+
+  const totalTaxes = isRetail ? 0 : round2(totalSalesTaxAll + totalAdvTax05);
+  const orderDiscountAmount = round2((grossSubtotal * (Number(discountPercent) || 0)) / 100);
+  const finalBillAmount = Math.max(0, round2(grossSubtotal - totalLineDiscounts - orderDiscountAmount + totalTaxes));
 
   const tenderedNum = Number(cashTendered) || 0;
-  const changeDue = Math.max(0, tenderedNum - finalBillAmount);
+  const changeDue = Math.max(0, round2(tenderedNum - finalBillAmount));
 
   const handleRowDoubleClick = (item) => {
     if (!isRetail) {
@@ -266,37 +315,72 @@ export const POSPage = ({ storeMode: propStoreMode }) => {
   };
 
   const handleSaveItemUpdates = (updatedItem) => {
-    updateQty(updatedItem.medicineId || updatedItem.id, updatedItem.batchNo || updatedItem.batchNumber, updatedItem.qty);
+    if (typeof updateCartItem === 'function') {
+      updateCartItem(updatedItem);
+    } else {
+      updateQty(updatedItem.medicineId || updatedItem.id, updatedItem.batchNo || updatedItem.batchNumber, updatedItem.qty);
+    }
   };
 
   // Build Invoice Data Object
-  const generateInvoiceData = (isPrint = false, paymentMode = 'Cash') => {
+  const generateInvoiceData = (isPrint = false, paymentModeOverride = null) => {
+    const isWholesaleCredit = !isRetail && (paymentModeOverride === 'CREDIT' || wholesalePaymentTerms === 'DUE');
+    const isRetailCredit = isRetail && paymentModeOverride === 'CREDIT';
+    const isCredit = isWholesaleCredit || isRetailCredit;
+    const paymentMode = paymentModeOverride || (isCredit ? 'CREDIT' : 'Cash');
+    const paymentStatus = isCredit ? 'NOT_PAID' : 'PAID';
+    const remainingDebt = isCredit ? finalBillAmount : 0;
+
+    const initialLogs = isCredit ? [] : [{
+      id: `LOG-${Date.now()}-${Math.floor(100 + Math.random() * 900)}`,
+      date: new Date().toISOString().split('T')[0],
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      amountPaid: finalBillAmount,
+      remainingDebt: 0,
+      collectedBy: user ? user.name : 'Testing Shop Admin',
+      method: 'Cash at Counter'
+    }];
+
     return {
       invoiceNo: isRetail ? `INV-RET-${Date.now().toString().slice(-6)}` : `INV-${Date.now().toString().slice(-6)}`,
       date: new Date().toISOString().split('T')[0],
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      saleType: isRetail ? (paymentMode === 'CREDIT' ? 'Retail Credit / Debt' : 'Retail Cash') : 'Wholesale Commercial',
-      customerName: isRetail ? (rxPatient ? rxPatient.name : 'Walk-in Retail Customer') : customerData.customerName,
-      shopName: currentShop?.shopName || 'Idrees Medical Store',
-      customerPhone: rxPatient ? rxPatient.phone : (customerData.customerPhone || '051-2345678'),
+      saleType: isRetail ? (isCredit ? 'Retail Credit / Debt' : 'Retail Cash') : (isCredit ? 'Wholesale Territory Delivery (Due)' : 'Wholesale Commercial (Cash)'),
+      customerName: isRetail ? (rxPatient ? rxPatient.name : 'Walk-in Retail Customer') : (customerData.customerName || 'Walk-in Customer'),
+      customerShopName: isRetail ? '' : (customerData.shopName || customerData.customerName || ''),
+      shopName: currentShop?.shopName || 'Testing Shop',
+      customerPhone: rxPatient ? rxPatient.phone : (customerData.customerPhone || ''),
+      customerAddress: rxPatient ? rxPatient.address : (customerData.customerAddress || ''),
+      region: isRetail ? (rxPatient?.city || currentShop?.city || 'Lahore') : (customerData.region || currentShop?.city || 'Lahore'),
+      deliveryMan: customerData.deliveryMan || (isRetail ? 'Counter Handover' : 'Express Delivery / Rider'),
+      bookingMan: customerData.bookingMan || '',
+      licenseNo: customerData.licenseNo || '',
+      customerNtn: customerData.customerNtn || '',
+      customerStrn: customerData.customerStrn || '',
+      filerStatus: customerData.filerStatus || 'FILER',
       doctorName: rxPatient ? rxPatient.doctorName : (hasControlledOrRx ? 'Dr. Tariq Parvez (PMC-88120)' : '-'),
-      cashierName: user ? user.name : 'Dr. Idrees (Pharmacist)',
+      cashierName: user ? user.name : 'Testing Shop Admin',
       items: [...cart],
       subtotal: grossSubtotal,
       grossTotal: grossSubtotal,
       discountPercent: Number(discountPercent) || 0,
-      discount: totalLineDiscounts + orderDiscountAmount,
+      discount: round2(totalLineDiscounts + orderDiscountAmount),
       totalSalesTax18,
+      totalSalesTax19,
+      totalOtherSalesTax,
+      totalSalesTaxAll,
       totalAdvTax05,
       totalTax: totalTaxes,
       netTotal: finalBillAmount,
       grandTotal: finalBillAmount,
-      cashTendered: paymentMode === 'CREDIT' ? 0 : (tenderedNum > 0 ? tenderedNum : finalBillAmount),
-      changeDue: paymentMode === 'CREDIT' ? 0 : (tenderedNum > 0 ? changeDue : 0),
+      cashTendered: isCredit ? 0 : (tenderedNum > 0 ? tenderedNum : finalBillAmount),
+      changeDue: isCredit ? 0 : (tenderedNum > 0 ? changeDue : 0),
       includeSection23Warranty,
       includeDrapWarranty,
       paymentMode,
-      paymentStatus: paymentMode === 'CREDIT' ? 'UNPAID' : 'PAID',
+      paymentStatus,
+      remainingDebt,
+      paymentLogs: initialLogs,
     };
   };
 
@@ -385,7 +469,7 @@ export const POSPage = ({ storeMode: propStoreMode }) => {
   };
 
   // Wholesale Checkout -> A4 Commercial Dual-Page Invoice
-  const handleWholesaleCheckout = () => {
+  const handleWholesaleCheckout = (forcedTerms = null) => {
     if (cart.length === 0) {
       alert('Cart is empty. Please add items to generate wholesale commercial invoice.');
       return;
@@ -394,7 +478,8 @@ export const POSPage = ({ storeMode: propStoreMode }) => {
 
     setIsCheckingOut(true);
     try {
-      const invoiceData = generateInvoiceData(true, 'Cash');
+      const activeTerms = forcedTerms || wholesalePaymentTerms;
+      const invoiceData = generateInvoiceData(true, activeTerms === 'DUE' ? 'CREDIT' : 'Cash');
       deductStock(cart);
       recordSale(invoiceData);
       setCompletedInvoice(invoiceData);
@@ -567,8 +652,8 @@ export const POSPage = ({ storeMode: propStoreMode }) => {
                       <div>
                         <div style={{ fontWeight: 700, fontSize: '13px', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                           <span>{m.name || m.brandName}</span>
-                          {m.controlledType === 'Narcotic' && <span style={{ fontSize: '9px', backgroundColor: '#dc2626', color: '#fff', padding: '0.1rem 0.35rem', borderRadius: '4px', fontWeight: 800 }}>NARCOTIC</span>}
-                          {m.requiresPrescription && m.controlledType !== 'Narcotic' && <span style={{ fontSize: '9px', backgroundColor: '#d97706', color: '#fff', padding: '0.1rem 0.35rem', borderRadius: '4px', fontWeight: 800 }}>Rx</span>}
+                          {isRetail && m.controlledType === 'Narcotic' && <span style={{ fontSize: '9px', backgroundColor: '#dc2626', color: '#fff', padding: '0.1rem 0.35rem', borderRadius: '4px', fontWeight: 800 }}>NARCOTIC</span>}
+                          {isRetail && m.requiresPrescription && m.controlledType !== 'Narcotic' && <span style={{ fontSize: '9px', backgroundColor: '#d97706', color: '#fff', padding: '0.1rem 0.35rem', borderRadius: '4px', fontWeight: 800 }}>Rx</span>}
                         </div>
                         <div style={{ fontSize: '11px', color: isSelected ? '#e0f2fe' : '#64748b', marginTop: '0.15rem' }}>
                           Code: {m.itemCode || m.id} • Formula: {m.formula || m.genericFormula} • 📍 Shelf: {m.rackLocation || 'Rack A-01'}
@@ -736,7 +821,22 @@ export const POSPage = ({ storeMode: propStoreMode }) => {
                             <td style={{ textAlign: 'right', fontWeight: 600 }}>{itemGross.toFixed(2)}</td>
 
                             {!isRetail && <td style={{ textAlign: 'center', color: '#dc2626' }}>{itemDisc > 0 ? `${item.discountPercent || 0}%` : '-'}</td>}
-                            {!isRetail && <td style={{ textAlign: 'right', color: '#0284c7' }}>{itemST.toFixed(2)}</td>}
+                            {!isRetail && (
+                              <td style={{ textAlign: 'right', color: '#0284c7', whiteSpace: 'nowrap' }}>
+                                <span style={{
+                                  fontSize: '9.5px',
+                                  fontWeight: 800,
+                                  backgroundColor: (Number(item.saleTaxPercent) === 19) ? '#fef3c7' : '#e0f2fe',
+                                  color: (Number(item.saleTaxPercent) === 19) ? '#b45309' : '#0284c7',
+                                  padding: '0.1rem 0.3rem',
+                                  borderRadius: '4px',
+                                  marginRight: '4px'
+                                }}>
+                                  {item.saleTaxPercent !== undefined ? item.saleTaxPercent : 18}%
+                                </span>
+                                {itemST.toFixed(2)}
+                              </td>
+                            )}
                             {!isRetail && <td style={{ textAlign: 'right', color: '#16a34a' }}>{itemAdv.toFixed(2)}</td>}
 
                             <td style={{ textAlign: 'right', fontWeight: 800 }}>{itemNet.toFixed(2)}</td>
@@ -774,9 +874,43 @@ export const POSPage = ({ storeMode: propStoreMode }) => {
               </div>
 
               {!isRetail && (
-                <div className="flex-between">
-                  <span className="subtext">Total Taxes:</span>
-                  <span style={{ fontWeight: 700, color: '#0284c7' }}>+ Rs. {totalTaxes.toFixed(2)}</span>
+                <>
+                  <div className="flex-between" style={{ color: '#0284c7' }}>
+                    <span className="subtext">Sales Tax (18% Standard):</span>
+                    <span style={{ fontWeight: 700 }}>+ Rs. {totalSalesTax18.toFixed(2)}</span>
+                  </div>
+
+                  {totalSalesTax19 > 0 && (
+                    <div className="flex-between" style={{ color: '#b45309' }}>
+                      <span className="subtext">Sales Tax (19% Special):</span>
+                      <span style={{ fontWeight: 700 }}>+ Rs. {totalSalesTax19.toFixed(2)}</span>
+                    </div>
+                  )}
+
+                  {totalOtherSalesTax > 0 && (
+                    <div className="flex-between" style={{ color: '#0284c7' }}>
+                      <span className="subtext">Other Sales Tax:</span>
+                      <span style={{ fontWeight: 700 }}>+ Rs. {totalOtherSalesTax.toFixed(2)}</span>
+                    </div>
+                  )}
+
+                  <div className="flex-between" style={{ color: '#16a34a' }}>
+                    <span className="subtext">Adv Tax 0.5% (Sec 236G):</span>
+                    <span style={{ fontWeight: 700 }}>+ Rs. {totalAdvTax05.toFixed(2)}</span>
+                  </div>
+
+                  <div className="flex-between" style={{ borderTop: '1px dashed #cbd5e1', paddingTop: '0.35rem', fontWeight: 800 }}>
+                    <span style={{ color: '#0f172a' }}>Total Taxes Added:</span>
+                    <span style={{ color: '#0284c7' }}>+ Rs. {totalTaxes.toFixed(2)}</span>
+                  </div>
+                </>
+              )}
+
+              {/* Line Discounts if any */}
+              {totalLineDiscounts > 0 && (
+                <div className="flex-between" style={{ color: '#dc2626', fontSize: '11px' }}>
+                  <span>Item Discounts:</span>
+                  <span style={{ fontWeight: 700 }}>- Rs. {totalLineDiscounts.toFixed(2)}</span>
                 </div>
               )}
 
@@ -894,14 +1028,67 @@ export const POSPage = ({ storeMode: propStoreMode }) => {
               </button>
             </div>
           ) : (
-            <button
-              onClick={handleWholesaleCheckout}
-              disabled={isCheckingOut}
-              className="btn btn-primary"
-              style={{ width: '100%', borderRadius: '12px', padding: '0.75rem', backgroundColor: '#0284c7', fontSize: '13px', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', opacity: isCheckingOut ? 0.7 : 1, cursor: isCheckingOut ? 'not-allowed' : 'pointer' }}
-            >
-              <CheckCircle size={16} /> {isCheckingOut ? 'Generating Invoice...' : '[Generate A4 Tax Invoice]'}
-            </button>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+              {/* WHOLESALE PAYMENT & DISPATCH TERMS */}
+              <div style={{ backgroundColor: '#f0fdf4', padding: '0.75rem', borderRadius: '12px', border: '1px solid #bbf7d0' }}>
+                <div style={{ fontSize: '11px', fontWeight: 800, color: '#166534', textTransform: 'uppercase', marginBottom: '0.45rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                  <Truck size={14} color="#16a34a" /> Payment & Dispatch Terms:
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.4rem' }}>
+                  <button
+                    type="button"
+                    onClick={() => setWholesalePaymentTerms('DUE')}
+                    style={{
+                      padding: '0.45rem 0.25rem',
+                      borderRadius: '8px',
+                      border: wholesalePaymentTerms === 'DUE' ? '2px solid #0284c7' : '1px solid #cbd5e1',
+                      backgroundColor: wholesalePaymentTerms === 'DUE' ? '#e0f2fe' : '#ffffff',
+                      color: wholesalePaymentTerms === 'DUE' ? '#0369a1' : '#475569',
+                      fontSize: '11px',
+                      fontWeight: 700,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    🚚 Delivery (Due)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setWholesalePaymentTerms('CASH')}
+                    style={{
+                      padding: '0.45rem 0.25rem',
+                      borderRadius: '8px',
+                      border: wholesalePaymentTerms === 'CASH' ? '2px solid #16a34a' : '1px solid #cbd5e1',
+                      backgroundColor: wholesalePaymentTerms === 'CASH' ? '#f0fdf4' : '#ffffff',
+                      color: wholesalePaymentTerms === 'CASH' ? '#15803d' : '#475569',
+                      fontSize: '11px',
+                      fontWeight: 700,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    💵 Cash (Paid)
+                  </button>
+                </div>
+                <div style={{ fontSize: '10px', color: '#64748b', marginTop: '0.35rem', lineHeight: '1.4' }}>
+                  {wholesalePaymentTerms === 'DUE' 
+                    ? '✓ Invoice will appear in Territory Ledger under Pending Deliveries for rider cash collection.'
+                    : '✓ Invoice marked fully settled at counter.'}
+                </div>
+              </div>
+
+              <button
+                onClick={() => handleWholesaleCheckout()}
+                disabled={isCheckingOut}
+                className="btn btn-primary"
+                style={{ width: '100%', borderRadius: '12px', padding: '0.75rem', backgroundColor: '#0284c7', fontSize: '13px', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', opacity: isCheckingOut ? 0.7 : 1, cursor: isCheckingOut ? 'not-allowed' : 'pointer' }}
+              >
+                <CheckCircle size={16} /> 
+                {isCheckingOut 
+                  ? 'Generating Invoice...' 
+                  : wholesalePaymentTerms === 'DUE' 
+                    ? '[Generate A4 Invoice & Add to Territory Ledger]' 
+                    : '[Generate Paid A4 Tax Invoice]'}
+              </button>
+            </div>
           )}
         </div>
       </div>
@@ -969,7 +1156,7 @@ export const POSPage = ({ storeMode: propStoreMode }) => {
           isOpen={Boolean(completedDebtSale)}
           customer={completedDebtSale.customer}
           saleData={completedDebtSale.saleData}
-          shopName={currentShop?.shopName || 'Idrees Medical Store'}
+          shopName={currentShop?.shopName || 'Testing Shop'}
           onClose={() => setCompletedDebtSale(null)}
         />
       )}

@@ -3,6 +3,7 @@ import { INITIAL_MEDICINES, INITIAL_BATCHES, INITIAL_VENDOR_RETURNS } from '../d
 import { AuthContext, useAuth } from './AuthContext';
 import { storageManager } from '../services/storageManager';
 import { loadRetailMockData, clearRetailMockData } from '../services/mockDataManager';
+import { dbSyncService } from '../services/dbSyncService';
 
 const InventoryContext = createContext();
 
@@ -13,8 +14,11 @@ export const InventoryProvider = ({ children }) => {
   const auth = useContext(AuthContext);
   const isRetail = auth?.currentShop?.mode === 'RETAIL';
 
-  // Wholesale Medicines: Pre-stocked with master catalog
+  // Wholesale Medicines: Pre-stocked with master catalog unless cleared
   const [wholesaleMedicines, setWholesaleMedicines] = useState(() => {
+    const isCleared = typeof localStorage !== 'undefined' && localStorage.getItem('pharmalink_wholesale_cleared') === 'true';
+    if (isCleared) return [];
+
     const saved = localStorage.getItem('pharmalink_pk_medicines');
     if (saved) {
       try {
@@ -63,14 +67,39 @@ export const InventoryProvider = ({ children }) => {
 
   useEffect(() => {
     storageManager.safeSetItem('pharmalink_pk_medicines', wholesaleMedicines);
-  }, [wholesaleMedicines]);
+    const tenantId = auth?.currentShop?.shopId || 'TEN-TESTING-SHOP';
+    if (wholesaleMedicines.length > 0) {
+      dbSyncService.syncMedicinesUpstream(tenantId, wholesaleMedicines).catch(() => {});
+    }
+  }, [wholesaleMedicines, auth?.currentShop?.shopId]);
 
   useEffect(() => {
     storageManager.safeSetItem('pharmalink_retail_medicines', retailMedicines);
-  }, [retailMedicines]);
+    const tenantId = auth?.currentShop?.shopId || 'TEN-TESTING-SHOP';
+    if (retailMedicines.length > 0) {
+      dbSyncService.syncMedicinesUpstream(tenantId, retailMedicines).catch(() => {});
+    }
+  }, [retailMedicines, auth?.currentShop?.shopId]);
+
+  // Initial cloud sync from Supabase
+  useEffect(() => {
+    const tenantId = auth?.currentShop?.shopId || 'TEN-TESTING-SHOP';
+    dbSyncService.fetchMedicines(tenantId).then((cloudMeds) => {
+      if (cloudMeds && cloudMeds.length > 0) {
+        setMedicines((prev) => {
+          const map = new Map(prev.map((m) => [m.id, m]));
+          cloudMeds.forEach((m) => map.set(m.id, m));
+          return Array.from(map.values());
+        });
+      }
+    }).catch(() => {});
+  }, [auth?.currentShop?.shopId]);
 
   // Wholesale Batches
   const [wholesaleBatches, setWholesaleBatches] = useState(() => {
+    const isCleared = typeof localStorage !== 'undefined' && localStorage.getItem('pharmalink_wholesale_cleared') === 'true';
+    if (isCleared) return [];
+
     const saved = localStorage.getItem('pharmalink_pk_batches');
     if (saved) {
       try {
@@ -117,6 +146,9 @@ export const InventoryProvider = ({ children }) => {
 
   // Wholesale & Retail Vendor Returns
   const [wholesaleVendorReturns, setWholesaleVendorReturns] = useState(() => {
+    const isCleared = typeof localStorage !== 'undefined' && localStorage.getItem('pharmalink_wholesale_cleared') === 'true';
+    if (isCleared) return [];
+
     const saved = localStorage.getItem('pharmalink_pk_vendor_returns');
     if (saved) {
       try {
@@ -188,7 +220,7 @@ export const InventoryProvider = ({ children }) => {
     localStorage.setItem(key, JSON.stringify(poTaxLogs));
   }, [poTaxLogs, isRetail]);
 
-  const addAuditLog = (actionTitle, itemBrandName, details, type = 'INFO', performedBy = 'Dr. Idrees') => {
+  const addAuditLog = (actionTitle, itemBrandName, details, type = 'INFO', performedBy = 'Store Admin') => {
     const now = new Date();
     const timeStr = `${now.toISOString().split('T')[0]} ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
     const newLog = {
@@ -424,26 +456,32 @@ export const InventoryProvider = ({ children }) => {
 
     // 2. Single pass on medicines
     setMedicines((prevMeds) => {
-      // Aggregate box deductions by medicine identifier
-      const deductions = new Map();
+      // Aggregate box deductions uniquely by medicine identifier
+      const medDeductions = new Map();
       cartItems.forEach((ci) => {
         const q = Number(ci.qty || ci.quantity || 1);
         const boxes = (ci.unitSelection === 'Box' || ci.unitType === 'Box')
           ? q
           : (q / Number(ci.tabletsPerBox || 200));
 
-        const keys = [ci.medicineId, ci.id, ci.name, ci.brandName].filter(Boolean);
-        keys.forEach((k) => {
-          deductions.set(k, (deductions.get(k) || 0) + boxes);
-        });
+        const targetKey = ci.medicineId || ci.id || ci.name;
+        if (targetKey) {
+          medDeductions.set(targetKey, (medDeductions.get(targetKey) || 0) + boxes);
+        }
       });
 
       return prevMeds.map((m) => {
-        const deducted = deductions.get(m.id) || deductions.get(m.name) || deductions.get(m.brandName) || 0;
+        const deducted = medDeductions.get(m.id)
+          ?? medDeductions.get(m.medicineId)
+          ?? medDeductions.get(m.itemCode)
+          ?? medDeductions.get(m.name)
+          ?? medDeductions.get(m.brandName)
+          ?? 0;
+
         if (deducted > 0) {
           return {
             ...m,
-            boxStock: Math.max(0, Math.round(((m.boxStock || 10) - deducted) * 10) / 10),
+            boxStock: Math.max(0, Math.round(((m.boxStock || 0) - deducted) * 10) / 10),
           };
         }
         return m;
@@ -510,7 +548,7 @@ export const InventoryProvider = ({ children }) => {
     });
   };
 
-  const markItemAsRTV = (batchId, tabletsCount, reason = 'Expiry <= 6 Months', loggedBy = 'Dr. Idrees') => {
+  const markItemAsRTV = (batchId, tabletsCount, reason = 'Expiry <= 6 Months', loggedBy = 'Store Admin') => {
     let targetBatch = null;
     let targetMed = null;
 
@@ -553,7 +591,7 @@ export const InventoryProvider = ({ children }) => {
     }
   };
 
-  const recordVendorReimbursement = (rtvId, amountPaid, staffName = 'Dr. Idrees') => {
+  const recordVendorReimbursement = (rtvId, amountPaid, staffName = 'Store Admin') => {
     const paid = Number(amountPaid) || 0;
     const now = new Date();
     const timeStr = `${now.toISOString().split('T')[0]} ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;

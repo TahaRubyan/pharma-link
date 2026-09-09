@@ -1,7 +1,7 @@
 import React from 'react';
 import { X, Send, CheckCircle, MessageSquare, Phone, DollarSign } from 'lucide-react';
 
-export const WhatsAppCreditModal = ({ isOpen, onClose, customer, saleData, shopName = 'Idrees Medical Store' }) => {
+export const WhatsAppCreditModal = ({ isOpen, onClose, customer, saleData, shopName = 'Testing Shop' }) => {
   if (!isOpen || !customer || !saleData) return null;
 
   const phoneClean = (customer.phone || '').replace(/[^0-9]/g, '');

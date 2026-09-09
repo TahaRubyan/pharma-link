@@ -23,16 +23,16 @@ export const CustomerLedgerPage = () => {
     const map = new Map();
 
     invoices.forEach((inv) => {
-      const name = (inv.shopName || inv.customerName || 'Walk-in Customer').trim();
+      const name = (inv.customerShopName || inv.customerName || inv.shopName || 'Walk-in Customer').trim();
       const key = name.toLowerCase();
 
       if (!map.has(key)) {
         map.set(key, {
           shopName: name,
-          phone: inv.customerPhone || '0300-5551234',
-          region: inv.region || 'Islamabad',
-          ntn: inv.customerNtn || 'NTN-948192-0',
-          strn: inv.customerStrn || 'STRN-4581-2',
+          phone: inv.customerPhone || 'N/A',
+          region: inv.region || currentShop?.city || 'Lahore',
+          ntn: inv.customerNtn || '-',
+          strn: inv.customerStrn || '-',
           creditLimit: 500000,
           invoices: []
         });

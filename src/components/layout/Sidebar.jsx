@@ -34,15 +34,14 @@ export const RETAIL_NAV_ITEMS = [
 ];
 
 export const WHOLESALE_NAV_ITEMS = [
+  { id: 'dashboard', label: 'Wholesale Dashboard', icon: LayoutDashboard, requiresAdmin: false },
   { id: 'pos', label: 'Wholesale POS', icon: ShoppingCart, requiresAdmin: false },
   { id: 'inventory', label: 'Stock & Regional Audit', icon: Package, hasBadge: 'FEFO', requiresAdmin: false },
-  { id: 'customer-debt', label: 'Customer Receivables & Khata', icon: CreditCard, requiresAdmin: true },
-  { id: 'expiry', label: 'Expiry Radar & Loss', icon: AlertTriangle, hasBadge: '<6m RTV', requiresAdmin: false },
   { id: 'region-ledger', label: 'Territory Ledger', icon: MapPin, requiresAdmin: true },
-  { id: 'customer-ledger', label: 'Customer Receivables', icon: Users, requiresAdmin: true },
-  { id: 'suppliers', label: 'Suppliers & RTV', icon: Truck, requiresAdmin: true },
-  { id: 'fbr', label: 'FBR Tax Audit (Annex-C)', icon: TrendingUp, requiresAdmin: true },
+  { id: 'suppliers', label: 'Suppliers & Inward PO', icon: Truck, requiresAdmin: true },
+  { id: 'fbr', label: 'FBR Tax Audit & Annex-C', icon: TrendingUp, requiresAdmin: true },
   { id: 'analytics', label: 'Sales & Movement Analytics', icon: FileText, requiresAdmin: true },
+  { id: 'expiry', label: 'Expiry Radar & Loss', icon: AlertTriangle, hasBadge: '<6m RTV', requiresAdmin: false },
   { id: 'settings', label: 'Store Profile & Signatures', icon: Settings, requiresAdmin: true },
 ];
 
@@ -98,12 +97,12 @@ export const Sidebar = ({ currentScreen, onNavigate, storeMode, onSwitchMode }) 
               {storeMode === 'RETAIL' ? 'Pharmacy Retail POS' : 'Wholesale ERP'}
             </h1>
             <p style={{ fontSize: '11px', color: '#64748b', fontWeight: 600, marginTop: '0.15rem', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              {currentShop ? currentShop.shopName : 'Idrees Medical Store'}
+              {currentShop ? currentShop.shopName : 'Testing Shop'}
             </p>
           </div>
         ) : (
           <div style={{ width: '32px', height: '32px', borderRadius: '8px', backgroundColor: '#0284c7', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 900, fontSize: '14px' }}>
-            {storeMode === 'RETAIL' ? 'IMS' : 'IPD'}
+            {(currentShop?.shopName || 'TS').slice(0, 2).toUpperCase()}
           </div>
         )}
 
@@ -130,22 +129,65 @@ export const Sidebar = ({ currentScreen, onNavigate, storeMode, onSwitchMode }) 
         </button>
       </div>
 
-      {/* Mode Tag */}
+      {/* Interactive Mode Switcher for Hybrid Shop */}
       {!isCollapsed && (
         <div style={{ padding: '0.65rem 1rem 0.35rem' }}>
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            backgroundColor: storeMode === 'RETAIL' ? '#ecfdf5' : '#eff6ff',
-            border: `1px solid ${storeMode === 'RETAIL' ? '#a7f3d0' : '#bfdbfe'}`,
-            padding: '0.3rem 0.65rem',
-            borderRadius: '8px',
-            justifyContent: 'space-between'
-          }}>
-            <span style={{ fontSize: '9.5px', color: storeMode === 'RETAIL' ? '#047857' : '#1d4ed8', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-              ● {storeMode === 'RETAIL' ? 'RETAIL COUNTER MODE' : 'WHOLESALE B2B'}
-            </span>
-          </div>
+          {onSwitchMode ? (
+            <div style={{ display: 'flex', backgroundColor: '#f1f5f9', padding: '0.2rem', borderRadius: '8px', gap: '0.2rem' }}>
+              <button
+                type="button"
+                onClick={() => onSwitchMode('WHOLESALE')}
+                style={{
+                  flex: 1,
+                  border: 'none',
+                  backgroundColor: storeMode === 'WHOLESALE' ? '#0284c7' : 'transparent',
+                  color: storeMode === 'WHOLESALE' ? '#ffffff' : '#64748b',
+                  fontSize: '10px',
+                  fontWeight: 800,
+                  padding: '0.35rem 0.2rem',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease'
+                }}
+                title="Switch to Wholesale B2B ERP"
+              >
+                🏢 Wholesale
+              </button>
+              <button
+                type="button"
+                onClick={() => onSwitchMode('RETAIL')}
+                style={{
+                  flex: 1,
+                  border: 'none',
+                  backgroundColor: storeMode === 'RETAIL' ? '#047857' : 'transparent',
+                  color: storeMode === 'RETAIL' ? '#ffffff' : '#64748b',
+                  fontSize: '10px',
+                  fontWeight: 800,
+                  padding: '0.35rem 0.2rem',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease'
+                }}
+                title="Switch to Retail Pharmacy POS"
+              >
+                💊 Retail POS
+              </button>
+            </div>
+          ) : (
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              backgroundColor: storeMode === 'RETAIL' ? '#ecfdf5' : '#eff6ff',
+              border: `1px solid ${storeMode === 'RETAIL' ? '#a7f3d0' : '#bfdbfe'}`,
+              padding: '0.3rem 0.65rem',
+              borderRadius: '8px',
+              justifyContent: 'space-between'
+            }}>
+              <span style={{ fontSize: '9.5px', color: storeMode === 'RETAIL' ? '#047857' : '#1d4ed8', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                ● {storeMode === 'RETAIL' ? 'RETAIL COUNTER MODE' : 'WHOLESALE B2B'}
+              </span>
+            </div>
+          )}
         </div>
       )}
 
@@ -219,59 +261,57 @@ export const Sidebar = ({ currentScreen, onNavigate, storeMode, onSwitchMode }) 
         </ul>
       </nav>
 
-      {/* Footer Profile & Prominent Logout */}
+      {/* Footer Profile */}
       <div style={{
         padding: isCollapsed ? '0.75rem 0.35rem' : '0.75rem 1rem',
         borderTop: '1px solid #f1f5f9',
         backgroundColor: '#fafafa'
       }}>
         {!isCollapsed ? (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div style={{ overflow: 'hidden', whiteSpace: 'nowrap' }}>
-              <div style={{ fontSize: '11.5px', fontWeight: 700, color: '#0f172a' }}>{user ? user.name : 'Dr. Idrees'}</div>
-              <div style={{ fontSize: '10px', color: '#64748b' }}>{user ? user.role : 'Pharmacist'}</div>
-            </div>
-            <button
-              onClick={logout}
-              title="Logout"
-              style={{
-                background: 'none',
-                border: '1px solid #fecaca',
-                backgroundColor: '#fef2f2',
-                borderRadius: '8px',
-                padding: '0.35rem 0.5rem',
-                cursor: 'pointer',
-                color: '#dc2626',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.25rem',
-                fontSize: '10.5px',
-                fontWeight: 700
-              }}
-            >
-              <Power size={13} color="#dc2626" /> Logout
-            </button>
-          </div>
-        ) : (
-          <button
-            onClick={logout}
-            title="Logout"
-            style={{
-              width: '100%',
-              background: 'none',
-              border: '1px solid #fecaca',
-              backgroundColor: '#fef2f2',
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+            <div style={{
+              width: '32px',
+              height: '32px',
               borderRadius: '8px',
-              padding: '0.45rem 0',
-              cursor: 'pointer',
-              color: '#dc2626',
+              backgroundColor: '#e0f2fe',
+              color: '#0284c7',
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'center'
-            }}
-          >
-            <Power size={15} color="#dc2626" />
-          </button>
+              justifyContent: 'center',
+              fontWeight: 800,
+              fontSize: '11px',
+              flexShrink: 0
+            }}>
+              {(user?.name || 'U').slice(0, 2).toUpperCase()}
+            </div>
+            <div style={{ overflow: 'hidden', whiteSpace: 'nowrap' }}>
+              <div style={{ fontSize: '11.5px', fontWeight: 700, color: '#0f172a' }}>{user ? user.name : 'Testing Shop Admin'}</div>
+              <div style={{ fontSize: '10px', color: '#16a34a', display: 'flex', alignItems: 'center', gap: '0.25rem', fontWeight: 600 }}>
+                <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#16a34a', display: 'inline-block' }}></span>
+                {user ? user.role : 'Pharmacist'} • Active
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', justifyContent: 'center' }}>
+            <div 
+              title={`${user?.name || 'User'} (${user?.role || 'Staff'})`}
+              style={{
+                width: '30px',
+                height: '30px',
+                borderRadius: '8px',
+                backgroundColor: '#e0f2fe',
+                color: '#0284c7',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontWeight: 800,
+                fontSize: '10px'
+              }}
+            >
+              {(user?.name || 'U').slice(0, 2).toUpperCase()}
+            </div>
+          </div>
         )}
       </div>
     </aside>

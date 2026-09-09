@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { INITIAL_SUPPLIERS, INITIAL_PURCHASE_ORDERS } from '../data/mockData';
 import { AuthContext, useAuth } from './AuthContext';
+import { dbSyncService } from '../services/dbSyncService';
 
 const SupplierContext = createContext();
 
@@ -9,6 +10,9 @@ export const SupplierProvider = ({ children }) => {
   const isRetail = auth?.currentShop?.mode === 'RETAIL';
 
   const [wholesaleSuppliers, setWholesaleSuppliers] = useState(() => {
+    const isCleared = typeof localStorage !== 'undefined' && localStorage.getItem('pharmalink_wholesale_cleared') === 'true';
+    if (isCleared) return [];
+
     const saved = localStorage.getItem('pharmalink_pk_suppliers');
     if (saved) {
       try {
@@ -54,6 +58,9 @@ export const SupplierProvider = ({ children }) => {
   }, [retailSuppliers]);
 
   const [wholesalePurchaseOrders, setWholesalePurchaseOrders] = useState(() => {
+    const isCleared = typeof localStorage !== 'undefined' && localStorage.getItem('pharmalink_wholesale_cleared') === 'true';
+    if (isCleared) return [];
+
     const saved = localStorage.getItem('pharmalink_pk_purchase_orders');
     if (saved) {
       try {
@@ -98,6 +105,30 @@ export const SupplierProvider = ({ children }) => {
     } catch (e) {}
   }, [retailPurchaseOrders]);
 
+  // Initial cloud sync from Supabase
+  useEffect(() => {
+    const tenantId = auth?.currentShop?.shopId || 'TEN-TESTING-SHOP';
+    dbSyncService.fetchSuppliers(tenantId).then((cloudSuppliers) => {
+      if (cloudSuppliers && cloudSuppliers.length > 0) {
+        setSuppliers((prev) => {
+          const map = new Map(prev.map((s) => [s.id, s]));
+          cloudSuppliers.forEach((s) => map.set(s.id, s));
+          return Array.from(map.values());
+        });
+      }
+    }).catch(() => {});
+
+    dbSyncService.fetchPurchaseOrders(tenantId).then((cloudPOs) => {
+      if (cloudPOs && cloudPOs.length > 0) {
+        setPurchaseOrders((prev) => {
+          const map = new Map(prev.map((p) => [p.poNumber || p.id, p]));
+          cloudPOs.forEach((p) => map.set(p.poNumber || p.id, p));
+          return Array.from(map.values());
+        });
+      }
+    }).catch(() => {});
+  }, [auth?.currentShop?.shopId]);
+
   // Helper to generate PO Number: PO-YYYYMMDD-XXXX
   const generatePONumber = () => {
     const dateStr = new Date().toISOString().split('T')[0].replace(/-/g, '');
@@ -110,6 +141,7 @@ export const SupplierProvider = ({ children }) => {
     const newSupplier = {
       id: newId,
       companyName: supplierData.companyName || supplierData.distributorName || supplierData.name || 'New Supplier',
+      name: supplierData.name || supplierData.companyName || 'New Supplier',
       contactPerson: supplierData.contactPerson || '-',
       phone: supplierData.phone || '-',
       email: supplierData.email || '-',
@@ -119,6 +151,8 @@ export const SupplierProvider = ({ children }) => {
       outstandingBalance: Number(supplierData.pendingBalance) || 0,
     };
     setSuppliers((prev) => [...prev, newSupplier]);
+    const tenantId = auth?.currentShop?.shopId || 'TEN-TESTING-SHOP';
+    dbSyncService.saveSupplier(tenantId, newSupplier).catch(() => {});
     return newSupplier;
   };
 
@@ -165,19 +199,30 @@ export const SupplierProvider = ({ children }) => {
 
   const createPurchaseOrder = (poData) => {
     const newPo = {
-      poNumber: generatePONumber(),
-      distributorName: poData.distributorName || 'Muller & Phipps Pakistan',
-      inwardDate: poData.inwardDate || new Date().toISOString().split('T')[0],
-      brandName: poData.brandName || 'Medicine',
-      genericFormula: poData.genericFormula || 'Formula',
-      batchNumber: poData.batchNumber || `BAT-${Date.now().toString().slice(-4)}`,
-      expiryDate: poData.expiryDate || '2027-12-31',
-      quantity: Number(poData.quantity) || 1,
-      boxPrice: Number(poData.boxPrice) || 0,
-      purchasePriceBox: Number(poData.purchasePriceBox) || 0,
-      totalAmount: (Number(poData.quantity) || 1) * (Number(poData.purchasePriceBox) || 0),
+      poNumber: poData.poNumber || generatePONumber(),
+      distributorName: poData.distributorName || poData.supplierName || 'Muller & Phipps Pakistan',
+      supplierName: poData.supplierName || poData.distributorName || 'Muller & Phipps Pakistan',
+      inwardDate: poData.inwardDate || poData.date || new Date().toISOString().split('T')[0],
+      deliveryDate: poData.deliveryDate || '',
+      challanNo: poData.challanNo || '',
+      paymentMethod: poData.paymentMode || poData.paymentMethod || 'Cash',
+      paymentStatus: poData.paymentStatus || 'PAID',
+      amountPaid: Number(poData.amountPaid || poData.totalAmount || 0),
+      grossCost: Number(poData.grossCost || poData.subtotal || 0),
+      salesTaxRate: Number(poData.salesTaxRate || 0),
+      salesTaxAmount: Number(poData.salesTaxAmount || 0),
+      advTaxRate: Number(poData.advTaxRate || 0),
+      advTaxAmount: Number(poData.advTaxAmount || 0),
+      inputTax: Number(poData.inputTax || (Number(poData.salesTaxAmount || 0) + Number(poData.advTaxAmount || 0))),
+      totalAmount: Number(poData.totalAmount || poData.grossCost || 0),
+      items: poData.items || [],
+      itemLines: poData.itemLines || '',
+      notes: poData.notes || '',
+      stockStatus: poData.stockStatus || 'Stock Received',
     };
     setPurchaseOrders((prev) => [newPo, ...prev]);
+    const tenantId = auth?.currentShop?.shopId || 'TEN-TESTING-SHOP';
+    dbSyncService.savePurchaseOrder(tenantId, newPo).catch(() => {});
     return newPo;
   };
 

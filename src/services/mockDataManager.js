@@ -6,14 +6,14 @@
  */
 
 import {
-  INITIAL_MEDICINES,
-  INITIAL_BATCHES,
-  INITIAL_INVOICES,
-  INITIAL_DEBT_CUSTOMERS,
-  INITIAL_SUPPLIERS,
-  INITIAL_PURCHASE_ORDERS,
-  INITIAL_PATIENTS,
-  INITIAL_VENDOR_RETURNS,
+  DEMO_MEDICINES,
+  DEMO_BATCHES,
+  DEMO_INVOICES,
+  DEMO_DEBT_CUSTOMERS,
+  DEMO_SUPPLIERS,
+  DEMO_PURCHASE_ORDERS,
+  DEMO_PATIENTS,
+  DEMO_VENDOR_RETURNS,
 } from '../data/mockData.js';
 import { storageManager } from './storageManager.js';
 
@@ -65,10 +65,10 @@ export const getRetailDataStats = () => {
 
   return {
     hasData,
-    medicinesCount: getCount(RETAIL_STORAGE_KEYS.MEDICINES, INITIAL_MEDICINES),
-    batchesCount: getCount(RETAIL_STORAGE_KEYS.BATCHES, INITIAL_BATCHES),
-    invoicesCount: getCount(RETAIL_STORAGE_KEYS.INVOICES, INITIAL_INVOICES),
-    customersCount: getCount(RETAIL_STORAGE_KEYS.DEBT_CUSTOMERS, INITIAL_DEBT_CUSTOMERS),
+    medicinesCount: getCount(RETAIL_STORAGE_KEYS.MEDICINES, DEMO_MEDICINES),
+    batchesCount: getCount(RETAIL_STORAGE_KEYS.BATCHES, DEMO_BATCHES),
+    invoicesCount: getCount(RETAIL_STORAGE_KEYS.INVOICES, DEMO_INVOICES),
+    customersCount: getCount(RETAIL_STORAGE_KEYS.DEBT_CUSTOMERS, DEMO_DEBT_CUSTOMERS),
   };
 };
 
@@ -76,20 +76,20 @@ export const getRetailDataStats = () => {
  * Load complete Pakistani retail pharmacy sample dataset
  */
 export const loadRetailMockData = (reload = true) => {
-  storageManager.safeSetItem(RETAIL_STORAGE_KEYS.MEDICINES, INITIAL_MEDICINES);
-  storageManager.safeSetItem(RETAIL_STORAGE_KEYS.BATCHES, INITIAL_BATCHES);
-  storageManager.safeSetItem(RETAIL_STORAGE_KEYS.INVOICES, INITIAL_INVOICES);
-  storageManager.safeSetItem(RETAIL_STORAGE_KEYS.DEBT_CUSTOMERS, INITIAL_DEBT_CUSTOMERS);
-  storageManager.safeSetItem(RETAIL_STORAGE_KEYS.SUPPLIERS, INITIAL_SUPPLIERS);
-  storageManager.safeSetItem(RETAIL_STORAGE_KEYS.PURCHASE_ORDERS, INITIAL_PURCHASE_ORDERS);
-  storageManager.safeSetItem(RETAIL_STORAGE_KEYS.PATIENTS, INITIAL_PATIENTS);
-  storageManager.safeSetItem(RETAIL_STORAGE_KEYS.VENDOR_RETURNS, INITIAL_VENDOR_RETURNS);
+  storageManager.safeSetItem(RETAIL_STORAGE_KEYS.MEDICINES, DEMO_MEDICINES);
+  storageManager.safeSetItem(RETAIL_STORAGE_KEYS.BATCHES, DEMO_BATCHES);
+  storageManager.safeSetItem(RETAIL_STORAGE_KEYS.INVOICES, DEMO_INVOICES);
+  storageManager.safeSetItem(RETAIL_STORAGE_KEYS.DEBT_CUSTOMERS, DEMO_DEBT_CUSTOMERS);
+  storageManager.safeSetItem(RETAIL_STORAGE_KEYS.SUPPLIERS, DEMO_SUPPLIERS);
+  storageManager.safeSetItem(RETAIL_STORAGE_KEYS.PURCHASE_ORDERS, DEMO_PURCHASE_ORDERS);
+  storageManager.safeSetItem(RETAIL_STORAGE_KEYS.PATIENTS, DEMO_PATIENTS);
+  storageManager.safeSetItem(RETAIL_STORAGE_KEYS.VENDOR_RETURNS, DEMO_VENDOR_RETURNS);
 
   storageManager.safeRemoveItem(RETAIL_STORAGE_KEYS.CLEARED_FLAG);
 
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent('pharmalink_retail_mock_data_changed', {
-      detail: { action: 'LOADED', count: INITIAL_MEDICINES.length }
+      detail: { action: 'LOADED', count: DEMO_MEDICINES.length }
     }));
     if (reload) {
       window.location.reload();

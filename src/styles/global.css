@@ -61,51 +61,44 @@ button, input, select, textarea {
   flex: 1;
 }
 
-/* Cards & Containers with Smooth Hover & Active States */
+/* Cards & Containers — System-Wide Clean Flat Styling */
 .card {
   background-color: var(--color-card-bg);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-card);
   padding: 1.25rem;
   box-shadow: var(--shadow-subtle);
+}
+
+/* Key Success Indicators (KSI) & KPI Cards — Exclusively Retain Smooth Hover & Active States */
+.ksi-card,
+.kpi-card {
   transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), 
               box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1), 
               border-color 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
 }
 
-.card:hover {
-  border-color: #cbd5e1;
-  box-shadow: 0 6px 16px -2px rgba(15, 23, 42, 0.07), 0 2px 4px -1px rgba(15, 23, 42, 0.03);
+.ksi-card:hover,
+.kpi-card:hover {
+  transform: translateY(-2px);
+  border-color: #0284c7 !important;
+  box-shadow: 0 10px 20px -3px rgba(2, 132, 199, 0.12), 0 4px 6px -2px rgba(15, 23, 42, 0.04) !important;
 }
 
-.card:active {
-  transform: translateY(0px) scale(0.998);
+.ksi-card:active,
+.kpi-card:active {
+  transform: translateY(0px) scale(0.99);
+  box-shadow: 0 2px 6px -1px rgba(2, 132, 199, 0.18) !important;
+  border-color: #0284c7 !important;
 }
 
-/* Interactive & Clickable Cards across the system (KPI cards, patient profiles, mode cards) */
+/* Interactive & Clickable Cards across the system (Clean flat pointer) */
 .card-hover,
 .card-interactive,
 .card[onClick],
 .clickable-card {
   cursor: pointer;
-}
-
-.card-hover:hover,
-.card-interactive:hover,
-.card[onClick]:hover,
-.clickable-card:hover {
-  transform: translateY(-3px);
-  border-color: #0284c7;
-  box-shadow: 0 12px 24px -4px rgba(2, 132, 199, 0.12), 0 4px 8px -2px rgba(15, 23, 42, 0.05);
-}
-
-.card-hover:active,
-.card-interactive:active,
-.card[onClick]:active,
-.clickable-card:active {
-  transform: translateY(0px) scale(0.992);
-  box-shadow: 0 2px 6px -1px rgba(2, 132, 199, 0.18);
-  border-color: #0284c7;
 }
 
 .flex-between {
@@ -126,7 +119,7 @@ button, input, select, textarea {
 @media (max-width: 1200px) { .grid-4 { grid-template-columns: repeat(2, 1fr); } }
 @media (max-width: 768px) { .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; } }
 
-/* Buttons with High-Quality Hover & Active States */
+/* Buttons — Clean Flat Styling (Hover & Active Animations Removed) */
 .btn {
   display: inline-flex;
   align-items: center;
@@ -138,13 +131,8 @@ button, input, select, textarea {
   border-radius: var(--radius-control);
   border: 1px solid transparent;
   cursor: pointer;
-  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
   text-decoration: none;
   user-select: none;
-}
-
-.btn:active {
-  transform: scale(0.97);
 }
 
 .btn:focus-visible {
@@ -158,34 +146,10 @@ button, input, select, textarea {
   box-shadow: 0 2px 4px rgba(17, 24, 39, 0.1);
 }
 
-.btn-primary:hover {
-  background-color: var(--color-primary-hover);
-  box-shadow: 0 4px 12px rgba(17, 24, 39, 0.2);
-  transform: translateY(-1px);
-}
-
-.btn-primary:active {
-  background-color: #000000;
-  transform: translateY(0) scale(0.97);
-  box-shadow: none;
-}
-
 .btn-outline {
   background-color: #ffffff;
   border-color: var(--color-border);
   color: var(--color-text-main);
-}
-
-.btn-outline:hover {
-  background-color: #f8fafc;
-  border-color: #94a3b8;
-  color: #0f172a;
-  transform: translateY(-1px);
-}
-
-.btn-outline:active {
-  background-color: #f1f5f9;
-  transform: translateY(0) scale(0.97);
 }
 
 .btn-danger {
@@ -194,15 +158,18 @@ button, input, select, textarea {
   box-shadow: 0 2px 4px rgba(239, 68, 68, 0.15);
 }
 
-.btn-danger:hover {
-  background-color: #dc2626;
-  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.25);
-  transform: translateY(-1px);
+/* Sidebar Navigation Items — Exclusively Retain Smooth Active & Hover States */
+.sidebar-item {
+  transition: background-color 0.15s ease, color 0.15s ease;
+  cursor: pointer;
 }
-
-.btn-danger:active {
-  background-color: #b91c1c;
-  transform: translateY(0) scale(0.97);
+.sidebar-item:hover {
+  background-color: #f1f5f9 !important;
+  color: #0284c7 !important;
+}
+.sidebar-item.active {
+  background-color: #e0f2fe !important;
+  color: #0284c7 !important;
 }
 
 /* Typography Hierarchy */
@@ -230,7 +197,7 @@ button, input, select, textarea {
   color: var(--color-text-muted);
 }
 
-/* Badges & Interactive Pill Tags */
+/* Badges & Clean Pill Tags */
 .badge {
   display: inline-flex;
   align-items: center;
@@ -241,11 +208,6 @@ button, input, select, textarea {
   line-height: 1.2;
   text-transform: uppercase;
   letter-spacing: 0.03em;
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
-}
-
-.badge:hover {
-  transform: translateY(-1px);
 }
 
 .badge-success { background-color: var(--status-success-bg); color: var(--status-success-text); }
@@ -257,7 +219,7 @@ button, input, select, textarea {
 .badge-narcotic { background-color: var(--badge-narcotic-bg); color: var(--badge-narcotic-text); }
 .badge-supplement { background-color: var(--badge-supplement-bg); color: var(--badge-supplement-text); }
 
-/* Table Utilities with Hover Row Effects */
+/* Table Utilities — Clean Flat Rows */
 .table-container {
   width: 100%;
   overflow-x: auto;
@@ -288,25 +250,22 @@ button, input, select, textarea {
   padding: 0.85rem 1rem;
   border-bottom: 1px solid var(--color-border);
   color: var(--color-text-main);
-  transition: background-color 0.15s ease;
 }
 
 .table tr:last-child td {
   border-bottom: none;
 }
 
-.table tr:hover td {
-  background-color: #f1f5f9;
-}
-
 /* ==========================================================================
    80MM POS THERMAL RECEIPT PRINT ENGINE (ZERO MULTI-PAGE OVERFLOW GUARANTEE)
    ========================================================================== */
 
-/* Screen View: Hide the isolated print mount completely */
+/* Screen View: Hide the isolated print mounts completely */
 @media screen {
   #thermal-print-mount,
-  .thermal-print-only {
+  .thermal-print-only,
+  #a4-print-mount,
+  .a4-print-only {
     display: none !important;
     visibility: hidden !important;
     height: 0 !important;
@@ -315,20 +274,14 @@ button, input, select, textarea {
   }
 }
 
-/* Print View: Enforce strict 80mm roll dimensions and hide #root */
+/* Print View: Enforce strict 80mm roll dimensions when thermal, or full A4 dimensions */
 @media print {
   @page {
-    margin: 0mm;
+    size: A4 portrait;
+    margin: 8mm 10mm;
   }
 
-  html {
-    margin: 0 !important;
-    padding: 0 !important;
-    background: #ffffff !important;
-    color: #000000 !important;
-  }
-
-  body {
+  html, body {
     margin: 0 !important;
     padding: 0 !important;
     background: #ffffff !important;
@@ -337,7 +290,9 @@ button, input, select, textarea {
     print-color-adjust: exact !important;
   }
 
-  /* When printing thermal receipt, completely remove the entire SPA root from layout */
+  /* -------------------------------------------------------------
+     1. 80MM POS THERMAL RECEIPT MODE
+     ------------------------------------------------------------- */
   body.printing-thermal #root,
   body:has(#thermal-print-mount > *) #root {
     display: none !important;
@@ -381,9 +336,179 @@ button, input, select, textarea {
     break-inside: avoid !important;
   }
 
-  .no-print,
-  .thermal-no-print {
+  /* -------------------------------------------------------------
+     2. A4 COMMERCIAL TAX INVOICE & DOCUMENT PRINT ENGINE (FBR / FORM 2A)
+     ------------------------------------------------------------- */
+  /* Isolated A4 Mount (guarantees zero sidebar or web layout bleed) */
+  body.printing-a4 #root,
+  body:has(#a4-print-mount > *) #root {
+    display: none !important;
+    height: 0 !important;
+    max-height: 0 !important;
+    overflow: hidden !important;
+    visibility: hidden !important;
+  }
+
+  body.printing-a4 > *:not(#a4-print-mount),
+  body:has(#a4-print-mount > *) > *:not(#a4-print-mount) {
     display: none !important;
   }
+
+  #a4-print-mount,
+  .a4-print-only {
+    display: block !important;
+    visibility: visible !important;
+    width: 100% !important;
+    max-width: 210mm !important;
+    margin: 0 auto !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+
+  #a4-print-mount * {
+    visibility: visible !important;
+    box-sizing: border-box !important;
+  }
+
+  body.printing-a4,
+  body:has(#printable-a4-invoice),
+  body:has(#printable-customer-statement),
+  body:has(#printable-controlled-register),
+  body:has(#printable-govt-invoice),
+  body:has(#printable-fbr-report),
+  body:has(#printable-debit-note) {
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+
+  /* Hide app navigation chrome */
+  body.printing-a4 aside,
+  body.printing-a4 nav,
+  body.printing-a4 header,
+  body:has(#printable-a4-invoice) aside,
+  body:has(#printable-a4-invoice) nav,
+  body:has(#printable-a4-invoice) header {
+    display: none !important;
+  }
+
+  /* Flatten modal overlays, fixed viewports and backdrops */
+  div[style*="position: fixed"],
+  div[style*="position:fixed"],
+  .modal-overlay,
+  .modal-backdrop {
+    position: static !important;
+    inset: auto !important;
+    background: transparent !important;
+    backdrop-filter: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    max-height: none !important;
+    height: auto !important;
+    overflow: visible !important;
+    box-shadow: none !important;
+    width: 100% !important;
+    display: block !important;
+  }
+
+  /* Reset scrollable card wrapper so multi-page invoices don't get clipped */
+  div[style*="overflow-y: auto"],
+  div[style*="overflowY: auto"],
+  div[style*="overflowY: 'auto'"],
+  div[style*="max-height: 94vh"],
+  div[style*="maxHeight: 94vh"],
+  div[style*="max-height: 92vh"],
+  div[style*="maxHeight: 92vh"],
+  .card {
+    position: static !important;
+    max-height: none !important;
+    height: auto !important;
+    overflow: visible !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  /* Hide modal buttons, action bars, close X buttons */
+  button,
+  .btn,
+  .no-print,
+  .thermal-no-print,
+  .a4-no-print,
+  button[style*="position: absolute"] {
+    display: none !important;
+  }
+
+  /* Render printable containers full width on A4 */
+  #printable-a4-invoice,
+  #printable-customer-statement,
+  #printable-controlled-register,
+  #printable-govt-invoice,
+  #printable-fbr-report,
+  #printable-debit-note {
+    display: block !important;
+    visibility: visible !important;
+    width: 100% !important;
+    max-width: 195mm !important;
+    margin: 0 auto !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    box-shadow: none !important;
+    border: none !important;
+  }
+
+  #printable-a4-invoice *,
+  #printable-customer-statement *,
+  #printable-controlled-register *,
+  #printable-govt-invoice *,
+  #printable-fbr-report *,
+  #printable-debit-note * {
+    visibility: visible !important;
+    box-sizing: border-box !important;
+  }
+
+  /* Individual A4 pages for multi-page invoices */
+  .a4-page-container {
+    page-break-after: always !important;
+    break-after: page !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    min-height: 260mm !important;
+    max-height: 275mm !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: space-between !important;
+    box-sizing: border-box !important;
+    border: 2px solid #000000 !important;
+    padding: 1rem !important;
+    background: #ffffff !important;
+    margin: 0 0 10mm 0 !important;
+  }
+
+  .a4-page-container:last-child {
+    page-break-after: auto !important;
+    break-after: auto !important;
+    margin-bottom: 0 !important;
+  }
+
+  /* Ensure table borders and headers print cleanly */
+  #printable-a4-invoice table,
+  #printable-customer-statement table,
+  #printable-controlled-register table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+  }
+
+  #printable-a4-invoice tr,
+  #printable-customer-statement tr,
+  #printable-controlled-register tr {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
 }
+
 

@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { MOCK_STAFF_ACCOUNTS, MULTI_TENANT_SHOPS } from '../data/mockData';
+import { dbSyncService } from '../services/dbSyncService';
 
 const AuthContext = createContext();
 
@@ -65,124 +66,29 @@ const DEFAULT_ROLES = [
 
 const INITIAL_TENANTS = [
   {
-    tenantId: 'TEN-IDREES-WS',
-    shopName: 'Idrees Pharma Distributor',
-    ownerName: 'Dr. Idrees',
-    phone: '053-3724601',
-    form20: '09-342-0139-045748D',
-    form21: '09-342-0139-045749D',
+    tenantId: 'TEN-TESTING-SHOP',
+    shopName: 'Testing Shop',
+    ownerName: 'Testing Administrator',
+    phone: '0300-1234567',
+    form20: 'TEST-DL-20-001',
+    form21: 'TEST-DL-21-001',
     gstin: '3277876174544',
-    city: 'Gujrat',
-    subscribedSystemScope: 'WHOLESALE_ONLY',
-    setupFeePaid: 75000,
-    monthlyFee: 7500,
-    subscriptionStatus: 'Active',
-    lastPaymentDate: '01-09-2026',
-    nextDueDate: '01-10-2026',
-    adminUsername: 'idrees.wholesale',
-    isTempPassword: false,
-    createdDate: '01-09-2026',
-  },
-  {
-    tenantId: 'TEN-IDREES-RT',
-    shopName: 'Idrees Medical Store',
-    ownerName: 'Dr. Idrees',
-    phone: '051-2345678',
-    form20: 'PK-DL-20-45812',
-    form21: 'PK-DL-21-45813',
-    gstin: 'PK-1234567-8',
-    city: 'Islamabad',
-    subscribedSystemScope: 'RETAIL_ONLY',
-    setupFeePaid: 0,
-    monthlyFee: 0,
-    subscriptionStatus: 'Free Trial',
-    lastPaymentDate: '01-09-2026',
-    nextDueDate: '01-10-2026',
-    adminUsername: 'idrees.retail',
-    isTempPassword: false,
-    createdDate: '01-09-2026',
-  },
-  {
-    tenantId: 'CP-1092',
-    shopName: 'PharmaLink Islamabad Flagship',
-    ownerName: 'Dr. Idrees',
-    phone: '0300-5551234',
-    form20: 'PK-DL-20-45812',
-    form21: 'PK-DL-21-45813',
-    gstin: 'PK-1234567-8',
-    city: 'Islamabad',
+    ntn: '4442705-7',
+    city: 'Lahore',
+    address: 'Main Commercial Market, Lahore',
     subscribedSystemScope: 'HYBRID_BOTH',
     setupFeePaid: 50000,
     monthlyFee: 5000,
     subscriptionStatus: 'Active',
-    lastPaymentDate: '01-08-2026',
-    nextDueDate: '01-09-2026',
-    adminUsername: 'admin@pharmalink.pk',
-    isTempPassword: true,
-    createdDate: '01-08-2026',
-  },
-  {
-    tenantId: 'CP-2041',
-    shopName: 'Al-Madina Wholesale Pharmacy',
-    ownerName: 'Tariq Parvez',
-    phone: '0321-8889900',
-    form20: 'PK-DL-20-99881',
-    form21: 'PK-DL-21-99882',
-    gstin: 'PK-8899112-9',
-    city: 'Lahore',
-    subscribedSystemScope: 'WHOLESALE_ONLY',
-    setupFeePaid: 65000,
-    monthlyFee: 7500,
-    subscriptionStatus: 'Due Soon',
-    lastPaymentDate: '28-07-2026',
-    nextDueDate: '28-08-2026',
-    adminUsername: 'tariq@almadinawholesale.pk',
+    lastPaymentDate: '01-09-2026',
+    nextDueDate: '01-10-2026',
+    adminUsername: 'testing.admin',
     isTempPassword: false,
-    createdDate: '28-07-2026',
-  },
-  {
-    tenantId: 'CP-3090',
-    shopName: 'Khyber Retail Meds',
-    ownerName: 'Shahid Afridi',
-    phone: '0333-1122334',
-    form20: 'PK-DL-20-11223',
-    form21: 'PK-DL-21-11224',
-    gstin: 'PK-3344556-1',
-    city: 'Peshawar',
-    subscribedSystemScope: 'RETAIL_ONLY',
-    setupFeePaid: 45000,
-    monthlyFee: 4000,
-    subscriptionStatus: 'Overdue',
-    lastPaymentDate: '10-07-2026',
-    nextDueDate: '10-08-2026',
-    adminUsername: 'afridi@khybermeds.pk',
-    isTempPassword: false,
-    createdDate: '10-07-2026',
+    createdDate: '01-09-2026',
   }
 ];
 
-const INITIAL_CLIENT_PAYMENT_LOGS = [
-  {
-    id: 'PAY-1001',
-    tenantId: 'CP-1092',
-    shopName: 'PharmaLink Islamabad Flagship',
-    amount: 5000,
-    paymentMethod: 'Bank Transfer (HBL)',
-    loggedDate: '01-08-2026',
-    loggedTime: '10:30 AM',
-    loggedBy: 'Master Super Admin',
-  },
-  {
-    id: 'PAY-1002',
-    tenantId: 'CP-2041',
-    shopName: 'Al-Madina Wholesale Pharmacy',
-    amount: 7500,
-    paymentMethod: 'EasyPaisa Business',
-    loggedDate: '28-07-2026',
-    loggedTime: '02:15 PM',
-    loggedBy: 'Master Super Admin',
-  }
-];
+const INITIAL_CLIENT_PAYMENT_LOGS = [];
 
 export const AuthProvider = ({ children }) => {
   const [userAccountType, setUserAccountType] = useState(() => {
@@ -233,10 +139,10 @@ export const AuthProvider = ({ children }) => {
   });
 
   const [user, setUser] = useState({
-    name: userAccountType === 'SUPER_ADMIN' ? 'Master Super Admin' : 'Dr. Idrees',
+    name: userAccountType === 'SUPER_ADMIN' ? 'Master Super Admin' : 'Testing Shop Admin',
     role: userAccountType === 'SUPER_ADMIN' ? 'SuperAdmin' : role,
     staffId: userAccountType === 'SUPER_ADMIN' ? 'SA-001' : 'EMP-001',
-    title: userAccountType === 'SUPER_ADMIN' ? 'MediStore SaaS Platform Owner' : 'Chief Pharmacist & Store Manager'
+    title: userAccountType === 'SUPER_ADMIN' ? 'MediStore SaaS Platform Owner' : 'Shop Administrator'
   });
 
   const [roles, setRoles] = useState(() => {
@@ -260,8 +166,33 @@ export const AuthProvider = ({ children }) => {
         console.error('Failed to parse saved staff accounts', e);
       }
     }
-    return MOCK_STAFF_ACCOUNTS;
+    return [];
   });
+
+  // Cloud sync staff accounts from Supabase
+  useEffect(() => {
+    let isMounted = true;
+    const loadCloudStaff = async () => {
+      try {
+        const tenantId = currentShop?.shopId || 'TEN-TESTING-SHOP';
+        const cloudStaff = await dbSyncService.fetchStaffAccounts(tenantId);
+        if (isMounted && cloudStaff && cloudStaff.length > 0) {
+          setStaffAccounts((prev) => {
+            const map = new Map();
+            prev.forEach((item) => map.set(item.id, item));
+            cloudStaff.forEach((item) => map.set(item.id, { ...(map.get(item.id) || {}), ...item }));
+            return Array.from(map.values());
+          });
+        }
+      } catch (err) {
+        console.warn('[AuthContext] Cloud staff sync warning:', err);
+      }
+    };
+    loadCloudStaff();
+    return () => {
+      isMounted = false;
+    };
+  }, [currentShop?.shopId]);
 
   useEffect(() => {
     localStorage.setItem('medistore_account_type', userAccountType);
@@ -287,14 +218,15 @@ export const AuthProvider = ({ children }) => {
     localStorage.setItem('pharmalink_user_role', role);
     if (userAccountType === 'CLIENT_USER') {
       const isRetail = currentShop?.mode === 'RETAIL';
+      const isHybrid = currentShop?.subscribedSystemScope === 'HYBRID_BOTH' || currentShop?.mode === 'HYBRID';
       setUser({
         name: role === 'Admin' 
-          ? (isRetail ? 'Dr. Idrees (Retail Admin)' : 'Dr. Idrees (Wholesale Admin)')
+          ? (isHybrid ? 'Testing Admin' : isRetail ? 'Testing Retail Admin' : 'Testing Wholesale Admin')
           : (isRetail ? 'Retail Counter Cashier' : 'Wholesale Billing Cashier'),
         role: role,
         staffId: role === 'Admin' ? 'EMP-001' : 'EMP-002',
         title: role === 'Admin' 
-          ? (isRetail ? 'Chief Pharmacist & Store Manager' : 'Distributor Operations Head')
+          ? (isHybrid ? 'Store Operations Head' : isRetail ? 'Chief Pharmacist & Store Manager' : 'Distributor Operations Head')
           : (isRetail ? 'Counter Cashier & POS Dispenser' : 'B2B Billing & Dispatch Cashier')
       });
     } else {
@@ -305,7 +237,7 @@ export const AuthProvider = ({ children }) => {
         title: 'MediStore SaaS Platform Owner'
       });
     }
-  }, [role, userAccountType, currentShop?.mode]);
+  }, [role, userAccountType, currentShop?.mode, currentShop?.subscribedSystemScope]);
 
   useEffect(() => {
     localStorage.setItem('pharmalink_custom_roles', JSON.stringify(roles));
@@ -343,7 +275,7 @@ export const AuthProvider = ({ children }) => {
     localStorage.setItem('pharmalink_session_login_role', 'Admin');
   };
 
-  const loginAsClientUser = (tenantId = 'CP-1092', roleType = 'Admin', mode = 'RETAIL') => {
+  const loginAsClientUser = (tenantId = 'TEN-TESTING-SHOP', roleType = 'Admin', mode = 'HYBRID') => {
     setIsAuthenticated(true);
     setUserAccountType('CLIENT_USER');
     setRoleState(roleType);
@@ -354,51 +286,35 @@ export const AuthProvider = ({ children }) => {
     localStorage.setItem('pharmalink_user_role', roleType);
     localStorage.setItem('pharmalink_session_login_role', roleType);
 
-    if (mode === 'RETAIL') {
-      let existingData = {};
-      try {
-        const savedShop = localStorage.getItem('pharmalink_active_shop');
-        if (savedShop) {
-          const parsed = JSON.parse(savedShop);
-          if (parsed.mode === 'RETAIL') existingData = parsed;
-        }
-      } catch (e) {}
+    const activeTenant = (tenantsList || []).find((t) => t.tenantId === tenantId) || INITIAL_TENANTS[0];
 
-      setCurrentShopState({
-        shopId: tenantId || 'TEN-IDREES-RT',
-        shopName: existingData.shopName || 'Idrees Medical Store',
-        city: existingData.city || '',
-        dlNumber: existingData.dlNumber || '',
-        gstin: existingData.gstin || '',
-        ntn: existingData.ntn || '',
-        address: existingData.address || '',
-        phone: existingData.phone || '',
-        mode: 'RETAIL',
-        ...existingData
-      });
-    } else {
-      let existingData = {};
-      try {
-        const savedShop = localStorage.getItem('pharmalink_active_shop');
-        if (savedShop) {
-          const parsed = JSON.parse(savedShop);
-          if (parsed.mode === 'WHOLESALE') existingData = parsed;
-        }
-      } catch (e) {}
+    let existingData = {};
+    try {
+      const savedShop = localStorage.getItem('pharmalink_active_shop');
+      if (savedShop) {
+        existingData = JSON.parse(savedShop);
+      }
+    } catch (e) {}
 
-      setCurrentShopState({
-        shopId: tenantId || 'TEN-IDREES-WS',
-        shopName: existingData.shopName || 'Idrees Pharma Distributor',
-        city: existingData.city || 'Gujrat',
-        dlNumber: existingData.dlNumber || '09-342-0139-045748D',
-        gstin: existingData.gstin || '3277876174544',
-        ntn: existingData.ntn || '4442705-7',
-        address: existingData.address || 'Jalal Pur Jattan, Gujrat',
-        phone: existingData.phone || '053-3724601, 053-3724602',
-        mode: 'WHOLESALE',
-        ...existingData
-      });
-    }
+    const resolvedMode = mode === 'HYBRID' || activeTenant?.subscribedSystemScope === 'HYBRID_BOTH'
+      ? 'HYBRID'
+      : mode === 'RETAIL'
+      ? 'RETAIL'
+      : 'WHOLESALE';
+
+    setCurrentShopState({
+      shopId: tenantId || activeTenant?.tenantId || 'TEN-TESTING-SHOP',
+      shopName: existingData.shopName || activeTenant?.shopName || 'Testing Shop',
+      city: existingData.city || activeTenant?.city || 'Lahore',
+      dlNumber: existingData.dlNumber || activeTenant?.form20 || 'TEST-DL-20-001',
+      gstin: existingData.gstin || activeTenant?.gstin || '3277876174544',
+      ntn: existingData.ntn || activeTenant?.ntn || '4442705-7',
+      address: existingData.address || activeTenant?.address || 'Main Commercial Market, Lahore',
+      phone: existingData.phone || activeTenant?.phone || '0300-1234567',
+      mode: resolvedMode,
+      subscribedSystemScope: activeTenant?.subscribedSystemScope || 'HYBRID_BOTH',
+      ...existingData
+    });
   };
 
   const onboardNewTenant = (tenantData) => {
@@ -522,9 +438,24 @@ export const AuthProvider = ({ children }) => {
       role: staffData.role || 'Cashier',
       title: staffData.title || (staffData.role === 'Admin' ? 'Managing Pharmacist & Admin' : 'Billing Cashier'),
       phone: staffData.phone || '',
-      status: staffData.status || 'Active'
+      status: staffData.status || 'Active',
+      storeMode: staffData.storeMode || currentShop?.mode || 'WHOLESALE',
     };
     setStaffAccounts((prev) => [newStaff, ...prev]);
+
+    // Asynchronously save to cloud database
+    const tenantId = currentShop?.shopId || 'TEN-TESTING-SHOP';
+    dbSyncService.saveStaffAccount({
+      id: newStaff.id,
+      tenantId: tenantId,
+      name: newStaff.name,
+      username: newStaff.username,
+      password: staffData.password || '123456',
+      role: newStaff.role,
+      status: newStaff.status,
+      storeMode: newStaff.storeMode,
+    });
+
     return newStaff;
   };
 

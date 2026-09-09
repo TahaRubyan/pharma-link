@@ -105,20 +105,24 @@ export const RegionLedgerPage = () => {
   }, [invoices, selectedRegion, selectedStatus, searchQuery]);
 
   const regionKPIs = useMemo(() => {
-    const uniqueShops = new Set(filteredInvoices.map((inv) => (inv.shopName || inv.customerName || '').trim().toLowerCase()));
+    const uniqueShops = new Set(filteredInvoices.map((inv) => (inv.customerShopName || inv.customerName || inv.shopName || '').trim().toLowerCase()));
     let totalShops = uniqueShops.size;
     let totalSalesNet = 0;
     let totalOutstandingDebt = 0;
     let totalCashSettledToday = 0;
+    let activeDueShops = 0;
 
     const todayStr = new Date().toISOString().split('T')[0];
 
     filteredInvoices.forEach((inv) => {
       const net = Number(inv.netTotal || inv.subtotal || 0);
-      const remaining = inv.remainingDebt !== undefined ? Number(inv.remainingDebt) : (inv.paymentStatus === 'PAID' ? 0 : net);
+      const remaining = inv.remainingDebt !== undefined 
+        ? Number(inv.remainingDebt) 
+        : (inv.paymentStatus === 'PAID' ? 0 : net);
 
       totalSalesNet += net;
       totalOutstandingDebt += remaining;
+      if (remaining > 0) activeDueShops++;
 
       const logs = inv.paymentLogs || [];
       logs.forEach((log) => {
@@ -129,24 +133,48 @@ export const RegionLedgerPage = () => {
     });
 
     return {
-      totalShops: totalShops || 2,
-      totalSalesNet: totalSalesNet || 1006.15,
-      totalOutstandingDebt: totalOutstandingDebt || 116.15,
+      totalShops,
+      activeDueShops,
+      totalSalesNet,
+      totalOutstandingDebt,
       totalCashSettledToday,
     };
   }, [filteredInvoices]);
 
   const handleSettleCash = (invoice) => {
+    const remaining = invoice.remainingDebt !== undefined 
+      ? Number(invoice.remainingDebt) 
+      : (invoice.paymentStatus === 'PAID' ? 0 : Number(invoice.netTotal || invoice.subtotal || 0));
+
     const val = cashInputs[invoice.invoiceNo];
     if (!val || isNaN(val) || Number(val) <= 0) {
       alert('Please enter a valid cash amount to settle.');
       return;
     }
 
-    const amountPaid = Number(val);
-    recordDebtPayment(invoice.invoiceNo, amountPaid);
+    const amountPaid = Math.min(Number(val), remaining);
+    if (typeof recordDebtPayment === 'function') {
+      recordDebtPayment(invoice.invoiceNo, amountPaid);
+    }
     setCashInputs((prev) => ({ ...prev, [invoice.invoiceNo]: '' }));
-    alert(`Cash payment of Rs. ${amountPaid.toLocaleString('en-PK')} settled for ${invoice.shopName || invoice.customerName}!`);
+    alert(`✅ Cash payment of Rs. ${amountPaid.toLocaleString('en-PK', { minimumFractionDigits: 2 })} successfully settled and added to system liquidity for ${invoice.customerShopName || invoice.customerName || invoice.shopName}!`);
+  };
+
+  const handleClearFullAmount = (invoice) => {
+    const remaining = invoice.remainingDebt !== undefined 
+      ? Number(invoice.remainingDebt) 
+      : (invoice.paymentStatus === 'PAID' ? 0 : Number(invoice.netTotal || invoice.subtotal || 0));
+
+    if (remaining <= 0) {
+      alert('This invoice is already fully cleared!');
+      return;
+    }
+
+    if (typeof recordDebtPayment === 'function') {
+      recordDebtPayment(invoice.invoiceNo, remaining);
+    }
+    setCashInputs((prev) => ({ ...prev, [invoice.invoiceNo]: '' }));
+    alert(`✅ Full balance of Rs. ${remaining.toLocaleString('en-PK', { minimumFractionDigits: 2 })} successfully cleared and added to system cash for ${invoice.customerShopName || invoice.customerName || invoice.shopName}!`);
   };
 
   return (
@@ -201,11 +229,11 @@ export const RegionLedgerPage = () => {
         </div>
 
         <div className="card" style={{ padding: '0.85rem', backgroundColor: '#eff6ff', border: '1px solid #bfdbfe', textAlign: 'center' }}>
-          <div style={{ fontSize: '10px', color: '#1d4ed8', fontWeight: 700 }}>ACTIVE REGIONS & SHOPS</div>
+          <div style={{ fontSize: '10px', color: '#1d4ed8', fontWeight: 700 }}>ACTIVE REGIONS & DESTINATIONS</div>
           <div style={{ fontSize: '18px', fontWeight: 800, color: '#1d4ed8', marginTop: '0.2rem' }}>
-            {regionKPIs.totalShops} Shops (1 Active)
+            {regionKPIs.totalShops} Destinations ({regionKPIs.activeDueShops} Due)
           </div>
-          <div style={{ fontSize: '10px', color: '#94a3b8' }}>Active delivery destinations in selected route</div>
+          <div style={{ fontSize: '10px', color: '#94a3b8' }}>Delivery destinations with pending recovery</div>
         </div>
       </div>
 
@@ -264,7 +292,7 @@ export const RegionLedgerPage = () => {
             Regional Shop Deliveries & Inline Cash Settlement Table
           </div>
           <span style={{ fontSize: '11px', color: '#64748b' }}>
-            Showing {filteredInvoices.length} of 2 Shop Invoices
+            Showing {filteredInvoices.length} Orders & Deliveries
           </span>
         </div>
 
@@ -283,73 +311,98 @@ export const RegionLedgerPage = () => {
               </tr>
             </thead>
             <tbody>
-              {filteredInvoices.map((inv, idx) => {
-                const net = Number(inv.netTotal || inv.subtotal || 890.00);
-                const remaining = inv.remainingDebt !== undefined ? Number(inv.remainingDebt) : (inv.paymentStatus === 'PAID' ? 0 : 116.15);
-                const isPaid = remaining === 0;
+              {filteredInvoices.length === 0 ? (
+                <tr>
+                  <td colSpan={8} style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8' }}>
+                    <Truck size={28} style={{ margin: '0 auto 0.5rem', opacity: 0.5 }} />
+                    <div style={{ fontWeight: 700 }}>No deliveries found for the selected filter</div>
+                    <div style={{ fontSize: '11px' }}>When you complete a wholesale sale or dispatch, the customer details and due balance will appear here.</div>
+                  </td>
+                </tr>
+              ) : (
+                filteredInvoices.map((inv, idx) => {
+                  const net = Number(inv.netTotal || inv.subtotal || 0);
+                  const remaining = inv.remainingDebt !== undefined 
+                    ? Number(inv.remainingDebt) 
+                    : (inv.paymentStatus === 'PAID' ? 0 : net);
+                  const isPaid = remaining === 0;
 
-                return (
-                  <tr key={inv.invoiceNo || idx}>
-                    <td>
-                      <div style={{ fontWeight: 700 }}>{inv.shopName || inv.customerName}</div>
-                      <div style={{ fontSize: '10px', color: '#64748b' }}>
-                        Inv #{inv.invoiceNo} • Ph: {inv.customerPhone || '0300-5551234'}
-                      </div>
-                    </td>
-                    <td>
-                      <span className="badge badge-otc">
-                        📍 {inv.region || 'Islamabad'}
-                      </span>
-                    </td>
-                    <td style={{ color: '#475569' }}>{inv.deliveryMan || 'Unassigned'}</td>
-                    <td style={{ textAlign: 'center' }}>
-                      <span className={`badge ${isPaid ? 'badge-success' : 'badge-danger'}`}>
-                        {isPaid ? 'FULLY PAID' : 'NOT PAID'}
-                      </span>
-                    </td>
-                    <td style={{ textAlign: 'right', fontWeight: 700 }}>Rs. {net.toFixed(2)}</td>
-                    <td style={{ textAlign: 'right', fontWeight: 700, color: remaining > 0 ? '#dc2626' : '#16a34a' }}>
-                      Rs. {remaining.toFixed(2)}
-                    </td>
-                    <td>
-                      {!isPaid ? (
-                        <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center' }}>
-                          <input
-                            type="number"
-                            placeholder="e.g. 5000"
-                            value={cashInputs[inv.invoiceNo] || ''}
-                            onChange={(e) => setCashInputs({ ...cashInputs, [inv.invoiceNo]: e.target.value })}
-                            style={{ width: '80px', padding: '0.25rem 0.45rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '11px', fontWeight: 700 }}
-                          />
+                  return (
+                    <tr key={inv.invoiceNo || idx}>
+                      <td>
+                        <div style={{ fontWeight: 700 }}>{inv.customerShopName || inv.customerName || inv.shopName || 'Walk-in Customer'}</div>
+                        <div style={{ fontSize: '10px', color: '#64748b' }}>
+                          Inv #{inv.invoiceNo} • {inv.date} {inv.customerPhone ? `• Ph: ${inv.customerPhone}` : ''}
+                        </div>
+                      </td>
+                      <td>
+                        <span className="badge badge-otc">
+                          📍 {inv.region || currentShop?.city || 'Lahore'}
+                        </span>
+                      </td>
+                      <td style={{ color: '#475569' }}>{inv.deliveryMan || 'Express Delivery / Rider'}</td>
+                      <td style={{ textAlign: 'center' }}>
+                        <span className={`badge ${isPaid ? 'badge-success' : remaining < net ? 'badge-warning' : 'badge-danger'}`}
+                          style={remaining > 0 && remaining < net ? { backgroundColor: '#fef3c7', color: '#b45309', border: '1px solid #fde68a' } : {}}
+                        >
+                          {isPaid ? 'FULLY PAID' : remaining < net ? 'PARTIALLY PAID' : 'DUE / NOT PAID'}
+                        </span>
+                      </td>
+                      <td style={{ textAlign: 'right', fontWeight: 700 }}>Rs. {net.toFixed(2)}</td>
+                      <td style={{ textAlign: 'right', fontWeight: 700, color: remaining > 0 ? '#dc2626' : '#16a34a' }}>
+                        Rs. {remaining.toFixed(2)}
+                      </td>
+                      <td>
+                        {!isPaid ? (
+                          <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center' }}>
+                            <input
+                              type="number"
+                              placeholder="Amount"
+                              value={cashInputs[inv.invoiceNo] !== undefined ? cashInputs[inv.invoiceNo] : remaining}
+                              onChange={(e) => setCashInputs({ ...cashInputs, [inv.invoiceNo]: e.target.value })}
+                              style={{ width: '75px', padding: '0.25rem 0.45rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '11px', fontWeight: 700 }}
+                            />
+                            <button
+                              onClick={() => handleSettleCash(inv)}
+                              className="btn btn-primary"
+                              style={{ fontSize: '10px', padding: '0.25rem 0.5rem', backgroundColor: '#16a34a', whiteSpace: 'nowrap' }}
+                              title="Settle specified cash amount"
+                            >
+                              Settle Cash
+                            </button>
+                            <button
+                              onClick={() => handleClearFullAmount(inv)}
+                              className="btn btn-outline"
+                              style={{ fontSize: '10px', padding: '0.25rem 0.4rem', borderColor: '#16a34a', color: '#16a34a', whiteSpace: 'nowrap' }}
+                              title="Clear full remaining due balance in 1 click"
+                            >
+                              Clear All
+                            </button>
+                          </div>
+                        ) : (
+                          <span style={{ color: '#16a34a', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                            <CheckCircle size={13} color="#16a34a" /> Settled / Added
+                          </span>
+                        )}
+                      </td>
+                      <td style={{ textAlign: 'center' }}>
+                        <div style={{ display: 'flex', gap: '0.35rem', justifyContent: 'center' }}>
+                          {isPaid ? (
+                            <span className="badge badge-success">✔ Settled</span>
+                          ) : null}
                           <button
-                            onClick={() => handleSettleCash(inv)}
-                            className="btn btn-primary"
-                            style={{ fontSize: '10px', padding: '0.25rem 0.5rem', backgroundColor: '#16a34a' }}
+                            onClick={() => handleOpenStatement(inv.customerShopName || inv.customerName || inv.shopName, inv.region || currentShop?.city || 'Lahore')}
+                            className="btn btn-outline"
+                            style={{ fontSize: '10px', padding: '0.2rem 0.5rem' }}
                           >
-                            Settle Cash
+                            Statement
                           </button>
                         </div>
-                      ) : (
-                        <span style={{ color: '#16a34a', fontWeight: 700 }}>Cleared</span>
-                      )}
-                    </td>
-                    <td style={{ textAlign: 'center' }}>
-                      <div style={{ display: 'flex', gap: '0.35rem', justifyContent: 'center' }}>
-                        {isPaid ? (
-                          <span className="badge badge-success">✔ Settled</span>
-                        ) : null}
-                        <button
-                          onClick={() => handleOpenStatement(inv.shopName || inv.customerName, inv.region || 'Gujrat')}
-                          className="btn btn-outline"
-                          style={{ fontSize: '10px', padding: '0.2rem 0.5rem' }}
-                        >
-                          Statement
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
             </tbody>
           </table>
         </div>

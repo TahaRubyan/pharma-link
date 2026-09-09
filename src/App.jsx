@@ -24,25 +24,59 @@ import SettingsPage from './pages/SettingsPage';
 import RegionLedgerPage from './pages/RegionLedgerPage';
 import CustomerLedgerPage from './pages/CustomerLedgerPage';
 import CustomerDebtPage from './pages/CustomerDebtPage';
+import WholesaleDashboardPage from './pages/WholesaleDashboardPage';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
 
 // Clean-slate deployment migration: Purge old test cache so user starts completely clean
-if (typeof window !== 'undefined' && !localStorage.getItem('pharmalink_clean_slate_v5')) {
+if (typeof window !== 'undefined' && !localStorage.getItem('pharmalink_clean_slate_v7')) {
   [
+    'pharmalink_medicines',
     'pharmalink_pk_medicines',
+    'pharmalink_batches',
     'pharmalink_pk_batches',
+    'pharmalink_invoices',
     'pharmalink_pk_invoices',
-    'pharmalink_debt_customers',
-    'pharmalink_pk_patients',
+    'pharmalink_suppliers',
     'pharmalink_pk_suppliers',
+    'pharmalink_purchase_orders',
     'pharmalink_pk_purchase_orders',
+    'pharmalink_vendor_returns',
     'pharmalink_pk_vendor_returns',
-    'pharmalink_pk_audit_logs',
-    'pharmalink_po_tax_logs',
-    'pharmalink_regions',
     'pharmalink_pk_returns',
-  ].forEach((key) => localStorage.removeItem(key));
-  localStorage.setItem('pharmalink_clean_slate_v5', 'true');
+    'pharmalink_customers',
+    'pharmalink_debt_customers',
+    'pharmalink_patients',
+    'pharmalink_pk_patients',
+    'pharmalink_retail_medicines',
+    'pharmalink_retail_batches',
+    'pharmalink_retail_invoices',
+    'pharmalink_retail_debt_customers',
+    'pharmalink_retail_suppliers',
+    'pharmalink_retail_purchase_orders',
+    'pharmalink_retail_patients',
+    'pharmalink_retail_vendor_returns',
+    'pharmalink_cart',
+    'pharmalink_hold_carts',
+    'pharmalink_last_invoice',
+    'pharmalink_last_sale',
+    'pharmalink_staff_accounts',
+    'pharmalink_staff_list',
+    'medistore_tenants_list',
+    'medistore_client_payment_logs',
+    'pharmalink_active_shop',
+    'pharmalink_is_auth',
+    'medistore_account_type',
+    'pharmalink_user_role',
+    'pharmalink_session_login_role',
+    'pharmalink_current_screen'
+  ].forEach((key) => {
+    try {
+      localStorage.removeItem(key);
+    } catch (e) {}
+  });
+  localStorage.setItem('pharmalink_wholesale_cleared', 'true');
+  localStorage.setItem('pharmalink_retail_cleared', 'true');
+  localStorage.setItem('pharmalink_clean_slate_v7', 'true');
 }
 
 // Error Boundary Fallback
@@ -91,7 +125,7 @@ class ErrorBoundary extends Component {
 }
 
 function AppContent() {
-  const { isSuperAdmin, tenantsList, isAuthenticated, setIsAuthenticated, currentShop, isCashier } = useAuth();
+  const { isSuperAdmin, tenantsList, isAuthenticated, setIsAuthenticated, currentShop, isCashier, userAccountType } = useAuth();
   const [isModeSelected, setIsModeSelected] = useState(true);
   const [storeMode, setStoreMode] = useState(() => {
     try {
@@ -115,6 +149,18 @@ function AppContent() {
     localStorage.setItem('pharmalink_current_screen', currentScreen);
   }, [currentScreen]);
 
+  // Synchronize browser tab title dynamically with active store profile
+  useEffect(() => {
+    if (typeof document !== 'undefined') {
+      if (isSuperAdmin || userAccountType === 'SUPER_ADMIN') {
+        document.title = 'PharmaLink Master Admin | SaaS Platform Owner';
+      } else {
+        const activeName = currentShop?.shopName || 'Testing Shop';
+        document.title = `${activeName} | PharmaLink ERP & POS`;
+      }
+    }
+  }, [currentShop?.shopName, isSuperAdmin, userAccountType]);
+
   const handleLoginSuccess = (accountType, tenantId, mode, userRole = 'Admin', targetScreen = null) => {
     setIsAuthenticated(true);
 
@@ -136,7 +182,7 @@ function AppContent() {
       } else if (userRole === 'Cashier') {
         setCurrentScreen('pos');
       } else {
-        setCurrentScreen('pos');
+        setCurrentScreen('dashboard');
       }
     }
   };
@@ -152,7 +198,11 @@ function AppContent() {
   const renderScreen = () => {
     switch (currentScreen) {
       case 'dashboard':
-        return <DashboardPage onNavigate={setCurrentScreen} />;
+        return storeMode === 'WHOLESALE' ? (
+          <WholesaleDashboardPage onNavigate={setCurrentScreen} />
+        ) : (
+          <DashboardPage onNavigate={setCurrentScreen} />
+        );
       case 'pos':
         return <POSPage storeMode={storeMode} />;
       case 'inventory':
@@ -168,7 +218,11 @@ function AppContent() {
       case 'region-ledger':
         return isCashier ? <POSPage storeMode={storeMode} /> : <RegionLedgerPage />;
       case 'customer-ledger':
-        return isCashier ? <POSPage storeMode={storeMode} /> : <CustomerLedgerPage />;
+        return storeMode === 'WHOLESALE' ? (
+          <WholesaleDashboardPage onNavigate={setCurrentScreen} />
+        ) : (
+          <CustomerDebtPage />
+        );
       case 'patients':
         return <PatientsPage onNavigate={setCurrentScreen} />;
       case 'fbr':
@@ -178,7 +232,13 @@ function AppContent() {
       case 'settings':
         return isCashier ? <POSPage storeMode={storeMode} /> : <SettingsPage storeMode={storeMode} />;
       default:
-        return isCashier ? <POSPage storeMode={storeMode} /> : <DashboardPage onNavigate={setCurrentScreen} />;
+        return isCashier ? (
+          <POSPage storeMode={storeMode} />
+        ) : storeMode === 'WHOLESALE' ? (
+          <WholesaleDashboardPage onNavigate={setCurrentScreen} />
+        ) : (
+          <DashboardPage onNavigate={setCurrentScreen} />
+        );
     }
   };
 

@@ -40,27 +40,54 @@ export const CartProvider = ({ children }) => {
     storageManager.safeSetItem('pharmalink_pos_doc', doctorName);
   }, [doctorName]);
 
+  const round2 = (num) => Math.round((Number(num || 0) + Number.EPSILON) * 100) / 100;
+
   const addToCart = (medicine, batch, unitSelection = 'Box') => {
     setCart((prev) => {
       const medId = medicine.id || medicine.medicineId;
       const bNo = batch ? (batch.batchNo || batch.batchNumber) : 'B-9481';
       const existingIdx = prev.findIndex((i) => (i.medicineId === medId || i.id === medId) && (i.batchNo === bNo || i.batchNumber === bNo));
-      const boxPrice = Number(medicine.boxSellingPrice || medicine.price || (batch ? batch.boxPrice : 150));
+      const boxPrice = round2(medicine.boxSellingPrice || medicine.price || (batch ? batch.boxPrice : 150));
+      const saleTaxRate = Number(medicine.saleTaxPercent !== undefined ? medicine.saleTaxPercent : (medicine.salesTaxRate !== undefined ? medicine.salesTaxRate : 18));
+      const advTaxRate = Number(medicine.advTaxPercent !== undefined ? medicine.advTaxPercent : 0.5);
 
       if (existingIdx >= 0) {
         return prev.map((item, idx) => {
           if (idx === existingIdx) {
             const newQty = item.qty + 1;
+            const rate = Number(item.boxPrice || item.price || boxPrice);
+            const gross = round2(newQty * rate);
+            const discPercent = Number(item.discountPercent || 0);
+            const discAmount = round2((gross * discPercent) / 100);
+            const taxable = Math.max(0, round2(gross - discAmount));
+            const tr = Number(item.saleTaxPercent !== undefined ? item.saleTaxPercent : saleTaxRate);
+            const ar = Number(item.advTaxPercent !== undefined ? item.advTaxPercent : advTaxRate);
+            const st = round2((taxable * tr) / 100);
+            const adv = round2((taxable * ar) / 100);
+            const net = round2(taxable + st + adv);
+
             return {
               ...item,
               qty: newQty,
               quantity: newQty,
-              total: newQty * boxPrice
+              gross,
+              discount: discAmount,
+              saleTaxPercent: tr,
+              salesTax18: st,
+              advTaxPercent: ar,
+              advTax05: adv,
+              netTotal: net,
+              total: net
             };
           }
           return item;
         });
       } else {
+        const gross = boxPrice;
+        const st = round2((gross * saleTaxRate) / 100);
+        const adv = round2((gross * advTaxRate) / 100);
+        const net = round2(gross + st + adv);
+
         return [
           ...prev,
           {
@@ -82,10 +109,15 @@ export const CartProvider = ({ children }) => {
             unitPrice: boxPrice,
             qty: 1,
             quantity: 1,
+            discountPercent: 0,
             discount: 0,
-            salesTax18: 0,
-            advTax05: 0,
-            total: boxPrice
+            gross,
+            saleTaxPercent: saleTaxRate,
+            salesTax18: st,
+            advTaxPercent: advTaxRate,
+            advTax05: adv,
+            netTotal: net,
+            total: net
           }
         ];
       }
@@ -97,8 +129,28 @@ export const CartProvider = ({ children }) => {
     setCart((prev) =>
       prev.map((item, i) => {
         if (i === index) {
-          const rate = item.boxPrice || item.price || item.unitPrice || 0;
-          return { ...item, qty: q, quantity: q, total: q * rate };
+          const rate = Number(item.boxPrice || item.price || item.unitPrice || 0);
+          const gross = round2(q * rate);
+          const discPercent = Number(item.discountPercent || 0);
+          const discAmount = round2((gross * discPercent) / 100);
+          const taxable = Math.max(0, round2(gross - discAmount));
+          const tr = Number(item.saleTaxPercent !== undefined ? item.saleTaxPercent : 18);
+          const ar = Number(item.advTaxPercent !== undefined ? item.advTaxPercent : 0.5);
+          const st = round2((taxable * tr) / 100);
+          const adv = round2((taxable * ar) / 100);
+          const net = round2(taxable + st + adv);
+
+          return {
+            ...item,
+            qty: q,
+            quantity: q,
+            gross,
+            discount: discAmount,
+            salesTax18: st,
+            advTax05: adv,
+            netTotal: net,
+            total: net
+          };
         }
         return item;
       })
@@ -110,8 +162,68 @@ export const CartProvider = ({ children }) => {
     setCart((prev) =>
       prev.map((item) => {
         if ((item.medicineId === medicineId || item.id === medicineId) && (item.batchNo === batchNo || item.batchNumber === batchNo)) {
-          const rate = item.boxPrice || item.price || item.unitPrice || 0;
-          return { ...item, qty: q, quantity: q, total: q * rate };
+          const rate = Number(item.boxPrice || item.price || item.unitPrice || 0);
+          const gross = round2(q * rate);
+          const discPercent = Number(item.discountPercent || 0);
+          const discAmount = round2((gross * discPercent) / 100);
+          const taxable = Math.max(0, round2(gross - discAmount));
+          const tr = Number(item.saleTaxPercent !== undefined ? item.saleTaxPercent : 18);
+          const ar = Number(item.advTaxPercent !== undefined ? item.advTaxPercent : 0.5);
+          const st = round2((taxable * tr) / 100);
+          const adv = round2((taxable * ar) / 100);
+          const net = round2(taxable + st + adv);
+
+          return {
+            ...item,
+            qty: q,
+            quantity: q,
+            gross,
+            discount: discAmount,
+            salesTax18: st,
+            advTax05: adv,
+            netTotal: net,
+            total: net
+          };
+        }
+        return item;
+      })
+    );
+  };
+
+  const updateCartItem = (updatedItem) => {
+    setCart((prev) =>
+      prev.map((item) => {
+        if ((item.medicineId === updatedItem.medicineId || item.id === updatedItem.id) &&
+            (item.batchNo === updatedItem.batchNo || item.batchNumber === updatedItem.batchNumber)) {
+          const q = Number(updatedItem.qty || updatedItem.quantity || 1);
+          const rate = Number(updatedItem.boxPrice || updatedItem.price || item.boxPrice || 0);
+          const gross = round2(q * rate);
+          const discPercent = Number(updatedItem.discountPercent !== undefined ? updatedItem.discountPercent : (item.discountPercent || 0));
+          const discAmount = updatedItem.discount !== undefined ? round2(updatedItem.discount) : round2((gross * discPercent) / 100);
+          const taxable = Math.max(0, round2(gross - discAmount));
+          const tr = Number(updatedItem.saleTaxPercent !== undefined ? updatedItem.saleTaxPercent : (item.saleTaxPercent !== undefined ? item.saleTaxPercent : 18));
+          const ar = Number(updatedItem.advTaxPercent !== undefined ? updatedItem.advTaxPercent : (item.advTaxPercent !== undefined ? item.advTaxPercent : 0.5));
+          const st = updatedItem.salesTax18 !== undefined ? round2(updatedItem.salesTax18) : round2((taxable * tr) / 100);
+          const adv = updatedItem.advTax05 !== undefined ? round2(updatedItem.advTax05) : round2((taxable * ar) / 100);
+          const net = round2(taxable + st + adv);
+
+          return {
+            ...item,
+            ...updatedItem,
+            qty: q,
+            quantity: q,
+            boxPrice: rate,
+            price: rate,
+            gross,
+            discountPercent: discPercent,
+            discount: discAmount,
+            saleTaxPercent: tr,
+            salesTax18: st,
+            advTaxPercent: ar,
+            advTax05: adv,
+            netTotal: net,
+            total: net
+          };
         }
         return item;
       })
@@ -211,7 +323,7 @@ export const CartProvider = ({ children }) => {
         date: new Date().toISOString().split('T')[0],
         time: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         saleType,
-        cashierName: 'Dr. Idrees',
+        cashierName: 'Store Admin',
         customerName: customerName || 'Walk-in Cash Customer',
         doctorName: doctorName || '-',
         items: [...cart],
@@ -264,6 +376,7 @@ export const CartProvider = ({ children }) => {
         addToCart,
         updateCartQuantity,
         updateQty,
+        updateCartItem,
         updateUnitType,
         updateLineTax,
         removeFromCart,

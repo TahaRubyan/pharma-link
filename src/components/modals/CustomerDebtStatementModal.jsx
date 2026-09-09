@@ -10,7 +10,7 @@ export const CustomerDebtStatementModal = ({ isOpen, onClose, customer, activeCy
     window.print();
   };
 
-  const shopName = currentShop?.shopName || 'Idrees Medical Store';
+  const shopName = currentShop?.shopName || 'Testing Shop';
   const shopAddress = currentShop?.address || 'F-7 Markaz, Islamabad, Pakistan';
   const shopPhone = currentShop?.phone || '051-2345678';
   const shopDL = currentShop?.dlNumber || 'PK-DL-20-45812 & Form 21';

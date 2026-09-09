@@ -2,79 +2,30 @@
 
 export const MULTI_TENANT_SHOPS = [
   {
-    shopId: "SHOP-ISB-01",
-    shopName: "Idrees Pharma Distributor",
-    city: "Gujrat",
-    dlNumber: "09-342-0139-045748D",
+    shopId: "TEN-TESTING-SHOP",
+    shopName: "Testing Shop",
+    city: "Lahore",
+    dlNumber: "TEST-DL-20-001 & Form 21",
     gstin: "3277876174544",
     ntn: "4442705-7",
-    address: "Jalal Pur Jattan, Gujrat",
-    phone: "053-3724601, 053-3724602",
-  },
-  {
-    shopId: "SHOP-LHR-02",
-    shopName: "Al-Madina Wholesale Medicine Depot",
-    city: "Lahore",
-    dlNumber: "PK-DL-20-99410 & Form 21",
-    gstin: "PK-9876543-2",
-    ntn: "7741920-3",
-    address: "Main Wholesale Market, Lahore",
-    phone: "042-3578900",
-  },
+    address: "Main Commercial Market, Lahore",
+    phone: "0300-1234567",
+    mode: "HYBRID",
+    subscribedSystemScope: "HYBRID_BOTH",
+  }
 ];
 
 export const STORE_INFO = {
-  shopId: "SHOP-ISB-01",
-  name: "IDREES PHARMA DISTRIBUTOR",
-  address: "Jalal Pur Jattan, Gujrat",
-  phone: "053-3724601, 053-3724602",
-  dlNumber: "09-342-0139-045748D",
+  shopId: "TEN-TESTING-SHOP",
+  name: "Testing Shop",
+  address: "Main Commercial Market, Lahore",
+  phone: "0300-1234567",
+  dlNumber: "TEST-DL-20-001",
   gstin: "3277876174544",
   ntn: "4442705-7",
 };
 
-export const MOCK_STAFF_ACCOUNTS = [
-  {
-    id: "EMP-101",
-    name: "Dr. Idrees (Retail Admin)",
-    username: "retail.admin",
-    role: "Admin",
-    storeMode: "RETAIL",
-    title: "Chief Pharmacist & Store Manager",
-    phone: "",
-    status: "Active",
-  },
-  {
-    id: "EMP-102",
-    name: "Retail Cashier",
-    username: "retail.cashier",
-    role: "Cashier",
-    storeMode: "RETAIL",
-    title: "POS Billing & Counter Cashier",
-    phone: "",
-    status: "Active",
-  },
-  {
-    id: "EMP-103",
-    name: "Dr. Idrees (Wholesale Admin)",
-    username: "wholesale.admin",
-    role: "Admin",
-    storeMode: "WHOLESALE",
-    title: "Distributor Operations Head",
-    phone: "",
-    status: "Active",
-  },
-  {
-    id: "EMP-104",
-    name: "Hassan Raza (Wholesale Cashier)",
-    username: "wholesale.cashier",
-    role: "Cashier",
-    storeMode: "WHOLESALE",
-    title: "B2B Billing & Dispatch Cashier",
-    phone: "",
-    status: "Active",
-  },
-];
+export const MOCK_STAFF_ACCOUNTS = [];
 
 // Helper functions for rolling, evergreen dates relative to runtime
 export const getPastDate = (daysAgo) => {
@@ -89,8 +40,18 @@ export const getFutureDate = (daysAhead) => {
   return d.toISOString().split('T')[0];
 };
 
-// 1. MASTER MEDICINE CATALOG (10 Realistic Pakistani Pharmaceuticals with Strictly 4-Digit Codes)
-export const INITIAL_MEDICINES = [
+// Production Clean States (Zero mock data - ready for client data entry)
+export const INITIAL_MEDICINES = [];
+export const INITIAL_BATCHES = [];
+export const INITIAL_SUPPLIERS = [];
+export const INITIAL_PURCHASE_ORDERS = [];
+export const INITIAL_VENDOR_RETURNS = [];
+export const INITIAL_PATIENTS = [];
+export const INITIAL_DEBT_CUSTOMERS = [];
+export const INITIAL_INVOICES = [];
+
+// Optional Demo Seed Catalog (For on-demand demo testing only)
+export const DEMO_MEDICINES = [
   {
     id: "MED-1001",
     itemCode: "1001",
@@ -344,7 +305,7 @@ export const INITIAL_MEDICINES = [
 ];
 
 // 2. BATCH REPOSITORY (Includes Active Batches, 2 Near-Expiry Batches <= 6 Months, and 1 Expired Lot)
-export const INITIAL_BATCHES = [
+export const DEMO_BATCHES = [
   {
     id: "BATCH-1001-A",
     medicineId: "MED-1001",
@@ -556,7 +517,7 @@ export const INITIAL_BATCHES = [
 ];
 
 // 3. PHARMACEUTICAL DISTRIBUTORS / SUPPLIERS
-export const INITIAL_SUPPLIERS = [
+export const DEMO_SUPPLIERS = [
   {
     id: "SUP-101",
     name: "Muller & Phipps Pakistan (Pvt) Ltd",
@@ -638,7 +599,7 @@ export const INITIAL_SUPPLIERS = [
 ];
 
 // 4. INWARD PURCHASE ORDERS (POs)
-export const INITIAL_PURCHASE_ORDERS = [
+export const DEMO_PURCHASE_ORDERS = [
   {
     poNumber: "PO-20260828-0001",
     inwardDate: getPastDate(8),
@@ -668,7 +629,7 @@ export const INITIAL_PURCHASE_ORDERS = [
 ];
 
 // 5. QUARANTINE / RTV VENDOR RETURNS
-export const INITIAL_VENDOR_RETURNS = [
+export const DEMO_VENDOR_RETURNS = [
   {
     id: "RTV-2026-001",
     date: getPastDate(2),
@@ -683,7 +644,7 @@ export const INITIAL_VENDOR_RETURNS = [
 ];
 
 // 6. PATIENT REGISTRY (With PMC Doctors, Diagnoses & Govt Stipend Flags)
-export const INITIAL_PATIENTS = [
+export const DEMO_PATIENTS = [
   {
     id: "PAT-101",
     name: "Muhammad Ali",
@@ -736,7 +697,7 @@ export const INITIAL_PATIENTS = [
 
 // 7. CUSTOMER KHATA / DEBT ACCOUNTS
 // Includes both unsettled debt (demonstrates deletion blocking) and settled debt (demonstrates deletion success)
-export const INITIAL_DEBT_CUSTOMERS = [
+export const DEMO_DEBT_CUSTOMERS = [
   {
     id: "CUST-DEBT-101",
     name: "Tariq Mahmood",
@@ -833,7 +794,7 @@ export const INITIAL_DEBT_CUSTOMERS = [
 ];
 
 // 8. ROLLING 7-DAY SALES INVOICES (Dynamic Bézier Graph with Natural Peaks & Dips)
-export const INITIAL_INVOICES = [
+export const DEMO_INVOICES = [
   // Day 6 ago (Total: Rs. 14,500)
   {
     invoiceNo: "INV-2026-0810",

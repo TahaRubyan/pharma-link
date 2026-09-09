@@ -126,7 +126,7 @@ export const StockMovementAuditModal = ({ isOpen, medicine, onClose }) => {
                   <td>Gujrat</td>
                   <td style={{ textAlign: 'center', fontWeight: 700 }}>10 Boxes</td>
                   <td style={{ textAlign: 'right', fontWeight: 700 }}>Rs. 30.00</td>
-                  <td>👤 Dr. Idrees</td>
+                  <td>👤 Store Admin</td>
                   <td><span className="badge badge-warning">Ayan (Driver)</span></td>
                 </tr>
               </tbody>

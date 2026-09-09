@@ -142,7 +142,7 @@ export const DashboardPage = ({ onNavigate }) => {
       {/* 4 KPI METRIC CARDS (Compact) */}
       <div className="grid-4" style={{ gap: '0.65rem' }}>
         {/* Today Turnover */}
-        <div className="card" style={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0', padding: '0.75rem', borderRadius: '12px' }}>
+        <div className="card ksi-card kpi-card" style={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0', padding: '0.75rem', borderRadius: '12px' }}>
           <div className="flex-between" style={{ marginBottom: '0.2rem' }}>
             <span className="subtext" style={{ fontWeight: 700, textTransform: 'uppercase', fontSize: '9.5px', color: '#64748b' }}>Today's Turnover</span>
             <div style={{ width: '24px', height: '24px', borderRadius: '6px', backgroundColor: '#f0f9ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -158,7 +158,7 @@ export const DashboardPage = ({ onNavigate }) => {
         </div>
 
         {/* Est Net Margin */}
-        <div className="card" style={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0', padding: '0.75rem', borderRadius: '12px' }}>
+        <div className="card ksi-card kpi-card" style={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0', padding: '0.75rem', borderRadius: '12px' }}>
           <div className="flex-between" style={{ marginBottom: '0.2rem' }}>
             <span className="subtext" style={{ fontWeight: 700, textTransform: 'uppercase', fontSize: '9.5px', color: '#64748b' }}>Est. Net Profit</span>
             <div style={{ width: '24px', height: '24px', borderRadius: '6px', backgroundColor: '#ecfdf5', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -174,7 +174,7 @@ export const DashboardPage = ({ onNavigate }) => {
         </div>
 
         {/* Low Stock Warnings */}
-        <div className="card" style={{ backgroundColor: lowStockCount > 0 ? '#fffbe0' : '#ffffff', borderColor: lowStockCount > 0 ? '#fde68a' : '#e2e8f0', padding: '0.75rem', borderRadius: '12px' }}>
+        <div className="card ksi-card kpi-card" style={{ backgroundColor: lowStockCount > 0 ? '#fffbe0' : '#ffffff', borderColor: lowStockCount > 0 ? '#fde68a' : '#e2e8f0', padding: '0.75rem', borderRadius: '12px' }}>
           <div className="flex-between" style={{ marginBottom: '0.2rem' }}>
             <span className="subtext" style={{ fontWeight: 700, color: lowStockCount > 0 ? '#b45309' : '#64748b', textTransform: 'uppercase', fontSize: '9.5px' }}>Low Stock Items</span>
             <div style={{ width: '24px', height: '24px', borderRadius: '6px', backgroundColor: lowStockCount > 0 ? '#fde68a' : '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -190,7 +190,7 @@ export const DashboardPage = ({ onNavigate }) => {
         </div>
 
         {/* Near-Expiry Radar */}
-        <div className="card" style={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0', padding: '0.75rem', borderRadius: '12px' }}>
+        <div className="card ksi-card kpi-card" style={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0', padding: '0.75rem', borderRadius: '12px' }}>
           <div className="flex-between" style={{ marginBottom: '0.2rem' }}>
             <span className="subtext" style={{ fontWeight: 700, textTransform: 'uppercase', fontSize: '9.5px', color: '#64748b' }}>Near-Expiry Radar</span>
             <div style={{ width: '24px', height: '24px', borderRadius: '6px', backgroundColor: '#fef2f2', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>

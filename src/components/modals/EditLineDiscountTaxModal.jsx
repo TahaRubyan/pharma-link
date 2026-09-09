@@ -122,9 +122,32 @@ export const EditLineDiscountTaxModal = ({ isOpen, item, onClose, onSave }) => {
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.85rem' }}>
             <div>
-              <label className="subtext" style={{ fontWeight: 600, display: 'block', marginBottom: '0.25rem', color: '#334155' }}>
-                Sale Tax (18%):
-              </label>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem' }}>
+                <label className="subtext" style={{ fontWeight: 600, color: '#334155' }}>
+                  Sale Tax %:
+                </label>
+                <div style={{ display: 'flex', gap: '0.2rem' }}>
+                  {[18, 19, 0].map(rateVal => (
+                    <button
+                      key={rateVal}
+                      type="button"
+                      onClick={() => setSaleTaxPercent(rateVal)}
+                      style={{
+                        padding: '0.1rem 0.35rem',
+                        fontSize: '9.5px',
+                        fontWeight: 700,
+                        borderRadius: '4px',
+                        border: '1px solid #cbd5e1',
+                        backgroundColor: Number(saleTaxPercent) === rateVal ? '#0284c7' : '#ffffff',
+                        color: Number(saleTaxPercent) === rateVal ? '#ffffff' : '#475569',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {rateVal}%
+                    </button>
+                  ))}
+                </div>
+              </div>
               <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center' }}>
                 <input
                   type="number"

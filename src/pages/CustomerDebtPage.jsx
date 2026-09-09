@@ -213,7 +213,7 @@ export const CustomerDebtPage = () => {
             {debtCustomers.length} Customers
           </div>
           <div style={{ fontSize: '11px', color: '#64748b', marginTop: '0.2rem' }}>
-            Store: {currentShop?.shopName || 'Idrees Medical Store'}
+            Store: {currentShop?.shopName || 'Testing Shop'}
           </div>
         </div>
       </div>

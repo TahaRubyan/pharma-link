@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { INITIAL_INVOICES } from '../data/mockData';
 import { AuthContext, useAuth } from './AuthContext';
 import { storageManager } from '../services/storageManager';
+import { dbSyncService } from '../services/dbSyncService';
 
 const SalesContext = createContext();
 
@@ -10,6 +11,9 @@ export const SalesProvider = ({ children }) => {
   const isRetail = auth?.currentShop?.mode === 'RETAIL';
 
   const [wholesaleInvoices, setWholesaleInvoices] = useState(() => {
+    const isCleared = typeof localStorage !== 'undefined' && localStorage.getItem('pharmalink_wholesale_cleared') === 'true';
+    if (isCleared) return [];
+
     const saved = localStorage.getItem('pharmalink_pk_invoices');
     if (saved) {
       try {
@@ -86,9 +90,27 @@ export const SalesProvider = ({ children }) => {
     storageManager.safeSetItem('pharmalink_retail_returns', retailReturns);
   }, [retailReturns]);
 
+  // Initial cloud sync from Supabase
+  useEffect(() => {
+    const tenantId = auth?.currentShop?.shopId || 'TEN-TESTING-SHOP';
+    dbSyncService.fetchInvoices(tenantId).then((cloudInvoices) => {
+      if (cloudInvoices && cloudInvoices.length > 0) {
+        setInvoices((prev) => {
+          const map = new Map(prev.map((i) => [i.invoiceNo, i]));
+          cloudInvoices.forEach((i) => map.set(i.invoiceNo, i));
+          return Array.from(map.values());
+        });
+      }
+    }).catch(() => {});
+  }, [auth?.currentShop?.shopId]);
+
   // Record a new POS Sale
   const recordSale = (saleData) => {
     setInvoices((prev) => [saleData, ...prev]);
+    const tenantId = auth?.currentShop?.shopId || 'TEN-TESTING-SHOP';
+    dbSyncService.saveInvoice(tenantId, saleData).catch((err) => {
+      console.warn('[SalesContext] Background cloud sync warning:', err);
+    });
   };
 
   // Process a Sales Return
@@ -96,15 +118,55 @@ export const SalesProvider = ({ children }) => {
     setReturns((prev) => [returnData, ...prev]);
   };
 
-  // Helper to find invoice by Invoice No or Customer Phone
-  const findInvoice = (query) => {
-    if (!query) return null;
-    const q = String(query).trim().toLowerCase();
-    return invoices.find(
-      (inv) =>
-        inv.invoiceNo.toLowerCase() === q ||
-        (inv.customerPhone && inv.customerPhone.toLowerCase() === q)
-    );
+  // Record an inline cash settlement or payment against an invoice's debt (Territory Delivery Ledger & Khata)
+  const recordDebtPayment = (invoiceNo, amountPaid, staffName = 'Testing Shop Admin') => {
+    if (!invoiceNo || isNaN(amountPaid) || Number(amountPaid) <= 0) return null;
+    const paid = Number(amountPaid);
+    let updatedInvoice = null;
+
+    setInvoices((prev) => {
+      const next = prev.map((inv) => {
+        if (inv.invoiceNo === invoiceNo) {
+          const originalNet = Number(inv.netTotal || inv.subtotal || 0);
+          const currentRemaining = inv.remainingDebt !== undefined 
+            ? Number(inv.remainingDebt) 
+            : (inv.paymentStatus === 'PAID' ? 0 : originalNet);
+          
+          const newRemaining = Math.max(0, Math.round((currentRemaining - paid) * 100) / 100);
+          const isFullyPaid = newRemaining === 0;
+
+          const newLog = {
+            id: `PAY-${Date.now()}-${Math.floor(100 + Math.random() * 900)}`,
+            date: new Date().toISOString().split('T')[0],
+            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            amountPaid: paid,
+            remainingDebt: newRemaining,
+            collectedBy: staffName,
+            method: 'Cash Settlement'
+          };
+
+          updatedInvoice = {
+            ...inv,
+            remainingDebt: newRemaining,
+            paymentStatus: isFullyPaid ? 'PAID' : 'PARTIAL',
+            paymentLogs: [...(inv.paymentLogs || []), newLog]
+          };
+          return updatedInvoice;
+        }
+        return inv;
+      });
+
+      return next;
+    });
+
+    if (updatedInvoice) {
+      const tenantId = auth?.currentShop?.shopId || 'TEN-TESTING-SHOP';
+      dbSyncService.saveInvoice(tenantId, updatedInvoice).catch((err) => {
+        console.warn('[SalesContext] Background cloud sync warning on debt payment:', err);
+      });
+    }
+
+    return updatedInvoice;
   };
 
   return (
@@ -115,6 +177,7 @@ export const SalesProvider = ({ children }) => {
         recordSale,
         recordReturn,
         findInvoice,
+        recordDebtPayment,
       }}
     >
       {children}

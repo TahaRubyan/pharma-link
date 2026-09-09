@@ -2,13 +2,55 @@ import React from 'react';
 import { X, Printer, TrendingUp, DollarSign } from 'lucide-react';
 import { useAuth, formatDateDDMMYYYY } from '../../context/AuthContext';
 
-export const AnalyticsReportModal = ({ isOpen, onClose, analyticsData }) => {
+export const AnalyticsReportModal = ({ isOpen, onClose, analyticsData, invoices: propInvoices }) => {
   const { currentShop } = useAuth();
   if (!isOpen) return null;
+
+  const invoices = propInvoices || analyticsData?.invoices || [];
 
   const handlePrint = () => {
     window.print();
   };
+
+  // Dynamic calculations
+  const grossTurnover = invoices.reduce((sum, inv) => sum + Number(inv.netTotal || inv.grossTotal || 0), 0);
+  const estProfit = invoices.reduce((sum, inv) => sum + (Number(inv.netTotal || inv.grossTotal || 0) * 0.25), 0);
+  const outstandingDebt = invoices.reduce((sum, inv) => sum + Number(inv.remainingDebt || 0), 0);
+
+  // Top 5 fast moving medicines
+  const medicineMap = {};
+  invoices.forEach((inv) => {
+    (inv.items || []).forEach((item) => {
+      const name = item.name || item.brandName || 'Item';
+      const qty = Number(item.qty || item.quantity || 1);
+      const total = Number(item.total || (qty * (item.price || item.unitPrice || 0)));
+      if (!medicineMap[name]) {
+        medicineMap[name] = { name, qty: 0, total: 0 };
+      }
+      medicineMap[name].qty += qty;
+      medicineMap[name].total += total;
+    });
+  });
+
+  const topMedicines = Object.values(medicineMap)
+    .sort((a, b) => b.total - a.total)
+    .slice(0, 5);
+
+  // Group by date for Daily Summary & Reconciliation
+  const dailyMap = {};
+  invoices.forEach((inv) => {
+    const date = inv.date || 'Unknown';
+    if (!dailyMap[date]) {
+      dailyMap[date] = { date, count: 0, turnover: 0, profit: 0, debt: 0 };
+    }
+    const net = Number(inv.netTotal || inv.grossTotal || 0);
+    dailyMap[date].count += 1;
+    dailyMap[date].turnover += net;
+    dailyMap[date].profit += net * 0.25;
+    dailyMap[date].debt += Number(inv.remainingDebt || 0);
+  });
+
+  const dailySummaries = Object.values(dailyMap).sort((a, b) => b.date.localeCompare(a.date));
 
   return (
     <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.45)', backdropFilter: 'blur(3px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, fontFamily: 'var(--font-sans)', padding: '1rem' }}>
@@ -23,7 +65,7 @@ export const AnalyticsReportModal = ({ isOpen, onClose, analyticsData }) => {
               <TrendingUp size={18} color="#0284c7" /> Official Commercial Sales & Profit Analytics Report
             </h3>
             <p className="subtext" style={{ marginTop: '0.15rem' }}>
-              {currentShop ? currentShop.shopName : 'IDREES PHARMA DISTRIBUTOR'} | Generated: {formatDateDDMMYYYY(new Date())}
+              {currentShop ? currentShop.shopName : 'Testing Shop'} | Generated: {formatDateDDMMYYYY(new Date())}
             </p>
           </div>
 
@@ -36,57 +78,47 @@ export const AnalyticsReportModal = ({ isOpen, onClose, analyticsData }) => {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.75rem', marginBottom: '1.25rem', textAlign: 'center' }}>
           <div style={{ backgroundColor: '#f8fafc', padding: '0.85rem', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
             <div style={{ fontSize: '10px', color: '#64748b', fontWeight: 700 }}>GROSS WHOLESALE TURNOVER</div>
-            <div style={{ fontSize: '18px', fontWeight: 800, color: '#0f172a', marginTop: '0.2rem' }}>Rs. 1,006.15</div>
+            <div style={{ fontSize: '18px', fontWeight: 800, color: '#0f172a', marginTop: '0.2rem' }}>
+              Rs. {grossTurnover.toLocaleString('en-PK', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </div>
           </div>
 
           <div style={{ backgroundColor: '#f0fdf4', padding: '0.85rem', borderRadius: '10px', border: '1px solid #bbf7d0' }}>
             <div style={{ fontSize: '10px', color: '#16a34a', fontWeight: 700 }}>ESTIMATED NET PROFIT (25%)</div>
-            <div style={{ fontSize: '18px', fontWeight: 800, color: '#16a34a', marginTop: '0.2rem' }}>Rs. 251.538</div>
+            <div style={{ fontSize: '18px', fontWeight: 800, color: '#16a34a', marginTop: '0.2rem' }}>
+              Rs. {estProfit.toLocaleString('en-PK', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </div>
           </div>
 
           <div style={{ backgroundColor: '#fff7ed', padding: '0.85rem', borderRadius: '10px', border: '1px solid #fed7aa' }}>
             <div style={{ fontSize: '10px', color: '#ea580c', fontWeight: 700 }}>OUTSTANDING CUSTOMER DEBT</div>
-            <div style={{ fontSize: '18px', fontWeight: 800, color: '#ea580c', marginTop: '0.2rem' }}>Rs. 0.00</div>
+            <div style={{ fontSize: '18px', fontWeight: 800, color: '#ea580c', marginTop: '0.2rem' }}>
+              Rs. {outstandingDebt.toLocaleString('en-PK', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </div>
           </div>
         </div>
 
         {/* TOP 5 RANKED MEDICINES */}
         <div style={{ marginBottom: '1.25rem' }}>
           <div style={{ fontSize: '12px', fontWeight: 700, color: '#334155', marginBottom: '0.4rem' }}>
-            🏆 Top 5 Fast-Moving Medicines:
+            🏆 Top Fast-Moving Medicines:
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '0.5rem', textAlign: 'center' }}>
-            <div style={{ backgroundColor: '#f8fafc', padding: '0.65rem 0.4rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-              <div style={{ fontSize: '10px', fontWeight: 800, color: '#0284c7' }}>Rank #1</div>
-              <div style={{ fontSize: '11px', fontWeight: 700, marginTop: '0.15rem' }}>Panadol 500mg</div>
-              <div style={{ fontSize: '10px', color: '#64748b' }}>10 Boxes | Rs. 30.00</div>
+          {topMedicines.length === 0 ? (
+            <div style={{ padding: '1rem', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0', textAlign: 'center', color: '#64748b', fontSize: '12px' }}>
+              No medicine sales recorded for this period.
             </div>
-
-            <div style={{ backgroundColor: '#f8fafc', padding: '0.65rem 0.4rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-              <div style={{ fontSize: '10px', fontWeight: 800, color: '#0284c7' }}>Rank #2</div>
-              <div style={{ fontSize: '11px', fontWeight: 700, marginTop: '0.15rem' }}>Arinac Forte</div>
-              <div style={{ fontSize: '10px', color: '#64748b' }}>10 Boxes | Rs. 85.00</div>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(topMedicines.length, 5)}, 1fr)`, gap: '0.5rem', textAlign: 'center' }}>
+              {topMedicines.map((med, idx) => (
+                <div key={idx} style={{ backgroundColor: '#f8fafc', padding: '0.65rem 0.4rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                  <div style={{ fontSize: '10px', fontWeight: 800, color: '#0284c7' }}>Rank #{idx + 1}</div>
+                  <div style={{ fontSize: '11px', fontWeight: 700, marginTop: '0.15rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{med.name}</div>
+                  <div style={{ fontSize: '10px', color: '#64748b' }}>{med.qty} Units | Rs. {med.total.toFixed(2)}</div>
+                </div>
+              ))}
             </div>
-
-            <div style={{ backgroundColor: '#f8fafc', padding: '0.65rem 0.4rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-              <div style={{ fontSize: '10px', fontWeight: 800, color: '#0284c7' }}>Rank #3</div>
-              <div style={{ fontSize: '11px', fontWeight: 700, marginTop: '0.15rem' }}>Risek 20mg</div>
-              <div style={{ fontSize: '10px', color: '#64748b' }}>1 Boxes | Rs. 150.00</div>
-            </div>
-
-            <div style={{ backgroundColor: '#f8fafc', padding: '0.65rem 0.4rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-              <div style={{ fontSize: '10px', fontWeight: 800, color: '#0284c7' }}>Rank #4</div>
-              <div style={{ fontSize: '11px', fontWeight: 700, marginTop: '0.15rem' }}>Augmentin 625mg</div>
-              <div style={{ fontSize: '10px', color: '#64748b' }}>1 Boxes | Rs. 420.00</div>
-            </div>
-
-            <div style={{ backgroundColor: '#f8fafc', padding: '0.65rem 0.4rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-              <div style={{ fontSize: '10px', fontWeight: 800, color: '#0284c7' }}>Rank #5</div>
-              <div style={{ fontSize: '11px', fontWeight: 700, marginTop: '0.15rem' }}>Deltacortril 5mg</div>
-              <div style={{ fontSize: '10px', color: '#64748b' }}>1 Boxes | Rs. 320.00</div>
-            </div>
-          </div>
+          )}
         </div>
 
         {/* DAILY RECONCILIATION TABLE */}
@@ -108,22 +140,28 @@ export const AnalyticsReportModal = ({ isOpen, onClose, analyticsData }) => {
                 </tr>
               </thead>
               <tbody>
-                <tr>
-                  <td>29-08-2026</td>
-                  <td>1 Orders</td>
-                  <td style={{ textAlign: 'right', fontWeight: 700 }}>Rs. 890.00</td>
-                  <td style={{ textAlign: 'right', fontWeight: 700, color: '#16a34a' }}>Rs. 222.50</td>
-                  <td style={{ textAlign: 'right' }}>Rs. 0.00</td>
-                  <td style={{ textAlign: 'center' }}><span className="badge badge-success">RECONCILED</span></td>
-                </tr>
-                <tr>
-                  <td>27-08-2026</td>
-                  <td>1 Orders</td>
-                  <td style={{ textAlign: 'right', fontWeight: 700 }}>Rs. 116.15</td>
-                  <td style={{ textAlign: 'right', fontWeight: 700, color: '#16a34a' }}>Rs. 29.038</td>
-                  <td style={{ textAlign: 'right' }}>Rs. 0.00</td>
-                  <td style={{ textAlign: 'center' }}><span className="badge badge-success">RECONCILED</span></td>
-                </tr>
+                {dailySummaries.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} style={{ textAlign: 'center', padding: '1.25rem', color: '#64748b' }}>
+                      No sales records found for this period.
+                    </td>
+                  </tr>
+                ) : (
+                  dailySummaries.map((day, idx) => (
+                    <tr key={idx}>
+                      <td>{day.date}</td>
+                      <td>{day.count} Orders</td>
+                      <td style={{ textAlign: 'right', fontWeight: 700 }}>Rs. {day.turnover.toLocaleString('en-PK', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                      <td style={{ textAlign: 'right', fontWeight: 700, color: '#16a34a' }}>Rs. {day.profit.toLocaleString('en-PK', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                      <td style={{ textAlign: 'right', color: day.debt > 0 ? '#ea580c' : '#64748b' }}>Rs. {day.debt.toLocaleString('en-PK', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                      <td style={{ textAlign: 'center' }}>
+                        <span className={`badge ${day.debt === 0 ? 'badge-success' : 'badge-warning'}`}>
+                          {day.debt === 0 ? 'RECONCILED' : 'OUTSTANDING'}
+                        </span>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>

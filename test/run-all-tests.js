@@ -14,9 +14,10 @@ import { runVisualRegressionTests } from './visual-regression.test.js';
 import { runPerformanceTests } from './performance.test.js';
 import { runUsabilityTests } from './usability.test.js';
 import { runAccessibilityTests } from './accessibility.test.js';
+import { runWholesaleMathLoadTests } from './wholesale-math-load.test.js';
 
 console.log('================================================================================');
-console.log(' 🏥 PHARMALINK MEDICAL STORE ERP & POS - 10-DIMENSION VERIFICATION SUITE');
+console.log(' 🏥 PHARMALINK MEDICAL STORE ERP & POS - 11-DIMENSION VERIFICATION & WHOLESALE LOAD SUITE');
 console.log('================================================================================\n');
 
 const startTime = performance.now();
@@ -32,6 +33,7 @@ const suites = [
   { name: '8. PERFORMANCE', run: runPerformanceTests, desc: 'Search latency <15ms, cart math <5ms, bundle budget' },
   { name: '9. USABILITY (UX)', run: runUsabilityTests, desc: 'Click efficiency, field guidance, empty states, hotkeys' },
   { name: '10. ACCESSIBILITY', run: runAccessibilityTests, desc: 'WCAG 2.1 AA compliance, ARIA names, keyboard focus' },
+  { name: '11. WHOLESALE LOAD & MATH', run: runWholesaleMathLoadTests, desc: '1,000 rapid orders, 18%/19% tax precision, batch deductions' },
 ];
 
 const results = [];

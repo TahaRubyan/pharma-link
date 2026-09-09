@@ -28,7 +28,7 @@ export const VendorRTVPage = () => {
     e.preventDefault();
     if (!selectedRtvForPayment || !reimbursementAmount) return;
 
-    recordVendorReimbursement(selectedRtvForPayment.id, reimbursementAmount, user.name || 'Dr. Idrees');
+    recordVendorReimbursement(selectedRtvForPayment.id, reimbursementAmount, user.name || 'Testing Shop Admin');
     alert(`Reimbursement payment of Rs. ${reimbursementAmount} recorded successfully by ${user.name}!`);
     setSelectedRtvForPayment(null);
     setReimbursementAmount('');
@@ -38,7 +38,7 @@ export const VendorRTVPage = () => {
     e.preventDefault();
     if (!rtvBatchId || !rtvTabletsCount) return;
 
-    markItemAsRTV(rtvBatchId, rtvTabletsCount, rtvReason, user.name || 'Dr. Idrees');
+    markItemAsRTV(rtvBatchId, rtvTabletsCount, rtvReason, user.name || 'Testing Shop Admin');
     alert(`Item returned to vendor successfully! Stock deducted and posted to RTV Receivable log.`);
     setIsManualRtvOpen(false);
     setRtvBatchId('');
@@ -178,7 +178,7 @@ export const VendorRTVPage = () => {
                       <td style={{ fontWeight: 800, color: '#0284C7' }}>Rs. {Number(rtv.claimAmount).toLocaleString('en-PK')}</td>
                       <td>
                         <div style={{ fontSize: '0.8rem' }}>{rtv.returnDate}</div>
-                        <div style={{ fontSize: '0.7rem', color: '#64748B' }}>By: {rtv.loggedBy || 'Dr. Idrees'}</div>
+                        <div style={{ fontSize: '0.7rem', color: '#64748B' }}>By: {rtv.loggedBy || 'Testing Shop Admin'}</div>
                       </td>
                       <td>
                         <span
@@ -308,7 +308,7 @@ export const VendorRTVPage = () => {
                 <label style={{ fontSize: '0.8rem', fontWeight: 700, display: 'block', marginBottom: '0.2rem' }}>Logged By (Staff Name):</label>
                 <input
                   type="text"
-                  value={user.name || 'Dr. Idrees'}
+                  value={user.name || 'Testing Shop Admin'}
                   readOnly
                   style={{ width: '100%', padding: '0.5rem', fontWeight: 700, backgroundColor: '#F1F5F9', borderRadius: '4px', border: '1px solid var(--color-border)' }}
                 />

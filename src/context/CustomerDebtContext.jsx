@@ -9,6 +9,9 @@ export const CustomerDebtProvider = ({ children }) => {
   const isRetail = auth?.currentShop?.mode === 'RETAIL';
 
   const [wholesaleDebtCustomers, setWholesaleDebtCustomers] = useState(() => {
+    const isCleared = typeof localStorage !== 'undefined' && localStorage.getItem('pharmalink_wholesale_cleared') === 'true';
+    if (isCleared) return [];
+
     const saved = localStorage.getItem('pharmalink_debt_customers');
     if (saved) {
       try {
@@ -137,7 +140,7 @@ export const CustomerDebtProvider = ({ children }) => {
   };
 
   // Generate WhatsApp Share URL & Text for Instant Credit Slip
-  const generateWhatsAppCreditSlip = (customer, saleData, shopName = 'Idrees Medical Store') => {
+  const generateWhatsAppCreditSlip = (customer, saleData, shopName = 'Testing Shop') => {
     const phoneClean = customer.phone.replace(/[^0-9]/g, '');
     const internationalPhone = phoneClean.startsWith('0')
       ? '92' + phoneClean.slice(1)

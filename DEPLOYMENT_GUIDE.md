@@ -55,7 +55,7 @@ npx vercel
    - *Set up and deploy?* ➔ Press `y` (Enter)
    - *Which scope?* ➔ Select your personal free account
    - *Link to existing project?* ➔ Press `n`
-   - *Project name?* ➔ `idrees-medical-store` (or your choice)
+   - *Project name?* ➔ `pharmalink-erp` (or your choice)
    - *In which directory is code located?* ➔ `./`
    - *Auto-detected Project Settings (Vite)?* ➔ Press `y` (Enter)
 
@@ -69,17 +69,16 @@ Your production URL will be displayed in the terminal and live instantly.
 
 ## 🔑 Default Login Credentials for Demo & Testing
 
-Once deployed on Vercel, use any of these credentials to access the system:
+Once deployed on Vercel / Cloudflare, use any of these credentials to access the system:
 
 | Role | Username | Password | Default Mode | Scope / Features |
 | :--- | :--- | :--- | :--- | :--- |
-| **Super Admin** | `master admin` | `admin123` | Master Control | Full cross-tenant access to both Retail & Wholesale systems |
-| **Retail Admin** | `retail admin` | `admin123` | **Retail Counter POS** | **Idrees Medical Store**: POS billing, loose tablets, Narcotics register, Customer Khata, Inward POs |
-| **Wholesale Admin** | `wholesale admin` | `admin123` | **Wholesale B2B ERP** | **Idrees Pharma Distributor**: B2B bulk orders, 18% ST, 0.5% Adv Tax, DRAP Sec 23 warranties, territory ledgers |
+| **Super Admin** | `masteradmin` | `admin123` | Master Platform Control | Full cross-tenant oversight, tenant onboarding, system factory reset |
+| **Testing Shop Admin** | `testing.admin` | `admin123` | **HYBRID (Wholesale + Retail)** | **Testing Shop**: POS billing, Wholesale orders, 18%/19% FBR tax, Territory Ledger, Customer Khata |
 
 ---
 
 ## 🛠️ Verification & Health Check
-- **Run all 80 tests locally before deploying**: `npm test`
+- **Run all 91 tests locally before deploying**: `npm test`
 - **Build production bundle**: `npm run build`
 - **Preview production build locally**: `npm run preview`

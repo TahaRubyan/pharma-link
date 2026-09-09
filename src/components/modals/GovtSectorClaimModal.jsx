@@ -11,13 +11,13 @@ export const GovtSectorClaimModal = ({ invoice, onClose }) => {
 
   if (!invoice) return null;
 
-  const shopName = currentShop?.shopName || 'Idrees Medical Store';
+  const shopName = currentShop?.shopName || 'Testing Shop';
   const shopAddress = currentShop?.address || 'F-7 Markaz, Islamabad';
   const shopPhone = currentShop?.phone || '051-2345678';
   const shopDL = currentShop?.dlNumber || 'PK-DL-20-45812 & Form 21';
   const shopGSTIN = currentShop?.gstin || 'PK-1234567-8';
 
-  const sigName = localStorage.getItem('pharmalink_sig_name') || currentShop?.signatoryName || 'Dr. Idrees';
+  const sigName = localStorage.getItem('pharmalink_sig_name') || currentShop?.signatoryName || 'Testing Administrator';
   const sigRole = localStorage.getItem('pharmalink_sig_role') || currentShop?.signatoryRole || 'Chief Pharmacist (Reg # PMC-45812)';
   const sigImage = localStorage.getItem('pharmalink_sig_image') || currentShop?.signatureImage || '';
 

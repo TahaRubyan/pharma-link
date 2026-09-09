@@ -23,7 +23,7 @@ export const PrintExpiryReportModal = ({ isOpen, items = [], onClose }) => {
               <AlertTriangle size={18} color="#dc2626" /> Pakistan Pharmacy Expiry Radar & Loss Control Audit Report
             </h3>
             <p className="subtext" style={{ marginTop: '0.15rem' }}>
-              {currentShop ? currentShop.shopName : 'IDREES PHARMA DISTRIBUTOR'} | Generated Date: {formatDateDDMMYYYY(new Date())}
+              {currentShop ? currentShop.shopName : 'TESTING SHOP'} | Generated Date: {formatDateDDMMYYYY(new Date())}
             </p>
           </div>
 

@@ -30,8 +30,23 @@ export const A4InvoicePrintModal = ({ invoice, onClose }) => {
   const { currentShop } = useAuth();
   if (!invoice) return null;
 
+  React.useEffect(() => {
+    document.body.classList.add('printing-a4');
+    const handleAfterPrint = () => {
+      // Completed
+    };
+    window.addEventListener('afterprint', handleAfterPrint);
+    return () => {
+      document.body.classList.remove('printing-a4');
+      window.removeEventListener('afterprint', handleAfterPrint);
+    };
+  }, []);
+
   const handlePrint = () => {
-    window.print();
+    document.body.classList.add('printing-a4');
+    setTimeout(() => {
+      window.print();
+    }, 50);
   };
 
   const rawItems = invoice.items || [];
@@ -45,29 +60,29 @@ export const A4InvoicePrintModal = ({ invoice, onClose }) => {
   if (pageChunks.length === 0) pageChunks.push([]);
 
   const sigImageBase64 = localStorage.getItem('pharmalink_sig_image') || currentShop?.signatureImage || '';
-  const sigName = localStorage.getItem('pharmalink_sig_name') || currentShop?.signatoryName || 'Dr. Idrees';
-  const sigRole = localStorage.getItem('pharmalink_sig_role') || currentShop?.signatoryRole || 'Managing Pharmacist & Owner';
+  const sigName = localStorage.getItem('pharmalink_sig_name') || currentShop?.signatoryName || 'Testing Administrator';
+  const sigRole = localStorage.getItem('pharmalink_sig_role') || currentShop?.signatoryRole || 'Authorized Signatory | Owner';
 
-  const grossTotal = Number(invoice.grossTotal || invoice.subtotal || 32700.00);
-  const totalTax = Number(invoice.totalTax || (invoice.salesTax18 || 0) + (invoice.advTax05 || 0) || 6098.70);
+  const grossTotal = Number(invoice.grossTotal || invoice.subtotal || 0);
+  const totalTax = Number(invoice.totalTax || (invoice.salesTax18 || 0) + (invoice.advTax05 || 0) || 0);
   const grandNetTotal = Number(invoice.netTotal || invoice.grandTotal || grossTotal + totalTax);
 
-  const distributorName = currentShop?.shopName || 'Idrees Medical Store';
-  const ownerNtn = currentShop?.ntn || '0792320-1';
+  const distributorName = currentShop?.shopName || 'TESTING SHOP';
+  const ownerNtn = currentShop?.ntn || '4442705-7';
   const ownerStrn = currentShop?.gstin || '3277876174544';
-  const storeAddress = currentShop?.address || 'F-7 Markaz, Islamabad';
-  const storePhone = currentShop?.phone || '051-2345678';
-  const depotDsl = currentShop?.dlNumber || 'PK-DL-20-45812 & Form 21';
+  const storeAddress = currentShop?.address || 'Jalal Pur Jattan, Gujrat';
+  const storePhone = currentShop?.phone || '053-3724601, 053-3724602';
+  const depotDsl = currentShop?.dlNumber || '09-342-0139-045748D';
 
   return (
     <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.5)', backdropFilter: 'blur(3px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, fontFamily: 'var(--font-sans)', padding: '1rem' }}>
       <div className="card" style={{ width: '100%', maxWidth: '920px', padding: '1.75rem', backgroundColor: '#ffffff', borderRadius: '20px', position: 'relative', maxHeight: '94vh', overflowY: 'auto', boxShadow: '0 20px 40px -15px rgba(15, 23, 42, 0.25)' }}>
-        <button onClick={onClose} style={{ position: 'absolute', right: '1.25rem', top: '1.25rem', background: 'none', border: 'none', cursor: 'pointer', padding: '0.2rem', borderRadius: '50%', backgroundColor: '#f8fafc' }}>
+        <button onClick={onClose} className="a4-no-print" style={{ position: 'absolute', right: '1.25rem', top: '1.25rem', background: 'none', border: 'none', cursor: 'pointer', padding: '0.2rem', borderRadius: '50%', backgroundColor: '#f8fafc' }}>
           <X size={20} color="#64748B" />
         </button>
 
         {/* Action Header */}
-        <div className="flex-between" style={{ marginBottom: '1.25rem', borderBottom: '1px solid #f1f5f9', paddingBottom: '0.75rem' }}>
+        <div className="flex-between a4-no-print" style={{ marginBottom: '1.25rem', borderBottom: '1px solid #f1f5f9', paddingBottom: '0.75rem' }}>
           <div>
             <h3 className="section-title" style={{ fontSize: '18px', color: '#0284c7' }}>
               A4 Commercial Dual-Page Tax Invoice (Form 2A / Section 23 Compliant)
@@ -87,6 +102,7 @@ export const A4InvoicePrintModal = ({ invoice, onClose }) => {
           {pageChunks.map((chunkItems, pageIdx) => (
             <div
               key={pageIdx}
+              className="a4-page-container"
               style={{
                 backgroundColor: '#ffffff',
                 border: '2px solid #111827',
@@ -150,7 +166,7 @@ export const A4InvoicePrintModal = ({ invoice, onClose }) => {
                     <div style={{ fontWeight: 800, textDecoration: 'underline', marginBottom: '0.2rem' }}>INVOICE DETAILS</div>
                     <div><strong>Invoice Number:</strong> {invoice.invoiceNo}</div>
                     <div><strong>Invoice Date:</strong> {formatDateDDMMYYYY(invoice.date || new Date())}</div>
-                    <div><strong>Booked By:</strong> {invoice.bookedBy || 'Idrees (Admin)'}</div>
+                    <div><strong>Booked By:</strong> {invoice.bookedBy || invoice.cashierName || 'Store Admin'}</div>
                     <div><strong>Payment Due Date:</strong> {formatDateDDMMYYYY(invoice.date || new Date())}</div>
                   </div>
                 </div>
@@ -173,20 +189,22 @@ export const A4InvoicePrintModal = ({ invoice, onClose }) => {
                       <th style={{ borderRight: '1px solid #000000', padding: '0.3rem 0.25rem', textAlign: 'right', width: '55px' }}>Rate</th>
                       <th style={{ borderRight: '1px solid #000000', padding: '0.3rem 0.25rem', textAlign: 'right', width: '60px' }}>Gross</th>
                       <th style={{ borderRight: '1px solid #000000', padding: '0.3rem 0.25rem', textAlign: 'center', width: '40px' }}>Disc %</th>
-                      <th style={{ borderRight: '1px solid #000000', padding: '0.3rem 0.25rem', textAlign: 'right', width: '55px' }}>Sale Tax 18%</th>
+                      <th style={{ borderRight: '1px solid #000000', padding: '0.3rem 0.25rem', textAlign: 'right', width: '70px' }}>Sale Tax 18%</th>
                       <th style={{ borderRight: '1px solid #000000', padding: '0.3rem 0.25rem', textAlign: 'right', width: '50px' }}>Adv Tax 0.5%</th>
                       <th style={{ padding: '0.3rem 0.35rem', textAlign: 'right', width: '65px' }}>Net Amount</th>
                     </tr>
                   </thead>
                   <tbody>
                     {chunkItems.map((item, idx) => {
-                      const itemRate = Number(item.boxPrice || item.price || 600);
-                      const itemQty = Number(item.qty || item.quantity || 2);
+                      const itemRate = Number(item.boxSellingPrice || item.boxPrice || item.price || 600);
+                      const itemQty = Number(item.qty || item.quantity || 1);
                       const itemGross = itemRate * itemQty;
                       const itemDisc = Number(item.discount || 0);
-                      const itemST = Number(item.salesTax18 || (itemGross * 0.18));
-                      const itemAdv = Number(item.advTax05 || (itemGross * 0.005));
-                      const itemNet = itemGross - itemDisc + itemST + itemAdv;
+                      const taxableAmount = Math.max(0, itemGross - itemDisc);
+                      const itemTaxRate = item.saleTaxPercent !== undefined ? Number(item.saleTaxPercent) : 18;
+                      const itemST = Number(item.salesTax18 !== undefined ? item.salesTax18 : (taxableAmount * (itemTaxRate / 100)));
+                      const itemAdv = Number(item.advTax05 !== undefined ? item.advTax05 : (taxableAmount * 0.005));
+                      const itemNet = taxableAmount + itemST + itemAdv;
 
                       return (
                         <tr key={idx} style={{ borderBottom: '1px solid #e2e8f0' }}>
@@ -218,7 +236,16 @@ export const A4InvoicePrintModal = ({ invoice, onClose }) => {
                             {itemDisc > 0 ? `${itemDisc.toFixed(1)}%` : '-'}
                           </td>
                           <td style={{ borderRight: '1px solid #000000', padding: '0.25rem 0.2rem', textAlign: 'right' }}>
-                            {itemST.toFixed(2)}
+                            {itemTaxRate === 19 ? (
+                              <>
+                                <span style={{ fontSize: '8.5px', fontWeight: 800, color: '#b45309', marginRight: '3px' }}>
+                                  (19%)
+                                </span>
+                                {itemST.toFixed(2)}
+                              </>
+                            ) : (
+                              itemST.toFixed(2)
+                            )}
                           </td>
                           <td style={{ borderRight: '1px solid #000000', padding: '0.25rem 0.2rem', textAlign: 'right' }}>
                             {itemAdv.toFixed(2)}
@@ -243,6 +270,27 @@ export const A4InvoicePrintModal = ({ invoice, onClose }) => {
                     <div style={{ marginTop: '0.15rem', fontStyle: 'italic', fontWeight: 700 }}>
                       <strong>Net Total In Words:</strong> {invoice.wordsTotal || numberToRupeesWords(grandNetTotal)}
                     </div>
+                    {/* Tax Bracket Breakdown */}
+                    {(() => {
+                      let t18 = 0;
+                      let t19 = 0;
+                      let tother = 0;
+                      items.forEach(it => {
+                        const q = Number(it.qty || it.quantity || 1);
+                        const r = Number(it.boxSellingPrice || it.boxPrice || it.price || 600);
+                        const gross = q * r - Number(it.discount || 0);
+                        const tr = it.saleTaxPercent !== undefined ? Number(it.saleTaxPercent) : 18;
+                        const st = Number(it.salesTax18 !== undefined ? it.salesTax18 : (gross * (tr / 100)));
+                        if (tr === 18) t18 += st;
+                        else if (tr === 19) t19 += st;
+                        else tother += st;
+                      });
+                      return (
+                        <div style={{ marginTop: '0.25rem', fontSize: '9.5px', color: '#334155', borderTop: '1px dashed #cbd5e1', paddingTop: '0.2rem' }}>
+                          <strong>FBR Tax Breakdown:</strong> 18% ST: Rs. {t18.toFixed(2)} | 19% ST: Rs. {t19.toFixed(2)} {tother > 0 ? `| Other ST: Rs. ${tother.toFixed(2)}` : ''} | 0.5% Adv Tax: Rs. {Number(invoice.advTax05 || (grossTotal * 0.005)).toFixed(2)}
+                        </div>
+                      );
+                    })()}
                   </div>
 
                   <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>

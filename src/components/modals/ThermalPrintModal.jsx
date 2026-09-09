@@ -246,11 +246,11 @@ export const ThermalPrintModal = ({ invoice, onClose }) => {
   const change = Number(invoice?.changeDue || invoice?.change || Math.max(0, tendered - netTotal));
 
   // Dynamic Store Data with exact sample defaults
-  const activeShopName = currentShop?.shopName || invoice?.shopName || 'IDREES MEDICAL STORE';
-  const activeAddress = currentShop?.address || invoice?.shopAddress || 'NEAR HBL BANK MAIN BAZAR JALAL PUR JATTAN,\nGUJRAT';
-  const activePhone = currentShop?.phone || invoice?.shopPhone || '03126262942';
-  const activeEmail = currentShop?.email || invoice?.shopEmail || 'Company@gmail.com';
-  const activeCashier = invoice?.cashierName || user?.name || 'Dr. Idrees (Retail Admin)';
+  const activeShopName = currentShop?.shopName || invoice?.shopName || 'TESTING SHOP';
+  const activeAddress = currentShop?.address || invoice?.shopAddress || 'Main Commercial Market, Lahore';
+  const activePhone = currentShop?.phone || invoice?.shopPhone || '0300-1234567';
+  const activeEmail = currentShop?.email || invoice?.shopEmail || 'contact@testingshop.pk';
+  const activeCashier = invoice?.cashierName || user?.name || 'Testing Shop Admin';
 
   // Format Invoice Number: 8 digits formatted
   const formattedNo = useMemo(() => {
