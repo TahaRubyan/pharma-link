@@ -118,6 +118,12 @@ export const SalesProvider = ({ children }) => {
     setReturns((prev) => [returnData, ...prev]);
   };
 
+  // Look up an invoice by invoiceNo, id, or reference
+  const findInvoice = (invoiceNo) => {
+    if (!invoiceNo) return null;
+    return invoices.find((inv) => inv.invoiceNo === invoiceNo || inv.invoiceNumber === invoiceNo || inv.id === invoiceNo) || null;
+  };
+
   // Record an inline cash settlement or payment against an invoice's debt (Territory Delivery Ledger & Khata)
   const recordDebtPayment = (invoiceNo, amountPaid, staffName = 'Testing Shop Admin') => {
     if (!invoiceNo || isNaN(amountPaid) || Number(amountPaid) <= 0) return null;

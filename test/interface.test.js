@@ -329,6 +329,55 @@ export function runInterfaceTests() {
     }
   });
 
+  // 12. Context Provider Value Static Audit (Zero Undefined Exports)
+  test('Interface - Complete context provider static audit confirms all exported values are declared', () => {
+    function getObjectTopLevelKeys(str) {
+      const keys = [];
+      let depth = 0;
+      let current = '';
+      for (let i = 0; i < str.length; i++) {
+        const char = str[i];
+        if (char === '(' || char === '{' || char === '[') depth++;
+        else if (char === ')' || char === '}' || char === ']') depth--;
+        else if (char === ',' && depth === 0) {
+          keys.push(current.trim());
+          current = '';
+          continue;
+        }
+        current += char;
+      }
+      if (current.trim()) keys.push(current.trim());
+      return keys;
+    }
+
+    const contextFiles = fs.readdirSync('src/context').filter(f => f.endsWith('.jsx'));
+    const missing = [];
+
+    for (const file of contextFiles) {
+      const code = fs.readFileSync(path.join('src/context', file), 'utf8');
+      const match = code.match(/value=\{\{\s*([\s\S]*?)\s*\}\}/);
+      if (!match) continue;
+
+      const rawEntries = getObjectTopLevelKeys(match[1]);
+      const codeBeforeProvider = code.slice(0, match.index);
+
+      for (const entry of rawEntries) {
+        if (entry.startsWith('//')) continue;
+        if (entry.includes(':')) continue;
+        const id = entry.trim();
+        if (!id) continue;
+
+        if (!codeBeforeProvider.includes(id)) {
+          missing.push(`${id} in src/context/${file}`);
+        }
+      }
+    }
+
+    if (missing.length > 0) {
+      throw new Error(`Found undeclared context exports:\n${missing.join('\n')}`);
+    }
+  });
+
   console.log(`📊 Interface Tests Summary: ${passedCount} Passed, ${failedCount} Failed\n`);
   return { passedCount, failedCount };
 }
