@@ -18,7 +18,7 @@ import { hashPassword, verifyPassword } from '../utils/cryptoUtils';
 import { dbSyncService } from '../services/dbSyncService';
 
 export const LoginPage = ({ onLoginSuccess }) => {
-  const { loginAsSuperAdmin, loginAsClientUser, staffAccounts = [], setStaffAccounts, tenantsList = [] } = useAuth();
+  const { loginAsSuperAdmin, loginAsClientUser, staffAccounts = [], setStaffAccounts, tenantsList = [], setTenantsList } = useAuth();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
@@ -91,8 +91,18 @@ export const LoginPage = ({ onLoginSuccess }) => {
       }
     }
 
-    // 3. Dynamic check against provisioned staff accounts with cryptographic hash support
-    for (const s of (staffAccounts || [])) {
+    // 3. Dynamic check against provisioned staff accounts (Memory + LocalStorage)
+    let allStaff = [...(staffAccounts || [])];
+    try {
+      const localStaff = JSON.parse(localStorage.getItem('pharmalink_staff_accounts') || '[]');
+      localStaff.forEach((ls) => {
+        if (!allStaff.some((s) => s.id === ls.id || s.username === ls.username)) {
+          allStaff.push(ls);
+        }
+      });
+    } catch (e) {}
+
+    for (const s of allStaff) {
       const u = (s.username || '').toLowerCase().replace(/\s+/g, '');
       const em = (s.email || '').toLowerCase().replace(/\s+/g, '');
       if (u === cleanUser || em === cleanUser) {
@@ -124,10 +134,21 @@ export const LoginPage = ({ onLoginSuccess }) => {
       }
     }
 
-    // 4. Dynamic check against onboarded pharmacy tenants (for instant admin login & mandatory first-time password setup)
-    for (const t of (tenantsList || [])) {
+    // 4. Dynamic check against onboarded pharmacy tenants (Memory + LocalStorage)
+    let allTenants = [...(tenantsList || [])];
+    try {
+      const localTenants = JSON.parse(localStorage.getItem('medistore_tenants_list') || '[]');
+      localTenants.forEach((lt) => {
+        if (!allTenants.some((t) => t.tenantId === lt.tenantId)) {
+          allTenants.push(lt);
+        }
+      });
+    } catch (e) {}
+
+    for (const t of allTenants) {
       const tu = (t.adminUsername || '').toLowerCase().replace(/\s+/g, '');
-      if (tu && tu === cleanUser) {
+      const tid = (t.tenantId || '').toLowerCase().replace(/\s+/g, '');
+      if ((tu && tu === cleanUser) || (tid && tid === cleanUser)) {
         const storedPass = t.tempPassword || t.password;
         const passMatch = storedPass && (cleanPass === storedPass || (await verifyPassword(cleanPass, storedPass)));
         if (passMatch) {
@@ -139,7 +160,7 @@ export const LoginPage = ({ onLoginSuccess }) => {
                 id: `STAFF-ADMIN-${t.tenantId}`,
                 tenantId: t.tenantId,
                 name: t.ownerName || `${t.shopName} Admin`,
-                username: t.adminUsername,
+                username: t.adminUsername || cleanUser,
                 role: 'Admin',
                 status: 'Active',
                 storeMode: tenantMode,
@@ -158,6 +179,44 @@ export const LoginPage = ({ onLoginSuccess }) => {
           return;
         }
       }
+    }
+
+    // 5. Real-Time Cloud Fallback: Dynamic lookup in Supabase
+    try {
+      const cloudUser = await dbSyncService.findStaffOrTenantUser(cleanUser);
+      if (cloudUser && cloudUser.type === 'staff') {
+        const s = cloudUser.record;
+        const passMatch = await verifyPassword(cleanPass, s.password);
+        if (passMatch) {
+          const staffMode = s.storeMode || 'HYBRID';
+          const staffRole = s.role || 'Cashier';
+          const staffTenantId = s.tenantId || 'TEN-TESTING-SHOP';
+          const targetScreen = staffRole === 'Cashier' ? 'pos' : 'dashboard';
+
+          // Cache locally
+          if (typeof setStaffAccounts === 'function') {
+            setStaffAccounts((prev) => [s, ...(prev || []).filter((item) => item.username !== s.username)]);
+          }
+
+          if (s.mustChangePassword) {
+            setPendingUserSession({
+              staffRecord: s,
+              staffTenantId,
+              staffRole,
+              staffMode,
+              targetScreen
+            });
+            setIsFirstLoginModalOpen(true);
+            return;
+          }
+
+          loginAsClientUser(staffTenantId, staffRole, staffMode);
+          onLoginSuccess('CLIENT_USER', staffTenantId, staffMode, staffRole, targetScreen);
+          return;
+        }
+      }
+    } catch (err) {
+      console.warn('Realtime cloud login fallback warning:', err);
     }
 
     setErrorMsg('Invalid username or password. Please check your credentials and try again.');
@@ -212,6 +271,21 @@ export const LoginPage = ({ onLoginSuccess }) => {
       }
       localStorage.setItem('pharmalink_staff_accounts', JSON.stringify(updatedList));
 
+      // Also synchronize tenantsList if account belongs to a pharmacy admin
+      try {
+        const storedTenants = JSON.parse(localStorage.getItem('medistore_tenants_list') || '[]');
+        const updatedTenants = storedTenants.map((t) => {
+          if (t.tenantId === staffTenantId) {
+            return { ...t, password: encryptedHash, tempPassword: encryptedHash, isTempPassword: false, mustChangePassword: false };
+          }
+          return t;
+        });
+        localStorage.setItem('medistore_tenants_list', JSON.stringify(updatedTenants));
+        if (typeof setTenantsList === 'function') {
+          setTenantsList(updatedTenants);
+        }
+      } catch (e) {}
+
       setFirstLoginSuccess('Permanent password saved! Logging you in...');
 
       setTimeout(() => {
@@ -235,7 +309,7 @@ export const LoginPage = ({ onLoginSuccess }) => {
     const cleanPin = recoveryPin.trim();
 
     if (!cleanU) {
-      setForgotError('Please enter your username or email.');
+      setForgotError('Please enter your username, email, or tenant ID.');
       return;
     }
     // Dynamic random key validation (also accepts emergency fallback 2026/PHARMA2026)
@@ -255,8 +329,9 @@ export const LoginPage = ({ onLoginSuccess }) => {
     setIsSubmittingForgot(true);
     try {
       const encryptedHash = await hashPassword(newPassword);
-      const isMasterReset = cleanU === 'masteradmin' || cleanU === 'superadmin' || cleanU === 'master' || cleanU === 'admin';
 
+      // 1. Master Super Admin Reset
+      const isMasterReset = cleanU === 'masteradmin' || cleanU === 'superadmin' || cleanU === 'master';
       if (isMasterReset) {
         localStorage.setItem('pharmalink_master_pass_hash', encryptedHash);
         setForgotSuccess('Master Super Admin password updated successfully! Please sign in with username "masteradmin".');
@@ -265,14 +340,11 @@ export const LoginPage = ({ onLoginSuccess }) => {
         setTimeout(() => {
           setIsForgotModalOpen(false);
           setForgotSuccess('');
-          setForgotError('');
-          setRecoveryPin('');
-          setNewPassword('');
-          setConfirmPassword('');
         }, 1200);
         return;
       }
 
+      // 2. Testing Shop Admin Reset
       if (cleanU === 'testing.admin') {
         localStorage.setItem('pharmalink_testing_admin_pass_hash', encryptedHash);
         setForgotSuccess('Testing Shop Admin password updated successfully! Please sign in with username "testing.admin".');
@@ -281,62 +353,130 @@ export const LoginPage = ({ onLoginSuccess }) => {
         setTimeout(() => {
           setIsForgotModalOpen(false);
           setForgotSuccess('');
-          setForgotError('');
-          setRecoveryPin('');
-          setNewPassword('');
-          setConfirmPassword('');
         }, 1200);
         return;
       }
 
-      // Find in provisioned staffAccounts
+      // 3. Search in staffAccounts (State & LocalStorage)
       let found = false;
-      const updatedList = (staffAccounts || []).map((s) => {
+      let matchedStaff = null;
+      let allStaff = [...(staffAccounts || [])];
+      try {
+        const localStaff = JSON.parse(localStorage.getItem('pharmalink_staff_accounts') || '[]');
+        localStaff.forEach((ls) => {
+          if (!allStaff.some((s) => s.id === ls.id || s.username === ls.username)) {
+            allStaff.push(ls);
+          }
+        });
+      } catch (e) {}
+
+      const updatedStaffList = allStaff.map((s) => {
         const su = (s.username || '').toLowerCase().replace(/\s+/g, '');
         const se = (s.email || '').toLowerCase().replace(/\s+/g, '');
         if (su === cleanU || se === cleanU) {
           found = true;
-          const updatedStaff = { ...s, password: encryptedHash, pin: encryptedHash, mustChangePassword: false };
-          // Persist to Supabase
-          dbSyncService.saveStaffAccount({
-            id: updatedStaff.id,
-            tenantId: updatedStaff.tenantId || 'TEN-TESTING-SHOP',
-            name: updatedStaff.name,
-            username: updatedStaff.username,
-            password: encryptedHash,
-            role: updatedStaff.role,
-            status: updatedStaff.status,
-            storeMode: updatedStaff.storeMode || 'WHOLESALE',
-            mustChangePassword: false,
-          }).catch(console.warn);
-          return updatedStaff;
+          matchedStaff = { ...s, password: encryptedHash, pin: encryptedHash, mustChangePassword: false };
+          return matchedStaff;
         }
         return s;
       });
 
-      if (!found) {
-        setForgotError(`Staff user account "${cleanU}" not found. Store user accounts must be provisioned by Master Admin.`);
+      if (found && matchedStaff) {
+        await dbSyncService.saveStaffAccount(matchedStaff);
+        if (typeof setStaffAccounts === 'function') {
+          setStaffAccounts(updatedStaffList);
+        }
+        localStorage.setItem('pharmalink_staff_accounts', JSON.stringify(updatedStaffList));
+        setForgotSuccess('Password reset successfully! Encrypted and saved.');
+        setUsername(cleanU);
+        setPassword(newPassword);
+        setTimeout(() => {
+          setIsForgotModalOpen(false);
+          setForgotSuccess('');
+        }, 1200);
         return;
       }
 
-      if (typeof setStaffAccounts === 'function') {
-        setStaffAccounts(updatedList);
-      }
-      localStorage.setItem('pharmalink_staff_accounts', JSON.stringify(updatedList));
+      // 4. Search in tenantsList (State & LocalStorage)
+      let allTenants = [...(tenantsList || [])];
+      try {
+        const localTenants = JSON.parse(localStorage.getItem('medistore_tenants_list') || '[]');
+        localTenants.forEach((lt) => {
+          if (!allTenants.some((t) => t.tenantId === lt.tenantId)) {
+            allTenants.push(lt);
+          }
+        });
+      } catch (e) {}
 
-      setForgotSuccess('Password reset successfully! Encrypted and saved.');
-      setUsername(cleanU);
-      setPassword(newPassword);
-      setTimeout(() => {
-        setIsForgotModalOpen(false);
-        setForgotSuccess('');
-        setForgotError('');
-        setRecoveryPin('');
-        setNewPassword('');
-        setConfirmPassword('');
-      }, 1200);
+      let matchedTenant = null;
+      const updatedTenantList = allTenants.map((t) => {
+        const tu = (t.adminUsername || '').toLowerCase().replace(/\s+/g, '');
+        const tid = (t.tenantId || '').toLowerCase().replace(/\s+/g, '');
+        if (tu === cleanU || tid === cleanU) {
+          found = true;
+          matchedTenant = { ...t, password: encryptedHash, tempPassword: encryptedHash, isTempPassword: false, mustChangePassword: false };
+          return matchedTenant;
+        }
+        return t;
+      });
+
+      if (found && matchedTenant) {
+        const adminStaffRecord = {
+          id: `STAFF-ADMIN-${matchedTenant.tenantId}`,
+          tenantId: matchedTenant.tenantId,
+          name: matchedTenant.ownerName || `${matchedTenant.shopName} Admin`,
+          username: matchedTenant.adminUsername || cleanU,
+          password: encryptedHash,
+          role: 'Admin',
+          status: 'Active',
+          storeMode: matchedTenant.subscribedSystemScope === 'RETAIL_ONLY' ? 'RETAIL' : 'WHOLESALE',
+          mustChangePassword: false
+        };
+        await dbSyncService.saveStaffAccount(adminStaffRecord);
+        if (typeof setTenantsList === 'function') {
+          setTenantsList(updatedTenantList);
+        }
+        localStorage.setItem('medistore_tenants_list', JSON.stringify(updatedTenantList));
+
+        const newStaffList = [adminStaffRecord, ...allStaff.filter((s) => s.username !== adminStaffRecord.username)];
+        if (typeof setStaffAccounts === 'function') {
+          setStaffAccounts(newStaffList);
+        }
+        localStorage.setItem('pharmalink_staff_accounts', JSON.stringify(newStaffList));
+
+        setForgotSuccess('Tenant Admin password reset successfully! Encrypted and saved.');
+        setUsername(matchedTenant.adminUsername || cleanU);
+        setPassword(newPassword);
+        setTimeout(() => {
+          setIsForgotModalOpen(false);
+          setForgotSuccess('');
+        }, 1200);
+        return;
+      }
+
+      // 5. Real-Time Cloud Fallback: Dynamic lookup in Supabase
+      const cloudUser = await dbSyncService.findStaffOrTenantUser(cleanU);
+      if (cloudUser) {
+        if (cloudUser.type === 'staff') {
+          const s = { ...cloudUser.record, password: encryptedHash, mustChangePassword: false };
+          await dbSyncService.saveStaffAccount(s);
+          const newStaffList = [s, ...allStaff.filter((item) => item.username !== s.username)];
+          if (typeof setStaffAccounts === 'function') setStaffAccounts(newStaffList);
+          localStorage.setItem('pharmalink_staff_accounts', JSON.stringify(newStaffList));
+          setForgotSuccess('User password reset successfully in cloud database!');
+          setUsername(s.username);
+          setPassword(newPassword);
+          setTimeout(() => {
+            setIsForgotModalOpen(false);
+            setForgotSuccess('');
+          }, 1200);
+          return;
+        }
+      }
+
+      setForgotError(`User account or tenant ID "${cleanU}" was not found in local records or cloud database. Please verify the username or contact Master Admin.`);
     } catch (err) {
-      setForgotError('Failed to encrypt and update password. Please try again.');
+      setForgotError('Password reset failed: ' + err.message);
     } finally {
       setIsSubmittingForgot(false);
     }

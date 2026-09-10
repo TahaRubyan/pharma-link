@@ -349,9 +349,157 @@ export const dbSyncService = {
         store_mode: staff.storeMode || 'HYBRID',
         must_change_password: Boolean(staff.mustChangePassword),
       };
-      await supabase.from('staff_accounts').upsert(row, { onConflict: 'id' });
+      const { error } = await supabase.from('staff_accounts').upsert(row, { onConflict: 'id' });
+      if (error) {
+        console.warn('[dbSync] saveStaffAccount supabase error:', error.message);
+      }
     } catch (e) {
       console.warn('[dbSync] saveStaffAccount error:', e.message);
+    }
+  },
+
+  // -------------------------------------------------------------
+  // 5. TENANT REGISTRATION & MULTI-TENANT MANAGEMENT
+  // -------------------------------------------------------------
+  async fetchTenants() {
+    if (!isSupabaseConfigured || !supabase) return null;
+    try {
+      const { data, error } = await supabase.from('tenants').select('*');
+      if (error) {
+        console.warn('[dbSync] fetchTenants error:', error.message);
+        return null;
+      }
+      if (data && data.length > 0) {
+        return data.map((t) => ({
+          tenantId: t.tenant_id,
+          shopName: t.shop_name,
+          ownerName: t.owner_name,
+          phone: t.phone,
+          city: t.city,
+          address: t.address,
+          ntn: t.ntn,
+          gstin: t.gstin,
+          dlNumber: t.dl_number,
+          form20: t.form20,
+          form21: t.form21,
+          subscribedSystemScope: t.mode === 'RETAIL' ? 'RETAIL_ONLY' : (t.mode === 'WHOLESALE' ? 'WHOLESALE_ONLY' : 'HYBRID_BOTH'),
+          subscriptionStatus: t.subscription_status || 'Active',
+          createdDate: t.created_at ? new Date(t.created_at).toLocaleDateString('en-GB').replace(/\//g, '-') : '28-08-2026',
+        }));
+      }
+      return null;
+    } catch (e) {
+      console.warn('[dbSync] fetchTenants exception:', e.message);
+      return null;
+    }
+  },
+
+  async saveTenant(tenant) {
+    if (!isSupabaseConfigured || !supabase || !tenant) return;
+    try {
+      const row = {
+        tenant_id: tenant.tenantId || tenant.shopId,
+        shop_name: tenant.shopName,
+        owner_name: tenant.ownerName || '',
+        phone: tenant.phone || '',
+        city: tenant.city || 'Islamabad',
+        address: tenant.address || `${tenant.city || 'Islamabad'}, Pakistan`,
+        ntn: tenant.ntn || '',
+        gstin: tenant.gstin || '',
+        dl_number: tenant.dlNumber || `${tenant.form20 || ''} & ${tenant.form21 || ''}`,
+        form20: tenant.form20 || null,
+        form21: tenant.form21 || null,
+        mode: tenant.subscribedSystemScope === 'RETAIL_ONLY' ? 'RETAIL' : (tenant.subscribedSystemScope === 'WHOLESALE_ONLY' ? 'WHOLESALE' : 'HYBRID'),
+        subscription_status: tenant.subscriptionStatus || 'Active',
+        updated_at: new Date().toISOString(),
+      };
+      const { error } = await supabase.from('tenants').upsert(row, { onConflict: 'tenant_id' });
+      if (error) {
+        console.warn('[dbSync] saveTenant supabase error:', error.message);
+      }
+    } catch (e) {
+      console.warn('[dbSync] saveTenant error:', e.message);
+    }
+  },
+
+  async deleteTenant(tenantId) {
+    if (!isSupabaseConfigured || !supabase || !tenantId) return { success: true };
+    try {
+      // 1. Cascade delete associated staff accounts
+      await supabase.from('staff_accounts').delete().eq('tenant_id', tenantId);
+      // 2. Cascade delete tenant operations
+      await supabase.from('invoices').delete().eq('tenant_id', tenantId);
+      await supabase.from('batches').delete().eq('tenant_id', tenantId);
+      await supabase.from('medicines').delete().eq('tenant_id', tenantId);
+      await supabase.from('purchase_orders').delete().eq('tenant_id', tenantId);
+      await supabase.from('suppliers').delete().eq('tenant_id', tenantId);
+      await supabase.from('customer_debt_logs').delete().eq('tenant_id', tenantId);
+      await supabase.from('customers').delete().eq('tenant_id', tenantId);
+      // 3. Delete tenant row itself
+      const { error } = await supabase.from('tenants').delete().eq('tenant_id', tenantId);
+      if (error) {
+        console.warn('[dbSync] deleteTenant error:', error.message);
+        return { success: false, error: error.message };
+      }
+      return { success: true };
+    } catch (err) {
+      console.warn('[dbSync] deleteTenant exception:', err.message);
+      return { success: false, error: err.message };
+    }
+  },
+
+  async findStaffOrTenantUser(identifier) {
+    if (!isSupabaseConfigured || !supabase || !identifier) return null;
+    const clean = String(identifier).trim().toLowerCase().replace(/\s+/g, '');
+    try {
+      // 1. Check staff_accounts in Supabase
+      const { data: staffData } = await supabase
+        .from('staff_accounts')
+        .select('*')
+        .ilike('username', clean)
+        .limit(1);
+
+      if (staffData && staffData.length > 0) {
+        const s = staffData[0];
+        return {
+          type: 'staff',
+          record: {
+            id: s.id,
+            tenantId: s.tenant_id,
+            name: s.name,
+            username: s.username,
+            password: s.password,
+            role: s.role,
+            status: s.status,
+            storeMode: s.store_mode,
+            mustChangePassword: Boolean(s.must_change_password),
+          }
+        };
+      }
+
+      // 2. Check tenants table by tenant_id or shop_name
+      const { data: tenantData } = await supabase
+        .from('tenants')
+        .select('*')
+        .or(`tenant_id.ilike.${clean},shop_name.ilike.%${clean}%`)
+        .limit(1);
+
+      if (tenantData && tenantData.length > 0) {
+        const t = tenantData[0];
+        return {
+          type: 'tenant',
+          record: {
+            tenantId: t.tenant_id,
+            shopName: t.shop_name,
+            ownerName: t.owner_name,
+            subscribedSystemScope: t.mode === 'RETAIL' ? 'RETAIL_ONLY' : (t.mode === 'WHOLESALE' ? 'WHOLESALE_ONLY' : 'HYBRID_BOTH'),
+          }
+        };
+      }
+      return null;
+    } catch (e) {
+      console.warn('[dbSync] findStaffOrTenantUser warning:', e.message);
+      return null;
     }
   },
 

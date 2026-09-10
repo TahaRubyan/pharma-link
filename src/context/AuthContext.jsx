@@ -169,11 +169,22 @@ export const AuthProvider = ({ children }) => {
     return [];
   });
 
-  // Cloud sync staff accounts from Supabase (fetches provisioned staff across tenants for unified login access)
+  // Cloud sync tenants & staff accounts from Supabase (unified cross-device SaaS registry)
   useEffect(() => {
     let isMounted = true;
-    const loadCloudStaff = async () => {
+    const loadCloudData = async () => {
       try {
+        // 1. Fetch tenants from Supabase
+        const cloudTenants = await dbSyncService.fetchTenants();
+        if (isMounted && cloudTenants && cloudTenants.length > 0) {
+          setTenantsList((prev) => {
+            const map = new Map();
+            prev.forEach((t) => map.set(t.tenantId, t));
+            cloudTenants.forEach((t) => map.set(t.tenantId, { ...(map.get(t.tenantId) || {}), ...t }));
+            return Array.from(map.values());
+          });
+        }
+        // 2. Fetch staff from Supabase
         const cloudStaff = await dbSyncService.fetchStaffAccounts();
         if (isMounted && cloudStaff && cloudStaff.length > 0) {
           setStaffAccounts((prev) => {
@@ -184,10 +195,10 @@ export const AuthProvider = ({ children }) => {
           });
         }
       } catch (err) {
-        console.warn('[AuthContext] Cloud staff sync warning:', err);
+        console.warn('[AuthContext] Cloud data sync warning:', err);
       }
     };
-    loadCloudStaff();
+    loadCloudData();
     return () => {
       isMounted = false;
     };
@@ -359,7 +370,19 @@ export const AuthProvider = ({ children }) => {
       mustChangePassword: true,
     };
     setStaffAccounts((prev) => [initialAdminStaff, ...(prev || [])]);
-    dbSyncService.saveStaffAccount(initialAdminStaff).catch((e) => console.warn('Sync new tenant staff warning:', e));
+
+    // Immediate localStorage persistence
+    try {
+      const storedTenants = JSON.parse(localStorage.getItem('medistore_tenants_list') || '[]');
+      localStorage.setItem('medistore_tenants_list', JSON.stringify([newTenant, ...storedTenants.filter(t => t.tenantId !== newTenant.tenantId)]));
+      const storedStaff = JSON.parse(localStorage.getItem('pharmalink_staff_accounts') || '[]');
+      localStorage.setItem('pharmalink_staff_accounts', JSON.stringify([initialAdminStaff, ...storedStaff.filter(s => s.username !== cleanAdminUser)]));
+    } catch (e) {}
+
+    // Cloud database persistence: Save tenant first, then staff account to satisfy foreign key constraint!
+    dbSyncService.saveTenant(newTenant)
+      .then(() => dbSyncService.saveStaffAccount(initialAdminStaff))
+      .catch((e) => console.warn('Sync new tenant and staff error:', e));
 
     const newPaymentLog = {
       id: `PAY-${Date.now().toString().slice(-4)}`,
@@ -374,6 +397,33 @@ export const AuthProvider = ({ children }) => {
     setClientPaymentLogs((prev) => [newPaymentLog, ...prev]);
 
     return { tenant: newTenant, tempPassword: tempPass };
+  };
+
+  const deleteTenant = async (tenantId) => {
+    if (!tenantId) return { success: false, error: 'Tenant ID required' };
+    if (tenantId === 'TEN-TESTING-SHOP') {
+      throw new Error('The default demo shop (TEN-TESTING-SHOP) cannot be deleted.');
+    }
+
+    // 1. Delete from Supabase cloud (cascading deletes staff, inventory, invoices)
+    await dbSyncService.deleteTenant(tenantId);
+
+    // 2. Remove from local React states
+    setTenantsList((prev) => prev.filter((t) => t.tenantId !== tenantId));
+    setStaffAccounts((prev) => prev.filter((s) => s.tenantId !== tenantId));
+    setClientPaymentLogs((prev) => prev.filter((p) => p.tenantId !== tenantId));
+
+    // 3. Update localStorage
+    try {
+      const curTenants = JSON.parse(localStorage.getItem('medistore_tenants_list') || '[]');
+      localStorage.setItem('medistore_tenants_list', JSON.stringify(curTenants.filter((t) => t.tenantId !== tenantId)));
+      const curStaff = JSON.parse(localStorage.getItem('pharmalink_staff_accounts') || '[]');
+      localStorage.setItem('pharmalink_staff_accounts', JSON.stringify(curStaff.filter((s) => s.tenantId !== tenantId)));
+      const curLogs = JSON.parse(localStorage.getItem('medistore_client_payment_logs') || '[]');
+      localStorage.setItem('medistore_client_payment_logs', JSON.stringify(curLogs.filter((p) => p.tenantId !== tenantId)));
+    } catch (e) {}
+
+    return { success: true };
   };
 
   const logClientPayment = (tenantId, amount, paymentMethod = 'Bank Transfer') => {
@@ -505,7 +555,9 @@ export const AuthProvider = ({ children }) => {
     loginAsSuperAdmin,
     loginAsClientUser,
     tenantsList,
+    setTenantsList,
     onboardNewTenant,
+    deleteTenant,
     logClientPayment,
     clientPaymentLogs,
     inspectingTenantId,

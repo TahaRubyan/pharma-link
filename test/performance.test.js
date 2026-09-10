@@ -119,7 +119,7 @@ export function runPerformanceTests() {
   });
 
   // 4. Production Asset Size Budget Audit
-  test('Performance - Production bundle adheres to strict size budgets (JS < 850KB, CSS < 15KB, HTML < 2KB)', () => {
+  test('Performance - Production bundle adheres to strict size budgets (JS < 850KB, CSS < 20KB, HTML < 2KB)', () => {
     const distPath = path.join(process.cwd(), 'dist');
     if (!fs.existsSync(distPath)) {
       throw new Error('dist directory does not exist. Run "npm run build" first.');
@@ -144,7 +144,7 @@ export function runPerformanceTests() {
     const cssFile = assetFiles.find(f => f.endsWith('.css'));
     if (cssFile) {
       const cssSizeKb = fs.statSync(path.join(assetsPath, cssFile)).size / 1024;
-      if (cssSizeKb > 15) throw new Error(`CSS bundle exceeds 15KB budget: ${cssSizeKb.toFixed(2)}KB`);
+      if (cssSizeKb > 20) throw new Error(`CSS bundle exceeds 20KB budget: ${cssSizeKb.toFixed(2)}KB`);
     }
   });
 

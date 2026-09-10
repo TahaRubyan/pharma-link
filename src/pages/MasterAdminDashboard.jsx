@@ -32,12 +32,14 @@ import ShopDetailsModal from '../components/modals/ShopDetailsModal';
 export const MasterAdminDashboard = () => {
   const { 
     tenantsList, 
+    setTenantsList,
     clientPaymentLogs, 
     inspectTenant, 
     loginAsClientUser,
     logout,
     staffAccounts = [],
-    setStaffAccounts
+    setStaffAccounts,
+    deleteTenant
   } = useAuth();
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -45,6 +47,13 @@ export const MasterAdminDashboard = () => {
   const [isOnboardModalOpen, setIsOnboardModalOpen] = useState(false);
   const [activePaymentTenant, setActivePaymentTenant] = useState(null);
   const [activeDetailsTenant, setActiveDetailsTenant] = useState(null);
+
+  // Tenant Deletion State
+  const [tenantToDelete, setTenantToDelete] = useState(null);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isDeletingTenant, setIsDeletingTenant] = useState(false);
+  const [deleteTenantError, setDeleteTenantError] = useState('');
+  const [deleteTenantSuccess, setDeleteTenantSuccess] = useState('');
 
   // User Provisioning Modal State
   const [isProvisionModalOpen, setIsProvisionModalOpen] = useState(false);
@@ -96,6 +105,12 @@ export const MasterAdminDashboard = () => {
 
     setIsSubmittingProv(true);
     try {
+      // 1. Ensure the tenant exists in Supabase first so Foreign Key constraint succeeds
+      const matchedTenant = (tenantsList || []).find((t) => t.tenantId === provTenantId);
+      if (matchedTenant) {
+        await dbSyncService.saveTenant(matchedTenant);
+      }
+
       // Hash password using cryptoUtils for encrypted storage
       const encryptedHash = await hashPassword(cleanPassword);
       const newStaff = {
@@ -110,10 +125,10 @@ export const MasterAdminDashboard = () => {
         mustChangePassword: true,
       };
 
-      // 1. Sync to Supabase staff_accounts table
+      // 2. Sync to Supabase staff_accounts table
       await dbSyncService.saveStaffAccount(newStaff);
 
-      // 2. Update local state and localStorage
+      // 3. Update local state and localStorage
       if (setStaffAccounts) {
         setStaffAccounts((prev) => [newStaff, ...(prev || [])]);
       }
@@ -130,6 +145,37 @@ export const MasterAdminDashboard = () => {
       setProvError(err.message || 'Failed to create user account.');
     } finally {
       setIsSubmittingProv(false);
+    }
+  };
+
+  const handleDeleteTenantConfirm = async () => {
+    if (!tenantToDelete) return;
+    if (tenantToDelete.tenantId === 'TEN-TESTING-SHOP') {
+      setDeleteTenantError('The default demo shop (TEN-TESTING-SHOP) cannot be deleted as it is required for baseline system demonstration.');
+      return;
+    }
+
+    setIsDeletingTenant(true);
+    setDeleteTenantError('');
+    try {
+      if (typeof deleteTenant === 'function') {
+        await deleteTenant(tenantToDelete.tenantId);
+      } else {
+        await dbSyncService.deleteTenant(tenantToDelete.tenantId);
+        if (setTenantsList) setTenantsList((prev) => prev.filter((t) => t.tenantId !== tenantToDelete.tenantId));
+        if (setStaffAccounts) setStaffAccounts((prev) => prev.filter((s) => s.tenantId !== tenantToDelete.tenantId));
+      }
+
+      setDeleteTenantSuccess(`Tenant shop "${tenantToDelete.shopName}" (${tenantToDelete.tenantId}) and its associated staff records were successfully deleted.`);
+      setTimeout(() => {
+        setIsDeleteModalOpen(false);
+        setTenantToDelete(null);
+        setDeleteTenantSuccess('');
+      }, 1300);
+    } catch (err) {
+      setDeleteTenantError(err.message || 'Failed to delete tenant.');
+    } finally {
+      setIsDeletingTenant(false);
     }
   };
 
@@ -583,6 +629,29 @@ export const MasterAdminDashboard = () => {
                         >
                           Login as Admin
                         </button>
+
+                        {/* Delete Tenant Action */}
+                        {tenant.tenantId !== 'TEN-TESTING-SHOP' && (
+                          <button
+                            onClick={() => {
+                              setDeleteTenantError('');
+                              setDeleteTenantSuccess('');
+                              setTenantToDelete(tenant);
+                              setIsDeleteModalOpen(true);
+                            }}
+                            className="btn btn-outline master-action-btn-danger"
+                            style={{
+                              fontSize: '11px',
+                              padding: '0.3rem 0.6rem',
+                              backgroundColor: '#fef2f2',
+                              color: '#dc2626',
+                              borderColor: '#fca5a5'
+                            }}
+                            title="Permanently delete this pharmacy client and its records"
+                          >
+                            <Trash2 size={13} /> Delete
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -613,6 +682,87 @@ export const MasterAdminDashboard = () => {
           tenant={activeDetailsTenant}
           onClose={() => setActiveDetailsTenant(null)}
         />
+      )}
+
+      {/* DELETE TENANT CONFIRMATION MODAL */}
+      {isDeleteModalOpen && tenantToDelete && (
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.65)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, padding: '1rem', fontFamily: 'var(--font-sans)' }}>
+          <div className="card" style={{ width: '100%', maxWidth: '520px', backgroundColor: '#ffffff', borderRadius: '20px', padding: '1.75rem', boxShadow: '0 25px 50px -12px rgba(15, 23, 42, 0.35)', border: '1px solid #fecdd3' }}>
+            <div className="flex-between" style={{ marginBottom: '1.25rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                <div style={{ width: '40px', height: '40px', borderRadius: '12px', backgroundColor: '#ffe4e6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Trash2 size={22} color="#e11d48" />
+                </div>
+                <div>
+                  <h3 style={{ fontSize: '17px', fontWeight: 800, color: '#9f1239', margin: 0 }}>Delete Client Tenant Shop</h3>
+                  <p style={{ fontSize: '11.5px', color: '#64748b', margin: '0.15rem 0 0' }}>Permanently remove pharmacy subscription & all linked staff accounts</p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  if (!isDeletingTenant) setIsDeleteModalOpen(false);
+                }}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', padding: '0.25rem' }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {deleteTenantSuccess ? (
+              <div style={{ padding: '1.25rem', backgroundColor: '#f0fdf4', border: '1px solid #86efac', borderRadius: '14px', marginBottom: '1rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#166534', fontWeight: 700, fontSize: '13px' }}>
+                  <CheckCircle2 size={18} color="#16a34a" /> {deleteTenantSuccess}
+                </div>
+              </div>
+            ) : (
+              <div>
+                {deleteTenantError && (
+                  <div style={{ padding: '0.75rem 1rem', backgroundColor: '#fef2f2', border: '1px solid #fca5a5', borderRadius: '10px', color: '#b91c1c', fontSize: '12px', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <AlertCircle size={16} /> {deleteTenantError}
+                  </div>
+                )}
+
+                <div style={{ padding: '1rem', backgroundColor: '#fff1f2', border: '1px solid #fecdd3', borderRadius: '12px', marginBottom: '1.25rem' }}>
+                  <div style={{ fontSize: '13px', fontWeight: 700, color: '#9f1239', marginBottom: '0.35rem' }}>
+                    Confirm deletion of pharmacy store:
+                  </div>
+                  <div style={{ fontSize: '14px', fontWeight: 800, color: '#0f172a', fontFamily: 'var(--font-mono)' }}>
+                    {tenantToDelete.shopName} (#{tenantToDelete.tenantId})
+                  </div>
+                  <div style={{ fontSize: '11.5px', color: '#64748b', marginTop: '0.25rem' }}>
+                    Owner: {tenantToDelete.ownerName || 'N/A'} • City: {tenantToDelete.city || 'N/A'} • Scope: {tenantToDelete.subscribedSystemScope}
+                  </div>
+                </div>
+
+                <div style={{ padding: '0.85rem 1rem', backgroundColor: '#fffbeb', border: '1px solid #fef08a', borderRadius: '12px', fontSize: '11.5px', color: '#854d0e', marginBottom: '1.25rem', lineHeight: '1.5' }}>
+                  ⚠️ <strong>Warning:</strong> This will delete this tenant from the cloud database and remove all staff credentials associated with it. This action cannot be undone.
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.65rem' }}>
+                  <button
+                    type="button"
+                    disabled={isDeletingTenant}
+                    onClick={() => setIsDeleteModalOpen(false)}
+                    className="btn btn-outline"
+                    style={{ fontSize: '12px', padding: '0.6rem 1.25rem' }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isDeletingTenant}
+                    onClick={handleDeleteTenantConfirm}
+                    className="btn btn-primary"
+                    style={{ fontSize: '12px', padding: '0.6rem 1.4rem', backgroundColor: '#e11d48', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
+                  >
+                    {isDeletingTenant ? <RefreshCw size={14} className="spin" /> : <Trash2 size={14} />}
+                    <span>{isDeletingTenant ? 'Deleting Tenant...' : 'Yes, Delete Tenant'}</span>
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
       )}
 
       {/* USER PROVISIONING WITH TEMPORARY PASSWORD MODAL */}

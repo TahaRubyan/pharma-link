@@ -804,5 +804,22 @@ button, input, select, textarea {
   transform: translateY(1px) scale(0.96);
 }
 
+.master-action-btn-danger {
+  transition: all 0.15s ease !important;
+}
+
+.master-action-btn-danger:hover {
+  background-color: #fee2e2 !important;
+  border-color: #f87171 !important;
+  color: #b91c1c !important;
+  transform: translateY(-1px);
+  box-shadow: 0 3px 8px rgba(220, 38, 38, 0.22);
+}
+
+.master-action-btn-danger:active {
+  transform: translateY(1px) scale(0.96);
+}
+
+
 
 
