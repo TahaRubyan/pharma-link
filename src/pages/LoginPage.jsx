@@ -18,7 +18,7 @@ import { hashPassword, verifyPassword } from '../utils/cryptoUtils';
 import { dbSyncService } from '../services/dbSyncService';
 
 export const LoginPage = ({ onLoginSuccess }) => {
-  const { loginAsSuperAdmin, loginAsClientUser, staffAccounts = [], setStaffAccounts } = useAuth();
+  const { loginAsSuperAdmin, loginAsClientUser, staffAccounts = [], setStaffAccounts, tenantsList = [] } = useAuth();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
@@ -119,6 +119,42 @@ export const LoginPage = ({ onLoginSuccess }) => {
 
           loginAsClientUser(staffTenantId, staffRole, staffMode);
           onLoginSuccess('CLIENT_USER', staffTenantId, staffMode, staffRole, targetScreen);
+          return;
+        }
+      }
+    }
+
+    // 4. Dynamic check against onboarded pharmacy tenants (for instant admin login & mandatory first-time password setup)
+    for (const t of (tenantsList || [])) {
+      const tu = (t.adminUsername || '').toLowerCase().replace(/\s+/g, '');
+      if (tu && tu === cleanUser) {
+        const storedPass = t.tempPassword || t.password;
+        const passMatch = storedPass && (cleanPass === storedPass || (await verifyPassword(cleanPass, storedPass)));
+        if (passMatch) {
+          const tenantMode = t.subscribedSystemScope === 'RETAIL_ONLY' ? 'RETAIL' : (t.subscribedSystemScope === 'WHOLESALE_ONLY' ? 'WHOLESALE' : 'HYBRID');
+          const targetScreen = 'dashboard';
+          if (t.isTempPassword || t.mustChangePassword) {
+            setPendingUserSession({
+              staffRecord: {
+                id: `STAFF-ADMIN-${t.tenantId}`,
+                tenantId: t.tenantId,
+                name: t.ownerName || `${t.shopName} Admin`,
+                username: t.adminUsername,
+                role: 'Admin',
+                status: 'Active',
+                storeMode: tenantMode,
+                mustChangePassword: true
+              },
+              staffTenantId: t.tenantId,
+              staffRole: 'Admin',
+              staffMode: tenantMode,
+              targetScreen
+            });
+            setIsFirstLoginModalOpen(true);
+            return;
+          }
+          loginAsClientUser(t.tenantId, 'Admin', tenantMode);
+          onLoginSuccess('CLIENT_USER', t.tenantId, tenantMode, 'Admin', targetScreen);
           return;
         }
       }
@@ -387,7 +423,7 @@ export const LoginPage = ({ onLoginSuccess }) => {
             <div style={{ position: 'relative' }}>
               <input
                 type="text"
-                placeholder="e.g. masteradmin (Super Admin) or staff username"
+                placeholder="your username"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 style={{
@@ -435,7 +471,7 @@ export const LoginPage = ({ onLoginSuccess }) => {
             <div style={{ position: 'relative' }}>
               <input
                 type={showPassword ? 'text' : 'password'}
-                placeholder="••••••••"
+                placeholder="your password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 style={{

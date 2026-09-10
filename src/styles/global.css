@@ -560,4 +560,249 @@ button, input, select, textarea {
   }
 }
 
+/* ==========================================================================
+   MASTER ADMIN DASHBOARD - HOVER & ACTIVE MICRO-INTERACTIONS
+   ========================================================================== */
+
+/* Universal Card Hover Utility */
+.card-hover {
+  transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1),
+              box-shadow 0.22s cubic-bezier(0.16, 1, 0.3, 1),
+              border-color 0.2s ease;
+}
+
+.card-hover:hover {
+  transform: translateY(-2.5px);
+  box-shadow: 0 10px 22px -5px rgba(15, 23, 42, 0.09), 0 4px 6px -2px rgba(15, 23, 42, 0.04);
+}
+
+.card-hover:active {
+  transform: translateY(-0.5px) scale(0.997);
+}
+
+/* Master Admin Executive Metric & KPI Cards */
+.master-kpi-card {
+  transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1),
+              box-shadow 0.22s cubic-bezier(0.16, 1, 0.3, 1),
+              border-color 0.2s ease,
+              background-color 0.2s ease;
+  cursor: pointer;
+  user-select: none;
+  position: relative;
+}
+
+.master-kpi-card:hover {
+  transform: translateY(-3.5px);
+  box-shadow: 0 14px 28px -6px rgba(2, 132, 199, 0.18), 0 4px 8px -2px rgba(15, 23, 42, 0.06);
+  border-color: #38bdf8 !important;
+}
+
+.master-kpi-card:active {
+  transform: translateY(-1px) scale(0.99);
+  box-shadow: 0 6px 14px -3px rgba(2, 132, 199, 0.22);
+}
+
+/* Master Header Primary Action Button (Onboard Client) */
+.master-btn-primary {
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.master-btn-primary:hover {
+  background-color: #1e293b !important;
+  box-shadow: 0 6px 16px -3px rgba(15, 23, 42, 0.32);
+  transform: translateY(-1.5px);
+}
+
+.master-btn-primary:active {
+  transform: translateY(1px) scale(0.97);
+  box-shadow: 0 2px 4px rgba(15, 23, 42, 0.2);
+}
+
+/* Master Header Secondary Action Button (Create User / Staff) */
+.master-btn-secondary {
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+.master-btn-secondary:hover {
+  background-color: #f0f9ff !important;
+  border-color: #0284c7 !important;
+  color: #0284c7 !important;
+  box-shadow: 0 4px 14px -2px rgba(2, 132, 199, 0.22);
+  transform: translateY(-1.5px);
+}
+
+.master-btn-secondary:active {
+  transform: translateY(1px) scale(0.97);
+  background-color: #e0f2fe !important;
+}
+
+/* Master Danger (Clear/Reset System Data) Button */
+.master-btn-danger {
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+.master-btn-danger:hover {
+  background-color: #b91c1c !important;
+  box-shadow: 0 6px 18px -3px rgba(220, 38, 38, 0.4);
+  transform: translateY(-1.5px);
+}
+
+.master-btn-danger:active {
+  transform: translateY(1px) scale(0.97);
+  box-shadow: 0 2px 4px rgba(220, 38, 38, 0.25);
+}
+
+/* Master Super Admin Logout Button */
+.master-btn-logout {
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+.master-btn-logout:hover {
+  background-color: #fee2e2 !important;
+  border-color: #f87171 !important;
+  box-shadow: 0 4px 12px -2px rgba(239, 68, 68, 0.22);
+  transform: translateY(-1.5px);
+}
+
+.master-btn-logout:active {
+  transform: translateY(1px) scale(0.97);
+}
+
+/* Quick Bar Button */
+.master-quickbar-btn {
+  transition: all 0.15s ease !important;
+}
+
+.master-quickbar-btn:hover {
+  background-color: #fee2e2 !important;
+  border-color: #f87171 !important;
+  transform: translateY(-1px);
+  box-shadow: 0 3px 8px rgba(220, 38, 38, 0.18);
+}
+
+.master-quickbar-btn:active {
+  transform: translateY(1px) scale(0.96);
+}
+
+/* Month Filter Selector */
+.master-filter-select {
+  transition: all 0.18s ease;
+}
+
+.master-filter-select:hover {
+  border-color: #0284c7 !important;
+  box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.12);
+}
+
+.master-filter-select:focus {
+  border-color: #0284c7 !important;
+  box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.22);
+}
+
+/* Filter Reset Button */
+.master-filter-reset {
+  transition: all 0.15s ease;
+}
+
+.master-filter-reset:hover {
+  background-color: #f1f5f9 !important;
+  border-color: #94a3b8 !important;
+  transform: translateY(-1px);
+}
+
+.master-filter-reset:active {
+  transform: translateY(1px) scale(0.96);
+}
+
+/* Search Bar Input in Master Admin */
+.master-search-input {
+  transition: all 0.2s ease !important;
+}
+
+.master-search-input:hover {
+  border-color: #94a3b8 !important;
+}
+
+.master-search-input:focus {
+  border-color: #0284c7 !important;
+  box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.18) !important;
+}
+
+/* Master Tenant Table Rows */
+.master-tenant-row {
+  transition: background-color 0.18s ease;
+}
+
+.master-tenant-row:hover {
+  background-color: #f8fafc !important;
+}
+
+/* Table Row Action Buttons */
+.master-action-btn-neutral {
+  transition: all 0.15s ease !important;
+}
+
+.master-action-btn-neutral:hover {
+  background-color: #f1f5f9 !important;
+  border-color: #64748b !important;
+  color: #0f172a !important;
+  transform: translateY(-1px);
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.08);
+}
+
+.master-action-btn-neutral:active {
+  transform: translateY(1px) scale(0.96);
+}
+
+.master-action-btn-success {
+  transition: all 0.15s ease !important;
+}
+
+.master-action-btn-success:hover {
+  background-color: #d1fae5 !important;
+  border-color: #34d399 !important;
+  color: #065f46 !important;
+  transform: translateY(-1px);
+  box-shadow: 0 3px 8px rgba(16, 185, 129, 0.24);
+}
+
+.master-action-btn-success:active {
+  transform: translateY(1px) scale(0.96);
+}
+
+.master-action-btn-inspect {
+  transition: all 0.15s ease !important;
+}
+
+.master-action-btn-inspect:hover {
+  background-color: #e0f2fe !important;
+  border-color: #38bdf8 !important;
+  color: #0284c7 !important;
+  transform: translateY(-1px);
+  box-shadow: 0 3px 8px rgba(2, 132, 199, 0.22);
+}
+
+.master-action-btn-inspect:active {
+  transform: translateY(1px) scale(0.96);
+}
+
+.master-action-btn-admin {
+  transition: all 0.15s ease !important;
+}
+
+.master-action-btn-admin:hover {
+  background-color: #1e293b !important;
+  color: #ffffff !important;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.28);
+}
+
+.master-action-btn-admin:active {
+  transform: translateY(1px) scale(0.96);
+}
+
+
 

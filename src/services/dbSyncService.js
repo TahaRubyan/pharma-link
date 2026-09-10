@@ -306,13 +306,14 @@ export const dbSyncService = {
   // -------------------------------------------------------------
   // 4. STAFF ACCOUNTS
   // -------------------------------------------------------------
-  async fetchStaffAccounts(tenantId = 'TEN-TESTING-SHOP') {
+  async fetchStaffAccounts(tenantId = null) {
     if (!isSupabaseConfigured || !supabase) return null;
     try {
-      const { data, error } = await supabase
-        .from('staff_accounts')
-        .select('*')
-        .eq('tenant_id', tenantId);
+      let query = supabase.from('staff_accounts').select('*');
+      if (tenantId) {
+        query = query.eq('tenant_id', tenantId);
+      }
+      const { data, error } = await query;
 
       if (error) return null;
       if (data && data.length > 0) {

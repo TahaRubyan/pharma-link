@@ -214,7 +214,7 @@ export const MasterAdminDashboard = () => {
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
           <button
             onClick={() => setIsOnboardModalOpen(true)}
-            className="btn btn-primary"
+            className="btn btn-primary master-btn-primary"
             style={{ borderRadius: '12px', fontSize: '12px', padding: '0.65rem 1.15rem', backgroundColor: '#111827' }}
           >
             <Plus size={16} /> Onboard New Client Shop
@@ -223,7 +223,7 @@ export const MasterAdminDashboard = () => {
           {/* User Provisioning Button */}
           <button
             onClick={handleOpenProvisionModal}
-            className="btn btn-outline"
+            className="btn btn-outline master-btn-secondary"
             style={{
               borderRadius: '12px',
               fontSize: '12px',
@@ -250,6 +250,7 @@ export const MasterAdminDashboard = () => {
               setResetError('');
               setIsResetModalOpen(true);
             }}
+            className="master-btn-danger"
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -262,14 +263,7 @@ export const MasterAdminDashboard = () => {
               color: '#ffffff',
               border: 'none',
               cursor: 'pointer',
-              boxShadow: '0 2px 4px rgba(220, 38, 38, 0.25)',
-              transition: 'all 0.15s ease'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = '#b91c1c';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = '#dc2626';
+              boxShadow: '0 2px 4px rgba(220, 38, 38, 0.25)'
             }}
             title="Reset system operational data across Wholesale & Retail in 1 click for demo readiness"
           >
@@ -280,6 +274,7 @@ export const MasterAdminDashboard = () => {
           {/* Dedicated Super Admin Logout Button */}
           <button
             onClick={logout}
+            className="master-btn-logout"
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -292,16 +287,7 @@ export const MasterAdminDashboard = () => {
               color: '#b91c1c',
               border: '1px solid #fca5a5',
               cursor: 'pointer',
-              boxShadow: '0 1px 2px rgba(220, 38, 38, 0.05)',
-              transition: 'all 0.15s ease'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = '#fee2e2';
-              e.currentTarget.style.borderColor = '#f87171';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = '#fef2f2';
-              e.currentTarget.style.borderColor = '#fca5a5';
+              boxShadow: '0 1px 2px rgba(220, 38, 38, 0.05)'
             }}
             title="Sign out of Super Admin command center and return to login"
           >
@@ -329,6 +315,7 @@ export const MasterAdminDashboard = () => {
               setResetError('');
               setIsResetModalOpen(true);
             }}
+            className="master-quickbar-btn"
             style={{ fontSize: '11.5px', padding: '0.45rem 0.9rem', borderRadius: '8px', border: '1px solid #fca5a5', backgroundColor: '#fef2f2', color: '#b91c1c', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.35rem' }}
           >
             <RotateCcw size={13} /> Clear System Data (0 Records)
@@ -354,6 +341,7 @@ export const MasterAdminDashboard = () => {
           <select
             value={selectedMonthFilter}
             onChange={(e) => setSelectedMonthFilter(e.target.value)}
+            className="master-filter-select"
             style={{
               padding: '0.45rem 0.85rem',
               borderRadius: '10px',
@@ -375,7 +363,7 @@ export const MasterAdminDashboard = () => {
           {selectedMonthFilter !== 'ALL_TIME' && (
             <button
               onClick={() => setSelectedMonthFilter('ALL_TIME')}
-              className="btn btn-outline"
+              className="btn btn-outline master-filter-reset"
               style={{ fontSize: '11px', padding: '0.35rem 0.65rem', borderRadius: '8px' }}
             >
               Reset Filter
@@ -403,7 +391,7 @@ export const MasterAdminDashboard = () => {
 
       {/* EXECUTIVE SAAS METRIC CARDS (Dynamically updated by Month Filter) */}
       <div className="grid-4">
-        <div className="card card-hover" style={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0' }}>
+        <div className="card card-hover master-kpi-card" style={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0' }}>
           <div className="flex-between" style={{ marginBottom: '0.5rem' }}>
             <span className="subtext" style={{ fontWeight: 600, textTransform: 'uppercase' }}>
               {selectedMonthFilter === 'ALL_TIME' ? 'Subscribed Clients' : 'Onboarded In Month'}
@@ -418,7 +406,7 @@ export const MasterAdminDashboard = () => {
           </div>
         </div>
 
-        <div className="card card-hover" style={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0' }}>
+        <div className="card card-hover master-kpi-card" style={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0' }}>
           <div className="flex-between" style={{ marginBottom: '0.5rem' }}>
             <span className="subtext" style={{ fontWeight: 600, textTransform: 'uppercase' }}>
               {selectedMonthFilter === 'ALL_TIME' ? 'Total SaaS Revenue' : 'Revenue In Month'}
@@ -433,7 +421,7 @@ export const MasterAdminDashboard = () => {
           </div>
         </div>
 
-        <div className="card card-hover" style={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0' }}>
+        <div className="card card-hover master-kpi-card" style={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0' }}>
           <div className="flex-between" style={{ marginBottom: '0.5rem' }}>
             <span className="subtext" style={{ fontWeight: 600, textTransform: 'uppercase' }}>Monthly Receivables</span>
             <Clock size={18} color="#111827" />
@@ -446,7 +434,7 @@ export const MasterAdminDashboard = () => {
           </div>
         </div>
 
-        <div className="card card-hover" style={{ backgroundColor: overdueTenants.length > 0 ? '#fffbe0' : '#ffffff', borderColor: overdueTenants.length > 0 ? '#fde68a' : '#e2e8f0' }}>
+        <div className="card card-hover master-kpi-card" style={{ backgroundColor: overdueTenants.length > 0 ? '#fffbe0' : '#ffffff', borderColor: overdueTenants.length > 0 ? '#fde68a' : '#e2e8f0' }}>
           <div className="flex-between" style={{ marginBottom: '0.5rem' }}>
             <span className="subtext" style={{ fontWeight: 700, color: overdueTenants.length > 0 ? '#b45309' : '#9ca3af', textTransform: 'uppercase' }}>Overdue Follow-ups</span>
             <AlertTriangle size={18} color={overdueTenants.length > 0 ? '#b45309' : '#9ca3af'} />
@@ -477,6 +465,7 @@ export const MasterAdminDashboard = () => {
               placeholder="Search Shop Name, Owner, Tenant ID, or City..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
+              className="master-search-input"
               style={{ width: '100%', padding: '0.55rem 0.75rem 0.55rem 2.3rem', borderRadius: '12px', border: '1px solid #cbd5e1', fontSize: '12px', outline: 'none' }}
             />
           </div>
@@ -506,7 +495,7 @@ export const MasterAdminDashboard = () => {
                 </tr>
               ) : (
                 displayedTenants.map((tenant) => (
-                  <tr key={tenant.tenantId}>
+                  <tr key={tenant.tenantId} className="master-tenant-row">
                     <td style={{ fontWeight: 700, fontFamily: 'var(--font-mono)' }}>
                       #{tenant.tenantId}
                     </td>
@@ -558,7 +547,7 @@ export const MasterAdminDashboard = () => {
                         {/* Shop Details Action */}
                         <button
                           onClick={() => setActiveDetailsTenant(tenant)}
-                          className="btn btn-outline"
+                          className="btn btn-outline master-action-btn-neutral"
                           style={{ fontSize: '11px', padding: '0.3rem 0.6rem' }}
                           title="Show overall shop details, licensing & payment ledger"
                         >
@@ -568,7 +557,7 @@ export const MasterAdminDashboard = () => {
                         {/* Log Payment Button */}
                         <button
                           onClick={() => setActivePaymentTenant(tenant)}
-                          className="btn btn-outline"
+                          className="btn btn-outline master-action-btn-success"
                           style={{ fontSize: '11px', padding: '0.3rem 0.6rem', backgroundColor: '#ecfdf5', color: '#047857', borderColor: '#a7f3d0' }}
                           title="Record client monthly payment"
                         >
@@ -578,7 +567,7 @@ export const MasterAdminDashboard = () => {
                         {/* Inspect Client Shop Button */}
                         <button
                           onClick={() => handleInspect(tenant.tenantId)}
-                          className="btn btn-outline"
+                          className="btn btn-outline master-action-btn-inspect"
                           style={{ fontSize: '11px', padding: '0.3rem 0.6rem' }}
                           title="Inspect client store in read-only mode"
                         >
@@ -588,7 +577,7 @@ export const MasterAdminDashboard = () => {
                         {/* Login Test Action */}
                         <button
                           onClick={() => loginAsClientUser(tenant.tenantId, 'Admin')}
-                          className="btn btn-primary"
+                          className="btn btn-primary master-action-btn-admin"
                           style={{ fontSize: '11px', padding: '0.3rem 0.65rem', backgroundColor: '#111827' }}
                           title="Log in as Client Admin for this shop"
                         >

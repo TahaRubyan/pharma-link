@@ -169,13 +169,12 @@ export const AuthProvider = ({ children }) => {
     return [];
   });
 
-  // Cloud sync staff accounts from Supabase
+  // Cloud sync staff accounts from Supabase (fetches provisioned staff across tenants for unified login access)
   useEffect(() => {
     let isMounted = true;
     const loadCloudStaff = async () => {
       try {
-        const tenantId = currentShop?.shopId || 'TEN-TESTING-SHOP';
-        const cloudStaff = await dbSyncService.fetchStaffAccounts(tenantId);
+        const cloudStaff = await dbSyncService.fetchStaffAccounts();
         if (isMounted && cloudStaff && cloudStaff.length > 0) {
           setStaffAccounts((prev) => {
             const map = new Map();
@@ -192,7 +191,7 @@ export const AuthProvider = ({ children }) => {
     return () => {
       isMounted = false;
     };
-  }, [currentShop?.shopId]);
+  }, []);
 
   useEffect(() => {
     localStorage.setItem('medistore_account_type', userAccountType);
@@ -345,6 +344,22 @@ export const AuthProvider = ({ children }) => {
     };
 
     setTenantsList((prev) => [newTenant, ...prev]);
+
+    // Provision default Admin staff account for this tenant with temporary password
+    const cleanAdminUser = (newTenant.adminUsername || '').toLowerCase().replace(/\s+/g, '');
+    const initialAdminStaff = {
+      id: `STAFF-ADMIN-${newTenantId}`,
+      tenantId: newTenantId,
+      name: newTenant.ownerName || `${newTenant.shopName} Admin`,
+      username: cleanAdminUser,
+      password: tempPass,
+      role: 'Admin',
+      status: 'Active',
+      storeMode: newTenant.subscribedSystemScope === 'RETAIL_ONLY' ? 'RETAIL' : (newTenant.subscribedSystemScope === 'WHOLESALE_ONLY' ? 'WHOLESALE' : 'HYBRID'),
+      mustChangePassword: true,
+    };
+    setStaffAccounts((prev) => [initialAdminStaff, ...(prev || [])]);
+    dbSyncService.saveStaffAccount(initialAdminStaff).catch((e) => console.warn('Sync new tenant staff warning:', e));
 
     const newPaymentLog = {
       id: `PAY-${Date.now().toString().slice(-4)}`,
