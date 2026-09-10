@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { INITIAL_MEDICINES, INITIAL_BATCHES, INITIAL_VENDOR_RETURNS } from '../data/mockData';
 import { AuthContext, useAuth } from './AuthContext';
 import { storageManager } from '../services/storageManager';
@@ -65,17 +65,67 @@ export const InventoryProvider = ({ children }) => {
     }
   };
 
+  const activeTenantId = auth?.currentShop?.shopId || 'TEN-TESTING-SHOP';
+  const prevTenantRef = useRef(activeTenantId);
+
+  // Synchronize inventory when switching between different pharmacy tenant shops
   useEffect(() => {
-    storageManager.safeSetItem('pharmalink_pk_medicines', wholesaleMedicines);
+    if (prevTenantRef.current !== activeTenantId) {
+      prevTenantRef.current = activeTenantId;
+
+      if (activeTenantId === 'TEN-TESTING-SHOP') {
+        const savedWs = storageManager.safeGetItem('pharmalink_pk_medicines', INITIAL_MEDICINES);
+        const savedRet = storageManager.safeGetItem('pharmalink_retail_medicines', INITIAL_MEDICINES);
+        setWholesaleMedicines(savedWs || []);
+        setRetailMedicines(savedRet || []);
+
+        const savedWsBatches = storageManager.safeGetItem('pharmalink_pk_batches', INITIAL_BATCHES);
+        const savedRetBatches = storageManager.safeGetItem('pharmalink_retail_batches', INITIAL_BATCHES);
+        setWholesaleBatches(savedWsBatches || []);
+        setRetailBatches(savedRetBatches || []);
+      } else {
+        // Clean-slate tenant isolation: load tenant's specific local store (defaults to empty [] for blank new shops)
+        const wsKey = `pharmalink_${activeTenantId}_wholesale_medicines`;
+        const retKey = `pharmalink_${activeTenantId}_retail_medicines`;
+        const savedWs = storageManager.safeGetItem(wsKey, []);
+        const savedRet = storageManager.safeGetItem(retKey, []);
+        setWholesaleMedicines(savedWs || []);
+        setRetailMedicines(savedRet || []);
+
+        const wsBatchKey = `pharmalink_${activeTenantId}_wholesale_batches`;
+        const retBatchKey = `pharmalink_${activeTenantId}_retail_batches`;
+        const savedWsBatches = storageManager.safeGetItem(wsBatchKey, []);
+        const savedRetBatches = storageManager.safeGetItem(retBatchKey, []);
+        setWholesaleBatches(savedWsBatches || []);
+        setRetailBatches(savedRetBatches || []);
+      }
+
+      // Fetch cloud records for this tenant from Supabase
+      dbSyncService.fetchMedicines(activeTenantId).then((cloudMeds) => {
+        if (cloudMeds && Array.isArray(cloudMeds)) {
+          if (isRetail) {
+            setRetailMedicines(cloudMeds);
+          } else {
+            setWholesaleMedicines(cloudMeds);
+          }
+        }
+      }).catch(() => {});
+    }
+  }, [activeTenantId, isRetail]);
+
+  useEffect(() => {
     const tenantId = auth?.currentShop?.shopId || 'TEN-TESTING-SHOP';
+    const key = tenantId === 'TEN-TESTING-SHOP' ? 'pharmalink_pk_medicines' : `pharmalink_${tenantId}_wholesale_medicines`;
+    storageManager.safeSetItem(key, wholesaleMedicines);
     if (wholesaleMedicines.length > 0) {
       dbSyncService.syncMedicinesUpstream(tenantId, wholesaleMedicines).catch(() => {});
     }
   }, [wholesaleMedicines, auth?.currentShop?.shopId]);
 
   useEffect(() => {
-    storageManager.safeSetItem('pharmalink_retail_medicines', retailMedicines);
     const tenantId = auth?.currentShop?.shopId || 'TEN-TESTING-SHOP';
+    const key = tenantId === 'TEN-TESTING-SHOP' ? 'pharmalink_retail_medicines' : `pharmalink_${tenantId}_retail_medicines`;
+    storageManager.safeSetItem(key, retailMedicines);
     if (retailMedicines.length > 0) {
       dbSyncService.syncMedicinesUpstream(tenantId, retailMedicines).catch(() => {});
     }
@@ -137,12 +187,16 @@ export const InventoryProvider = ({ children }) => {
   };
 
   useEffect(() => {
-    storageManager.safeSetItem('pharmalink_pk_batches', wholesaleBatches);
-  }, [wholesaleBatches]);
+    const tenantId = auth?.currentShop?.shopId || 'TEN-TESTING-SHOP';
+    const key = tenantId === 'TEN-TESTING-SHOP' ? 'pharmalink_pk_batches' : `pharmalink_${tenantId}_wholesale_batches`;
+    storageManager.safeSetItem(key, wholesaleBatches);
+  }, [wholesaleBatches, auth?.currentShop?.shopId]);
 
   useEffect(() => {
-    storageManager.safeSetItem('pharmalink_retail_batches', retailBatches);
-  }, [retailBatches]);
+    const tenantId = auth?.currentShop?.shopId || 'TEN-TESTING-SHOP';
+    const key = tenantId === 'TEN-TESTING-SHOP' ? 'pharmalink_retail_batches' : `pharmalink_${tenantId}_retail_batches`;
+    storageManager.safeSetItem(key, retailBatches);
+  }, [retailBatches, auth?.currentShop?.shopId]);
 
   // Wholesale & Retail Vendor Returns
   const [wholesaleVendorReturns, setWholesaleVendorReturns] = useState(() => {

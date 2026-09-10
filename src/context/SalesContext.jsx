@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { INITIAL_INVOICES } from '../data/mockData';
 import { AuthContext, useAuth } from './AuthContext';
 import { storageManager } from '../services/storageManager';
@@ -46,13 +46,38 @@ export const SalesProvider = ({ children }) => {
     else setWholesaleInvoices(updater);
   };
 
-  useEffect(() => {
-    storageManager.safeSetItem('pharmalink_pk_invoices', wholesaleInvoices);
-  }, [wholesaleInvoices]);
+  const activeTenantId = auth?.currentShop?.shopId || 'TEN-TESTING-SHOP';
+  const prevTenantRef = useRef(activeTenantId);
 
   useEffect(() => {
-    storageManager.safeSetItem('pharmalink_retail_invoices', retailInvoices);
-  }, [retailInvoices]);
+    if (prevTenantRef.current !== activeTenantId) {
+      prevTenantRef.current = activeTenantId;
+
+      if (activeTenantId === 'TEN-TESTING-SHOP') {
+        const savedWs = storageManager.safeGetItem('pharmalink_pk_invoices', INITIAL_INVOICES);
+        const savedRet = storageManager.safeGetItem('pharmalink_retail_invoices', INITIAL_INVOICES);
+        setWholesaleInvoices(savedWs || []);
+        setRetailInvoices(savedRet || []);
+      } else {
+        const wsKey = `pharmalink_${activeTenantId}_wholesale_invoices`;
+        const retKey = `pharmalink_${activeTenantId}_retail_invoices`;
+        const savedWs = storageManager.safeGetItem(wsKey, []);
+        const savedRet = storageManager.safeGetItem(retKey, []);
+        setWholesaleInvoices(savedWs || []);
+        setRetailInvoices(savedRet || []);
+      }
+    }
+  }, [activeTenantId]);
+
+  useEffect(() => {
+    const key = activeTenantId === 'TEN-TESTING-SHOP' ? 'pharmalink_pk_invoices' : `pharmalink_${activeTenantId}_wholesale_invoices`;
+    storageManager.safeSetItem(key, wholesaleInvoices);
+  }, [wholesaleInvoices, activeTenantId]);
+
+  useEffect(() => {
+    const key = activeTenantId === 'TEN-TESTING-SHOP' ? 'pharmalink_retail_invoices' : `pharmalink_${activeTenantId}_retail_invoices`;
+    storageManager.safeSetItem(key, retailInvoices);
+  }, [retailInvoices, activeTenantId]);
 
   const [wholesaleReturns, setWholesaleReturns] = useState(() => {
     const saved = localStorage.getItem('pharmalink_pk_returns');

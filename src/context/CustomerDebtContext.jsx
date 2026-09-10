@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { INITIAL_DEBT_CUSTOMERS } from '../data/mockData';
 import { AuthContext, useAuth } from './AuthContext';
 
@@ -42,13 +42,42 @@ export const CustomerDebtProvider = ({ children }) => {
     else setWholesaleDebtCustomers(updater);
   };
 
-  useEffect(() => {
-    localStorage.setItem('pharmalink_debt_customers', JSON.stringify(wholesaleDebtCustomers));
-  }, [wholesaleDebtCustomers]);
+  const activeTenantId = auth?.currentShop?.shopId || 'TEN-TESTING-SHOP';
+  const prevTenantRef = useRef(activeTenantId);
 
   useEffect(() => {
-    localStorage.setItem('pharmalink_retail_debt_customers', JSON.stringify(retailDebtCustomers));
-  }, [retailDebtCustomers]);
+    if (prevTenantRef.current !== activeTenantId) {
+      prevTenantRef.current = activeTenantId;
+
+      if (activeTenantId === 'TEN-TESTING-SHOP') {
+        try {
+          const savedWs = localStorage.getItem('pharmalink_debt_customers');
+          const savedRet = localStorage.getItem('pharmalink_retail_debt_customers');
+          setWholesaleDebtCustomers(savedWs ? JSON.parse(savedWs) : INITIAL_DEBT_CUSTOMERS);
+          setRetailDebtCustomers(savedRet ? JSON.parse(savedRet) : INITIAL_DEBT_CUSTOMERS);
+        } catch (e) {}
+      } else {
+        try {
+          const wsKey = `pharmalink_${activeTenantId}_wholesale_customers`;
+          const retKey = `pharmalink_${activeTenantId}_retail_customers`;
+          const savedWs = localStorage.getItem(wsKey);
+          const savedRet = localStorage.getItem(retKey);
+          setWholesaleDebtCustomers(savedWs ? JSON.parse(savedWs) : []);
+          setRetailDebtCustomers(savedRet ? JSON.parse(savedRet) : []);
+        } catch (e) {}
+      }
+    }
+  }, [activeTenantId]);
+
+  useEffect(() => {
+    const key = activeTenantId === 'TEN-TESTING-SHOP' ? 'pharmalink_debt_customers' : `pharmalink_${activeTenantId}_wholesale_customers`;
+    localStorage.setItem(key, JSON.stringify(wholesaleDebtCustomers));
+  }, [wholesaleDebtCustomers, activeTenantId]);
+
+  useEffect(() => {
+    const key = activeTenantId === 'TEN-TESTING-SHOP' ? 'pharmalink_retail_debt_customers' : `pharmalink_${activeTenantId}_retail_customers`;
+    localStorage.setItem(key, JSON.stringify(retailDebtCustomers));
+  }, [retailDebtCustomers, activeTenantId]);
 
   // Register a new customer for credit/debt khata
   const addDebtCustomer = (customerData) => {

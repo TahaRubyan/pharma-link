@@ -66,6 +66,29 @@ const DEFAULT_ROLES = [
 
 const INITIAL_TENANTS = [
   {
+    tenantId: 'TEN-IDREES-PHARMA',
+    shopName: 'Idrees Pharma Distributor',
+    ownerName: 'Muhammad Idrees',
+    phone: '0300-5551234',
+    form20: 'DL-20-IDR-101',
+    form21: 'DL-21-IDR-101',
+    gstin: '3277876174588',
+    ntn: '4442705-8',
+    city: 'Lahore',
+    address: 'Wholesale Medicine Market, Circular Road, Lahore, Pakistan',
+    subscribedSystemScope: 'HYBRID_BOTH',
+    setupFeePaid: 50000,
+    monthlyFee: 5000,
+    subscriptionStatus: 'Active',
+    lastPaymentDate: '10-09-2026',
+    nextDueDate: '10-10-2026',
+    adminUsername: 'idrees.distributor',
+    password: 'idrees123',
+    tempPassword: 'idrees123',
+    isTempPassword: false,
+    createdDate: '10-09-2026',
+  },
+  {
     tenantId: 'TEN-TESTING-SHOP',
     shopName: 'Testing Shop',
     ownerName: 'Testing Administrator',
@@ -88,6 +111,21 @@ const INITIAL_TENANTS = [
   }
 ];
 
+const DEFAULT_STAFF_ACCOUNTS = [
+  {
+    id: 'STAFF-IDREES-ADMIN',
+    tenantId: 'TEN-IDREES-PHARMA',
+    name: 'Muhammad Idrees',
+    username: 'idrees.distributor',
+    password: 'idrees123',
+    role: 'Admin',
+    status: 'Active',
+    storeMode: 'HYBRID',
+    title: 'Store Administrator',
+    mustChangePassword: false,
+  }
+];
+
 const INITIAL_CLIENT_PAYMENT_LOGS = [];
 
 export const AuthProvider = ({ children }) => {
@@ -98,15 +136,20 @@ export const AuthProvider = ({ children }) => {
   const [inspectingTenantId, setInspectingTenantId] = useState(null);
 
   const [tenantsList, setTenantsList] = useState(() => {
+    const map = new Map();
+    INITIAL_TENANTS.forEach((t) => map.set(t.tenantId, t));
     const saved = localStorage.getItem('medistore_tenants_list');
     if (saved) {
       try {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          parsed.forEach((t) => map.set(t.tenantId, { ...(map.get(t.tenantId) || {}), ...t }));
+        }
       } catch (e) {
         console.error('Failed to parse saved tenants list', e);
       }
     }
-    return INITIAL_TENANTS;
+    return Array.from(map.values());
   });
 
   const [clientPaymentLogs, setClientPaymentLogs] = useState(() => {
@@ -158,15 +201,20 @@ export const AuthProvider = ({ children }) => {
   });
 
   const [staffAccounts, setStaffAccounts] = useState(() => {
+    const map = new Map();
+    DEFAULT_STAFF_ACCOUNTS.forEach((s) => map.set(s.id, s));
     const savedStaff = localStorage.getItem('pharmalink_staff_accounts');
     if (savedStaff) {
       try {
-        return JSON.parse(savedStaff);
+        const parsed = JSON.parse(savedStaff);
+        if (Array.isArray(parsed)) {
+          parsed.forEach((s) => map.set(s.id, { ...(map.get(s.id) || {}), ...s }));
+        }
       } catch (e) {
         console.error('Failed to parse saved staff accounts', e);
       }
     }
-    return [];
+    return Array.from(map.values());
   });
 
   // Cloud sync tenants & staff accounts from Supabase (unified cross-device SaaS registry)

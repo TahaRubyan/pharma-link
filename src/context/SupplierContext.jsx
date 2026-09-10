@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { INITIAL_SUPPLIERS, INITIAL_PURCHASE_ORDERS } from '../data/mockData';
 import { AuthContext, useAuth } from './AuthContext';
 import { dbSyncService } from '../services/dbSyncService';
@@ -45,17 +45,54 @@ export const SupplierProvider = ({ children }) => {
     else setWholesaleSuppliers(updater);
   };
 
+  const activeTenantId = auth?.currentShop?.shopId || 'TEN-TESTING-SHOP';
+  const prevTenantRef = useRef(activeTenantId);
+
   useEffect(() => {
-    try {
-      localStorage.setItem('pharmalink_pk_suppliers', JSON.stringify(wholesaleSuppliers));
-    } catch (e) {}
-  }, [wholesaleSuppliers]);
+    if (prevTenantRef.current !== activeTenantId) {
+      prevTenantRef.current = activeTenantId;
+
+      if (activeTenantId === 'TEN-TESTING-SHOP') {
+        const savedWs = localStorage.getItem('pharmalink_pk_suppliers');
+        const savedRet = localStorage.getItem('pharmalink_retail_suppliers');
+        setWholesaleSuppliers(savedWs ? JSON.parse(savedWs) : INITIAL_SUPPLIERS);
+        setRetailSuppliers(savedRet ? JSON.parse(savedRet) : INITIAL_SUPPLIERS);
+
+        const savedWsPO = localStorage.getItem('pharmalink_pk_purchase_orders');
+        const savedRetPO = localStorage.getItem('pharmalink_retail_purchase_orders');
+        setWholesalePurchaseOrders(savedWsPO ? JSON.parse(savedWsPO) : INITIAL_PURCHASE_ORDERS);
+        setRetailPurchaseOrders(savedRetPO ? JSON.parse(savedRetPO) : INITIAL_PURCHASE_ORDERS);
+      } else {
+        const wsKey = `pharmalink_${activeTenantId}_wholesale_suppliers`;
+        const retKey = `pharmalink_${activeTenantId}_retail_suppliers`;
+        const savedWs = localStorage.getItem(wsKey);
+        const savedRet = localStorage.getItem(retKey);
+        setWholesaleSuppliers(savedWs ? JSON.parse(savedWs) : []);
+        setRetailSuppliers(savedRet ? JSON.parse(savedRet) : []);
+
+        const wsPOKey = `pharmalink_${activeTenantId}_wholesale_purchase_orders`;
+        const retPOKey = `pharmalink_${activeTenantId}_retail_purchase_orders`;
+        const savedWsPO = localStorage.getItem(wsPOKey);
+        const savedRetPO = localStorage.getItem(retPOKey);
+        setWholesalePurchaseOrders(savedWsPO ? JSON.parse(savedWsPO) : []);
+        setRetailPurchaseOrders(savedRetPO ? JSON.parse(savedRetPO) : []);
+      }
+    }
+  }, [activeTenantId]);
 
   useEffect(() => {
     try {
-      localStorage.setItem('pharmalink_retail_suppliers', JSON.stringify(retailSuppliers));
+      const key = activeTenantId === 'TEN-TESTING-SHOP' ? 'pharmalink_pk_suppliers' : `pharmalink_${activeTenantId}_wholesale_suppliers`;
+      localStorage.setItem(key, JSON.stringify(wholesaleSuppliers));
     } catch (e) {}
-  }, [retailSuppliers]);
+  }, [wholesaleSuppliers, activeTenantId]);
+
+  useEffect(() => {
+    try {
+      const key = activeTenantId === 'TEN-TESTING-SHOP' ? 'pharmalink_retail_suppliers' : `pharmalink_${activeTenantId}_retail_suppliers`;
+      localStorage.setItem(key, JSON.stringify(retailSuppliers));
+    } catch (e) {}
+  }, [retailSuppliers, activeTenantId]);
 
   const [wholesalePurchaseOrders, setWholesalePurchaseOrders] = useState(() => {
     const isCleared = typeof localStorage !== 'undefined' && localStorage.getItem('pharmalink_wholesale_cleared') === 'true';
