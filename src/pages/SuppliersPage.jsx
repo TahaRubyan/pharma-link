@@ -17,6 +17,7 @@ import NewPOModal from '../components/modals/NewPOModal';
 import RetailNewPOModal from '../components/modals/RetailNewPOModal';
 import SupplierPaymentModal from '../components/modals/SupplierPaymentModal';
 import SupplierLedgerModal from '../components/modals/SupplierLedgerModal';
+import POInvoiceModal from '../components/modals/POInvoiceModal';
 
 export const SuppliersPage = () => {
   const { suppliers = [], purchaseOrders = [] } = useSupplier();
@@ -32,6 +33,7 @@ export const SuppliersPage = () => {
   const [isRetailPOOpen, setIsRetailPOOpen] = useState(false);
   const [selectedSupplierForPay, setSelectedSupplierForPay] = useState(null);
   const [selectedSupplierForLedger, setSelectedSupplierForLedger] = useState(null);
+  const [selectedPOForInvoice, setSelectedPOForInvoice] = useState(null);
 
   const filteredSuppliers = useMemo(() => {
     return suppliers.filter((s) => {
@@ -230,6 +232,7 @@ export const SuppliersPage = () => {
                   <th style={{ textAlign: 'right' }}>Total Cost</th>
                   <th style={{ textAlign: 'center' }}>Payment Status</th>
                   <th style={{ textAlign: 'center' }}>Stock Status</th>
+                  <th style={{ textAlign: 'center' }}>Invoice Voucher</th>
                 </tr>
               </thead>
               <tbody>
@@ -248,6 +251,29 @@ export const SuppliersPage = () => {
                     <td style={{ textAlign: 'center' }}>
                       <span className="badge badge-otc">{po.stockStatus || 'Stock Received'}</span>
                     </td>
+                    <td style={{ textAlign: 'center' }}>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedPOForInvoice(po)}
+                        className="btn btn-outline"
+                        style={{
+                          fontSize: '10px',
+                          padding: '0.25rem 0.55rem',
+                          borderRadius: '6px',
+                          color: '#0284c7',
+                          borderColor: '#bae6fd',
+                          backgroundColor: '#f0f9ff',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '0.3rem',
+                          fontWeight: 700,
+                          cursor: 'pointer'
+                        }}
+                        title="View & Print Inward PO Invoice"
+                      >
+                        <FileText size={11} /> PO Invoice
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -257,6 +283,14 @@ export const SuppliersPage = () => {
       </div>
 
       {/* MODALS */}
+      {selectedPOForInvoice && (
+        <POInvoiceModal
+          isOpen={Boolean(selectedPOForInvoice)}
+          po={selectedPOForInvoice}
+          onClose={() => setSelectedPOForInvoice(null)}
+        />
+      )}
+
       {isRTVOpen && (
         <RTVModal
           isOpen={isRTVOpen}

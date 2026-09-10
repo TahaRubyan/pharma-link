@@ -407,6 +407,7 @@ export const dbSyncService = {
       return {
         tenantId: t.tenant_id,
         shopName: t.shop_name,
+        description: t.description || '',
         ownerName: t.owner_name,
         phone: t.phone,
         city: t.city,
@@ -416,8 +417,11 @@ export const dbSyncService = {
         dlNumber: t.dl_number,
         form20: t.form20,
         form21: t.form21,
+        mode: t.mode,
         subscribedSystemScope: t.mode === 'RETAIL' ? 'RETAIL_ONLY' : (t.mode === 'WHOLESALE' ? 'WHOLESALE_ONLY' : 'HYBRID_BOTH'),
         subscriptionStatus: t.subscription_status || 'Active',
+        setupFeePaid: Number(t.setup_fee_paid || 0),
+        monthlyFee: Number(t.monthly_fee || 0),
         createdDate: t.created_at ? new Date(t.created_at).toLocaleDateString('en-GB').replace(/\//g, '-') : '28-08-2026',
       };
     } catch (e) {
@@ -432,6 +436,7 @@ export const dbSyncService = {
       const row = {
         tenant_id: tenant.tenantId || tenant.shopId,
         shop_name: tenant.shopName,
+        description: tenant.description || '',
         owner_name: tenant.ownerName || '',
         phone: tenant.phone || '',
         city: tenant.city || 'Islamabad',
@@ -442,6 +447,8 @@ export const dbSyncService = {
         form20: tenant.form20 || null,
         form21: tenant.form21 || null,
         mode: tenant.subscribedSystemScope === 'RETAIL_ONLY' ? 'RETAIL' : (tenant.subscribedSystemScope === 'WHOLESALE_ONLY' ? 'WHOLESALE' : 'HYBRID'),
+        setup_fee_paid: Number(tenant.setupFeePaid || 0),
+        monthly_fee: Number(tenant.monthlyFee || 0),
         subscription_status: tenant.subscriptionStatus || 'Active',
         updated_at: new Date().toISOString(),
       };

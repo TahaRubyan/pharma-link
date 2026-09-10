@@ -27,6 +27,11 @@ export const ShopDetailsModal = ({ tenant, onClose }) => {
             <h3 className="section-title" style={{ fontSize: '18px', margin: 0 }}>
               {tenant.shopName} <span style={{ fontSize: '13px', color: '#9ca3af', fontWeight: 600 }}>(#{tenant.tenantId})</span>
             </h3>
+            {tenant.description && (
+              <div style={{ fontSize: '12px', color: '#0284c7', fontWeight: 600, marginTop: '0.15rem' }}>
+                {tenant.description}
+              </div>
+            )}
             <div style={{ fontSize: '12px', color: '#64748B', marginTop: '0.15rem' }}>
               Owner: <strong>{tenant.ownerName}</strong> • {tenant.city || 'Islamabad'}, Pakistan
             </div>

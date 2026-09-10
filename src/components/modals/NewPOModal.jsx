@@ -59,10 +59,14 @@ export const NewPOModal = ({ isOpen, onClose }) => {
       expiryDate: '',
       inwardBoxes: '',
       purchaseCost: '',
-      sellingMrp: '',
-      shelfLocation: 'Rack A-01',
+      itemDiscount: '',
+      shelfLocation: '',
     },
   ]);
+
+  // Whole-Bill Discount State (PKR Flat or Percentage)
+  const [billDiscountType, setBillDiscountType] = useState('FIXED'); // 'FIXED' | 'PERCENT'
+  const [billDiscount, setBillDiscount] = useState('');
 
   // Dedicated Distributor Tax Input States (As Billed by Seller on Invoice)
   const [distributorSalesTaxType, setDistributorSalesTaxType] = useState('18'); // '0' | '18' | '19' | 'CUSTOM'
@@ -152,25 +156,39 @@ export const NewPOModal = ({ isOpen, onClose }) => {
         expiryDate: '',
         inwardBoxes: '',
         purchaseCost: '',
-        sellingMrp: '',
-        shelfLocation: 'Rack A-01',
+        itemDiscount: '',
+        shelfLocation: '',
       },
     ]);
+  };
+
+  const formatExpiryInput = (val) => {
+    let clean = val.replace(/[^\d-]/g, '');
+    if (clean.includes('-')) {
+      const parts = clean.split('-');
+      if (parts[0].length > 2) parts[0] = parts[0].slice(0, 2);
+      if (parts[1] && parts[1].length > 4) parts[1] = parts[1].slice(0, 4);
+      return parts.join('-');
+    }
+    if (clean.length > 2) {
+      return `${clean.slice(0, 2)}-${clean.slice(2, 6)}`;
+    }
+    return clean;
   };
 
   const handleItemChange = (idx, field, val) => {
     setItems((prev) =>
       prev.map((item, i) => {
         if (i === idx) {
-          const updated = { ...item, [field]: val };
-          // If selecting known medicine name, auto-fill generic and previous prices
+          const formattedVal = field === 'expiryDate' ? formatExpiryInput(val) : val;
+          const updated = { ...item, [field]: formattedVal };
+          // If selecting known medicine name, auto-fill generic and previous purchase cost
           if (field === 'tradeName') {
             const matchedMed = medicines.find(m => (m.name || m.brandName || '').toLowerCase() === val.toLowerCase());
             if (matchedMed) {
               updated.itemCode = matchedMed.itemCode || matchedMed.id || updated.itemCode;
               updated.genericFormula = matchedMed.formula || matchedMed.genericFormula || updated.genericFormula;
               updated.purchaseCost = String(matchedMed.purchaseCost || matchedMed.purchasePriceBox || updated.purchaseCost);
-              updated.sellingMrp = String(matchedMed.boxSellingPrice || matchedMed.boxPrice || matchedMed.price || updated.sellingMrp);
               updated.shelfLocation = matchedMed.rackLocation || updated.shelfLocation;
             }
           }
@@ -203,23 +221,57 @@ export const NewPOModal = ({ isOpen, onClose }) => {
     return 0.5;
   }, [distributorAdvTaxType, customAdvTaxRate]);
 
-  // Base Goods Value (Sum of boxes * purchase cost)
+  // Base Goods Value (Sum of boxes * purchase cost before discount)
   const grossBaseCost = useMemo(() => {
     return items.reduce((sum, item) => sum + (Number(item.inwardBoxes) || 0) * (Number(item.purchaseCost) || 0), 0);
   }, [items]);
 
-  // Tax amounts matching seller's invoice
+  // Total Item-Level Discounts
+  const totalItemDiscounts = useMemo(() => {
+    return items.reduce((sum, it) => {
+      const lineBase = (Number(it.inwardBoxes) || 0) * (Number(it.purchaseCost) || 0);
+      const disc = Math.min(lineBase, Math.max(0, Number(it.itemDiscount) || 0));
+      return sum + disc;
+    }, 0);
+  }, [items]);
+
+  // Goods Value after item discounts
+  const subtotalAfterItemDiscounts = useMemo(() => {
+    return Math.max(0, grossBaseCost - totalItemDiscounts);
+  }, [grossBaseCost, totalItemDiscounts]);
+
+  // Whole-Bill Discount Amount
+  const billDiscountAmount = useMemo(() => {
+    const val = Number(billDiscount) || 0;
+    if (val <= 0) return 0;
+    if (billDiscountType === 'PERCENT') {
+      return Math.round((subtotalAfterItemDiscounts * (Math.min(100, val) / 100) + Number.EPSILON) * 100) / 100;
+    }
+    return Math.min(subtotalAfterItemDiscounts, val);
+  }, [billDiscount, billDiscountType, subtotalAfterItemDiscounts]);
+
+  // Total Discount on entire PO
+  const totalDiscountLogged = useMemo(() => {
+    return Math.round((totalItemDiscounts + billDiscountAmount + Number.EPSILON) * 100) / 100;
+  }, [totalItemDiscounts, billDiscountAmount]);
+
+  // Net Taxable Goods Value (post all discounts)
+  const netGoodsValue = useMemo(() => {
+    return Math.max(0, subtotalAfterItemDiscounts - billDiscountAmount);
+  }, [subtotalAfterItemDiscounts, billDiscountAmount]);
+
+  // Tax amounts matching seller's invoice (calculated on net goods value)
   const salesTaxAmount = useMemo(() => {
-    return Math.round((grossBaseCost * (activeSalesTaxRate / 100) + Number.EPSILON) * 100) / 100;
-  }, [grossBaseCost, activeSalesTaxRate]);
+    return Math.round((netGoodsValue * (activeSalesTaxRate / 100) + Number.EPSILON) * 100) / 100;
+  }, [netGoodsValue, activeSalesTaxRate]);
 
   const advTaxAmount = useMemo(() => {
-    return Math.round((grossBaseCost * (activeAdvTaxRate / 100) + Number.EPSILON) * 100) / 100;
-  }, [grossBaseCost, activeAdvTaxRate]);
+    return Math.round((netGoodsValue * (activeAdvTaxRate / 100) + Number.EPSILON) * 100) / 100;
+  }, [netGoodsValue, activeAdvTaxRate]);
 
   const totalPoCost = useMemo(() => {
-    return Math.round((grossBaseCost + salesTaxAmount + advTaxAmount + Number.EPSILON) * 100) / 100;
-  }, [grossBaseCost, salesTaxAmount, advTaxAmount]);
+    return Math.round((netGoodsValue + salesTaxAmount + advTaxAmount + Number.EPSILON) * 100) / 100;
+  }, [netGoodsValue, salesTaxAmount, advTaxAmount]);
 
   const totalBoxesCount = useMemo(() => {
     return items.reduce((sum, item) => sum + (Number(item.inwardBoxes) || 0), 0);
@@ -255,6 +307,7 @@ export const NewPOModal = ({ isOpen, onClose }) => {
     e.preventDefault();
 
     const poRecord = {
+      id: `PO-${Date.now()}`,
       poNumber: poCode,
       poReference: poCode,
       supplierName: selectedDistributor,
@@ -264,21 +317,40 @@ export const NewPOModal = ({ isOpen, onClose }) => {
       inwardDate,
       challanNo,
       itemLines: items.map((i) => `${i.tradeName} (${i.inwardBoxes} Boxes)`).join(', '),
-      items: items.map((it) => ({
-        ...it,
-        itemCode: it.itemCode?.trim() || '',
-        boxCost: Number(it.purchaseCost) || 0,
-        boxMrp: Number(it.sellingMrp) || 0,
-        shelfLocation: it.shelfLocation?.trim() || 'Rack A-01',
-      })),
-      subtotal: grossBaseCost,
+      items: items.map((it) => {
+        const lineBase = (Number(it.inwardBoxes) || 0) * (Number(it.purchaseCost) || 0);
+        const itemDisc = Math.min(lineBase, Math.max(0, Number(it.itemDiscount) || 0));
+        return {
+          ...it,
+          itemCode: it.itemCode?.trim() || '',
+          tradeName: it.tradeName?.trim() || '',
+          genericFormula: it.genericFormula?.trim() || '',
+          batchNo: it.batchNo?.trim() || '',
+          expiryDate: it.expiryDate?.trim() || '',
+          inwardBoxes: Number(it.inwardBoxes) || 0,
+          quantity: Number(it.inwardBoxes) || 0,
+          purchaseCost: Number(it.purchaseCost) || 0,
+          boxCost: Number(it.purchaseCost) || 0,
+          itemDiscount: itemDisc,
+          lineTotal: Math.max(0, lineBase - itemDisc),
+          shelfLocation: it.shelfLocation?.trim() || '',
+        };
+      }),
       grossCost: grossBaseCost,
+      subtotal: grossBaseCost,
+      itemDiscountsTotal: totalItemDiscounts,
+      billDiscount: billDiscountAmount,
+      billDiscountType,
+      totalDiscount: totalDiscountLogged,
+      discount: totalDiscountLogged,
+      netGoodsValue,
       salesTaxRate: activeSalesTaxRate,
       salesTaxAmount: salesTaxAmount,
       advTaxRate: activeAdvTaxRate,
       advTaxAmount: advTaxAmount,
       inputTax: salesTaxAmount + advTaxAmount,
       totalAmount: totalPoCost,
+      totalCost: totalPoCost,
       paymentStatus,
       paymentMode,
       amountPaid: Number(amountPaid) || 0,
@@ -299,7 +371,8 @@ export const NewPOModal = ({ isOpen, onClose }) => {
       boxes: totalBoxesCount,
       medicinesCount: items.length,
       supplier: selectedDistributor,
-      cost: totalPoCost
+      cost: totalPoCost,
+      totalDiscount: totalDiscountLogged
     });
     setIsSuccessAnimated(true);
   };
@@ -631,22 +704,24 @@ export const NewPOModal = ({ isOpen, onClose }) => {
               <table className="table" style={{ fontSize: '11px' }}>
                 <thead>
                   <tr>
-                    <th>Item Code</th>
+                    <th style={{ width: '80px' }}>Item Code</th>
                     <th>Medicine Trade Name *</th>
-                    <th>Generic Formula</th>
-                    <th>Batch Lot *</th>
-                    <th>Expiry *</th>
+                    <th style={{ minWidth: '100px' }}>Formula (Optional)</th>
+                    <th style={{ width: '85px' }}>Batch Lot *</th>
+                    <th style={{ width: '90px' }}>Expiry (MM-YYYY) *</th>
                     <th style={{ width: '80px' }}>Inward Boxes *</th>
-                    <th style={{ width: '90px' }}>Cost / Box *</th>
-                    <th style={{ width: '90px' }}>MRP / Box</th>
-                    <th>Shelf</th>
-                    <th>Total (PKR)</th>
-                    <th style={{ width: '40px', textAlign: 'center' }}></th>
+                    <th style={{ width: '85px' }}>Cost / Box *</th>
+                    <th style={{ width: '85px' }}>Item Disc (Rs)</th>
+                    <th style={{ width: '85px' }}>Shelf (Optional)</th>
+                    <th style={{ width: '95px', textAlign: 'right' }}>Total (PKR)</th>
+                    <th style={{ width: '35px', textAlign: 'center' }}></th>
                   </tr>
                 </thead>
                 <tbody>
                   {items.map((it, idx) => {
-                    const lineTotal = (Number(it.inwardBoxes) || 0) * (Number(it.purchaseCost) || 0);
+                    const lineBase = (Number(it.inwardBoxes) || 0) * (Number(it.purchaseCost) || 0);
+                    const itemDisc = Math.min(lineBase, Math.max(0, Number(it.itemDiscount) || 0));
+                    const lineTotal = Math.max(0, lineBase - itemDisc);
 
                     return (
                       <tr key={idx}>
@@ -656,7 +731,7 @@ export const NewPOModal = ({ isOpen, onClose }) => {
                             placeholder="e.g. 1001"
                             value={it.itemCode}
                             onChange={(e) => handleItemChange(idx, 'itemCode', e.target.value)}
-                            style={{ width: '70px', padding: '0.35rem 0.5rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '11px', fontFamily: 'var(--font-mono)' }}
+                            style={{ width: '75px', padding: '0.35rem 0.5rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '11px', fontFamily: 'var(--font-mono)' }}
                           />
                         </td>
                         <td>
@@ -672,7 +747,7 @@ export const NewPOModal = ({ isOpen, onClose }) => {
                         <td>
                           <input
                             type="text"
-                            placeholder="Formula"
+                            placeholder="Formula (Opt)"
                             value={it.genericFormula}
                             onChange={(e) => handleItemChange(idx, 'genericFormula', e.target.value)}
                             style={{ width: '100%', minWidth: '100px', padding: '0.35rem 0.5rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '11px' }}
@@ -691,11 +766,11 @@ export const NewPOModal = ({ isOpen, onClose }) => {
                         <td>
                           <input
                             type="text"
-                            placeholder="12-2028"
+                            placeholder="MM-YYYY"
                             value={it.expiryDate}
                             onChange={(e) => handleItemChange(idx, 'expiryDate', e.target.value)}
                             style={{
-                              width: '80px',
+                              width: '85px',
                               padding: '0.35rem 0.5rem',
                               borderRadius: '6px',
                               border: (it.expiryDate && typeof isExpiryWithin6Months === 'function' && isExpiryWithin6Months(it.expiryDate))
@@ -704,7 +779,8 @@ export const NewPOModal = ({ isOpen, onClose }) => {
                               backgroundColor: (it.expiryDate && typeof isExpiryWithin6Months === 'function' && isExpiryWithin6Months(it.expiryDate))
                                 ? '#fef2f2'
                                 : '#ffffff',
-                              fontSize: '11px'
+                              fontSize: '11px',
+                              fontFamily: 'var(--font-mono)'
                             }}
                             required
                           />
@@ -739,17 +815,18 @@ export const NewPOModal = ({ isOpen, onClose }) => {
                         <td>
                           <input
                             type="number"
+                            min="0"
                             step="any"
-                            placeholder="MRP"
-                            value={it.sellingMrp}
-                            onChange={(e) => handleItemChange(idx, 'sellingMrp', e.target.value)}
+                            placeholder="Rs. 0"
+                            value={it.itemDiscount}
+                            onChange={(e) => handleItemChange(idx, 'itemDiscount', e.target.value)}
                             style={{ width: '75px', padding: '0.35rem 0.5rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '11px', textAlign: 'right' }}
                           />
                         </td>
                         <td>
                           <input
                             type="text"
-                            placeholder="Rack"
+                            placeholder="Shelf (Opt)"
                             value={it.shelfLocation}
                             onChange={(e) => handleItemChange(idx, 'shelfLocation', e.target.value)}
                             style={{ width: '75px', padding: '0.35rem 0.5rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '11px' }}
@@ -795,6 +872,92 @@ export const NewPOModal = ({ isOpen, onClose }) => {
                 </div>
               </div>
             )}
+
+            {/* WHOLE-BILL DISCOUNT PANEL */}
+            <div style={{
+              backgroundColor: '#f8fafc',
+              border: '1.5px solid #cbd5e1',
+              borderRadius: '12px',
+              padding: '0.85rem 1.15rem',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              gap: '0.75rem'
+            }}>
+              <div>
+                <div style={{ fontSize: '12.5px', fontWeight: 800, color: '#0f172a' }}>
+                  Whole-Bill Additional Discount
+                </div>
+                <div style={{ fontSize: '11px', color: '#64748b', marginTop: '0.15rem' }}>
+                  Gross Goods Value: <strong>PKR {grossBaseCost.toLocaleString('en-PK', { minimumFractionDigits: 2 })}</strong>
+                  {totalItemDiscounts > 0 && (
+                    <span> • Item Discounts: <strong style={{ color: '#dc2626' }}>- PKR {totalItemDiscounts.toLocaleString('en-PK', { minimumFractionDigits: 2 })}</strong></span>
+                  )}
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <div style={{ display: 'flex', backgroundColor: '#e2e8f0', padding: '0.15rem', borderRadius: '6px' }}>
+                  <button
+                    type="button"
+                    onClick={() => setBillDiscountType('FIXED')}
+                    style={{
+                      padding: '0.25rem 0.6rem',
+                      fontSize: '11px',
+                      fontWeight: 700,
+                      borderRadius: '4px',
+                      border: 'none',
+                      backgroundColor: billDiscountType === 'FIXED' ? '#0284c7' : 'transparent',
+                      color: billDiscountType === 'FIXED' ? '#ffffff' : '#475569',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    PKR (Rs)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setBillDiscountType('PERCENT')}
+                    style={{
+                      padding: '0.25rem 0.6rem',
+                      fontSize: '11px',
+                      fontWeight: 700,
+                      borderRadius: '4px',
+                      border: 'none',
+                      backgroundColor: billDiscountType === 'PERCENT' ? '#0284c7' : 'transparent',
+                      color: billDiscountType === 'PERCENT' ? '#ffffff' : '#475569',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Percent (%)
+                  </button>
+                </div>
+
+                <input
+                  type="number"
+                  min="0"
+                  step="any"
+                  placeholder={billDiscountType === 'PERCENT' ? 'e.g. 5%' : 'e.g. 2000'}
+                  value={billDiscount}
+                  onChange={(e) => setBillDiscount(e.target.value)}
+                  style={{
+                    width: '110px',
+                    padding: '0.35rem 0.6rem',
+                    borderRadius: '6px',
+                    border: '1px solid #cbd5e1',
+                    fontSize: '11.5px',
+                    fontWeight: 700,
+                    textAlign: 'right'
+                  }}
+                />
+
+                {billDiscountAmount > 0 && (
+                  <span style={{ fontSize: '11px', fontWeight: 800, color: '#dc2626' }}>
+                    - PKR {billDiscountAmount.toLocaleString('en-PK', { minimumFractionDigits: 2 })}
+                  </span>
+                )}
+              </div>
+            </div>
 
             {/* DEDICATED DISTRIBUTOR TAX ASSESSMENT PANEL (As Defined by Seller on Invoice) */}
             <div style={{
@@ -944,8 +1107,10 @@ export const NewPOModal = ({ isOpen, onClose }) => {
               }}>
                 <div>
                   <div style={{ fontSize: '11px', color: '#64748b' }}>
-                    Goods Value: <strong>PKR {grossBaseCost.toLocaleString('en-PK', { minimumFractionDigits: 2 })}</strong> | 
-                    Sales Tax ({activeSalesTaxRate}%): <strong>+ PKR {salesTaxAmount.toLocaleString('en-PK', { minimumFractionDigits: 2 })}</strong> | 
+                    Gross Goods: <strong>PKR {grossBaseCost.toLocaleString('en-PK', { minimumFractionDigits: 2 })}</strong> | 
+                    Discounts: <strong style={{ color: '#dc2626' }}>- PKR {totalDiscountLogged.toLocaleString('en-PK', { minimumFractionDigits: 2 })}</strong> | 
+                    Net Goods: <strong>PKR {netGoodsValue.toLocaleString('en-PK', { minimumFractionDigits: 2 })}</strong> | 
+                    ST ({activeSalesTaxRate}%): <strong>+ PKR {salesTaxAmount.toLocaleString('en-PK', { minimumFractionDigits: 2 })}</strong> | 
                     Adv Tax ({activeAdvTaxRate}%): <strong>+ PKR {advTaxAmount.toLocaleString('en-PK', { minimumFractionDigits: 2 })}</strong>
                   </div>
                   <div style={{ fontSize: '10px', color: '#0284c7', fontWeight: 600, marginTop: '0.15rem' }}>
@@ -1010,11 +1175,14 @@ export const NewPOModal = ({ isOpen, onClose }) => {
                 <div><strong>Manufacturer / Vendor:</strong> {selectedDistributor}</div>
                 <div><strong>PO Reference #:</strong> {poCode}</div>
                 <div><strong>Inward Date:</strong> {inwardDate}</div>
-                <div><strong>Goods Subtotal:</strong> PKR {grossBaseCost.toLocaleString('en-PK', { minimumFractionDigits: 2 })}</div>
+                <div><strong>Gross Goods:</strong> PKR {grossBaseCost.toLocaleString('en-PK', { minimumFractionDigits: 2 })}</div>
+                <div><strong>Total Discounts:</strong> <span style={{ color: '#dc2626', fontWeight: 700 }}>- PKR {totalDiscountLogged.toLocaleString('en-PK', { minimumFractionDigits: 2 })}</span></div>
+                <div><strong>Net Taxable Goods:</strong> PKR {netGoodsValue.toLocaleString('en-PK', { minimumFractionDigits: 2 })}</div>
                 <div><strong>Distributor ST ({activeSalesTaxRate}%):</strong> + PKR {salesTaxAmount.toLocaleString('en-PK', { minimumFractionDigits: 2 })}</div>
                 <div><strong>Distributor WHT ({activeAdvTaxRate}%):</strong> + PKR {advTaxAmount.toLocaleString('en-PK', { minimumFractionDigits: 2 })}</div>
-                <div style={{ gridColumn: '1 / -1', borderTop: '1px dashed #bae6fd', paddingTop: '0.4rem' }}>
-                  <strong>Total Payable as on Seller's Invoice:</strong> <strong style={{ color: '#0284c7', fontSize: '14px', fontFamily: 'var(--font-mono)' }}>PKR {totalPoCost.toLocaleString('en-PK', { minimumFractionDigits: 2 })}</strong>
+                <div style={{ gridColumn: '1 / -1', borderTop: '1px dashed #bae6fd', paddingTop: '0.4rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span><strong>Total Payable as on Seller's Invoice:</strong> <strong style={{ color: '#0284c7', fontSize: '15px', fontFamily: 'var(--font-mono)' }}>PKR {totalPoCost.toLocaleString('en-PK', { minimumFractionDigits: 2 })}</strong></span>
+                  <span style={{ fontSize: '11px', color: '#64748b' }}>Includes PKR {totalDiscountLogged.toLocaleString('en-PK', { minimumFractionDigits: 2 })} total discount savings</span>
                 </div>
               </div>
             </div>

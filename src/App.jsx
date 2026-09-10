@@ -243,7 +243,7 @@ function AppContent() {
       case 'fbr':
         return isCashier ? <POSPage storeMode={storeMode} /> : <FBRTaxPage />;
       case 'analytics':
-        return isCashier ? <POSPage storeMode={storeMode} /> : <AnalyticsPage />;
+        return <AnalyticsPage />;
       case 'settings':
         return isCashier ? <POSPage storeMode={storeMode} /> : <SettingsPage storeMode={storeMode} />;
       default:

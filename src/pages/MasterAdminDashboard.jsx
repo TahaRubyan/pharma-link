@@ -547,6 +547,9 @@ export const MasterAdminDashboard = () => {
                     </td>
                     <td>
                       <div style={{ fontWeight: 700, color: '#0f172a' }}>{tenant.shopName}</div>
+                      {tenant.description && (
+                        <div style={{ fontSize: '10.5px', color: '#0284c7', fontWeight: 600 }}>{tenant.description}</div>
+                      )}
                       <div style={{ fontSize: '11px', color: '#64748b' }}>Owner: {tenant.ownerName} (Form 20: {tenant.form20})</div>
                     </td>
                     <td>

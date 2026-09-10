@@ -68,6 +68,7 @@ const INITIAL_TENANTS = [
   {
     tenantId: 'TEN-IDREES-PHARMA',
     shopName: 'Idrees Pharma Distributor',
+    description: 'Wholesale Medicine Distributor & Bulk B2B Supply Hub',
     ownerName: 'Muhammad Idrees',
     phone: '0300-5551234',
     form20: 'DL-20-IDR-101',
@@ -76,9 +77,10 @@ const INITIAL_TENANTS = [
     ntn: '4442705-8',
     city: 'Lahore',
     address: 'Wholesale Medicine Market, Circular Road, Lahore, Pakistan',
-    subscribedSystemScope: 'HYBRID_BOTH',
-    setupFeePaid: 50000,
-    monthlyFee: 5000,
+    subscribedSystemScope: 'WHOLESALE_ONLY',
+    mode: 'WHOLESALE',
+    setupFeePaid: 0,
+    monthlyFee: 0,
     subscriptionStatus: 'Active',
     lastPaymentDate: '10-09-2026',
     nextDueDate: '10-10-2026',
@@ -91,6 +93,7 @@ const INITIAL_TENANTS = [
   {
     tenantId: 'TEN-TESTING-SHOP',
     shopName: 'Testing Shop',
+    description: 'Multi-Store Hybrid Pharmacy & Bulk Distribution Testbed',
     ownerName: 'Testing Administrator',
     phone: '0300-1234567',
     form20: 'TEST-DL-20-001',
@@ -100,8 +103,9 @@ const INITIAL_TENANTS = [
     city: 'Lahore',
     address: 'Main Commercial Market, Lahore',
     subscribedSystemScope: 'HYBRID_BOTH',
-    setupFeePaid: 50000,
-    monthlyFee: 5000,
+    mode: 'HYBRID',
+    setupFeePaid: 0,
+    monthlyFee: 0,
     subscriptionStatus: 'Active',
     lastPaymentDate: '01-09-2026',
     nextDueDate: '01-10-2026',
@@ -120,7 +124,7 @@ const DEFAULT_STAFF_ACCOUNTS = [
     password: 'idrees123',
     role: 'Admin',
     status: 'Active',
-    storeMode: 'HYBRID',
+    storeMode: 'WHOLESALE',
     title: 'Store Administrator',
     mustChangePassword: false,
   }
@@ -143,7 +147,18 @@ export const AuthProvider = ({ children }) => {
       try {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed)) {
-          parsed.forEach((t) => map.set(t.tenantId, { ...(map.get(t.tenantId) || {}), ...t }));
+          parsed.forEach((t) => {
+            const initial = map.get(t.tenantId) || {};
+            const merged = { ...initial, ...t };
+            if (t.tenantId === 'TEN-TESTING-SHOP' || t.tenantId === 'TEN-IDREES-PHARMA') {
+              merged.setupFeePaid = 0;
+              merged.monthlyFee = 0;
+              if (initial.subscribedSystemScope) merged.subscribedSystemScope = initial.subscribedSystemScope;
+              if (initial.description) merged.description = initial.description;
+              if (initial.mode) merged.mode = initial.mode;
+            }
+            map.set(t.tenantId, merged);
+          });
         }
       } catch (e) {
         console.error('Failed to parse saved tenants list', e);
@@ -380,15 +395,16 @@ export const AuthProvider = ({ children }) => {
     }
 
     // 2. Resolve System / Store Mode
-    const targetScope = activeTenant?.subscribedSystemScope || 'HYBRID_BOTH';
-    const resolvedMode = mode 
-      ? mode 
-      : (targetScope === 'RETAIL_ONLY' ? 'RETAIL' : (targetScope === 'WHOLESALE_ONLY' ? 'WHOLESALE' : 'HYBRID'));
+    const targetScope = activeTenant?.subscribedSystemScope || (activeTenant?.mode === 'WHOLESALE' ? 'WHOLESALE_ONLY' : 'HYBRID_BOTH');
+    const resolvedMode = targetScope === 'WHOLESALE_ONLY' || activeTenant?.mode === 'WHOLESALE'
+      ? 'WHOLESALE'
+      : (targetScope === 'RETAIL_ONLY' ? 'RETAIL' : (mode || 'HYBRID'));
 
     // 3. Build Fresh Shop Object strictly from the Active Tenant (NEVER contaminated by old shop state)
     const freshShop = {
       shopId: tenantId || activeTenant?.tenantId || 'TEN-TESTING-SHOP',
       shopName: activeTenant?.shopName || 'Testing Shop',
+      description: activeTenant?.description || '',
       ownerName: activeTenant?.ownerName || '',
       city: activeTenant?.city || 'Lahore',
       dlNumber: activeTenant?.dlNumber || (activeTenant?.form20 && activeTenant?.form21 ? `${activeTenant.form20} & ${activeTenant.form21}` : (activeTenant?.form20 || activeTenant?.form21 || 'TEST-DL-20-001')),

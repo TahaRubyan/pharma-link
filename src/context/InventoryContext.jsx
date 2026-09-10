@@ -356,7 +356,7 @@ export const InventoryProvider = ({ children }) => {
 
     inwardItems.forEach((item) => {
       const boxCost = Number(item.boxCost || item.purchasePriceBox || 400);
-      const boxMrp = Number(item.boxMrp || item.boxSellingPrice || item.boxPrice || 500);
+      const boxMrp = Number(item.boxMrp || item.boxSellingPrice || item.boxPrice || Math.round(boxCost * 1.15) || 500);
       const boxesCount = Number(item.inwardBoxes || item.quantity || 1);
       const stripsPerBox = Number(item.stripsPerBox || 10);
       const tabletsPerStrip = Number(item.tabletsPerStrip || 10);

@@ -61,12 +61,14 @@ export const Sidebar = ({ currentScreen, onNavigate, storeMode, onSwitchMode }) 
 
   const activeNavItems = storeMode === 'RETAIL' ? RETAIL_NAV_ITEMS : WHOLESALE_NAV_ITEMS;
 
-  const visibleNavItems = activeNavItems.filter((item) => {
-    if (isCashier && item.requiresAdmin) {
-      return false;
-    }
-    return true;
-  });
+  // Cashier view must strictly contain: Dashboard, POS, Stock, Supplier PO, Sales Movement, Expiry Radar
+  const CASHIER_ALLOWED_IDS = ['dashboard', 'pos', 'inventory', 'suppliers', 'analytics', 'expiry'];
+
+  const visibleNavItems = isCashier
+    ? CASHIER_ALLOWED_IDS.map((id) => activeNavItems.find((item) => item.id === id)).filter(Boolean)
+    : activeNavItems;
+
+  const isHybridShop = (currentShop?.subscribedSystemScope === 'HYBRID_BOTH' || currentShop?.mode === 'HYBRID') && currentShop?.subscribedSystemScope !== 'WHOLESALE_ONLY';
 
   return (
     <aside style={{
@@ -129,10 +131,10 @@ export const Sidebar = ({ currentScreen, onNavigate, storeMode, onSwitchMode }) 
         </button>
       </div>
 
-      {/* Interactive Mode Switcher for Hybrid Shop */}
+      {/* Interactive Mode Switcher for Hybrid Shop Only */}
       {!isCollapsed && (
         <div style={{ padding: '0.65rem 1rem 0.35rem' }}>
-          {onSwitchMode ? (
+          {isHybridShop && !isCashier && onSwitchMode ? (
             <div style={{ display: 'flex', backgroundColor: '#f1f5f9', padding: '0.2rem', borderRadius: '8px', gap: '0.2rem' }}>
               <button
                 type="button"
@@ -181,12 +183,12 @@ export const Sidebar = ({ currentScreen, onNavigate, storeMode, onSwitchMode }) 
               alignItems: 'center',
               backgroundColor: storeMode === 'RETAIL' ? '#ecfdf5' : '#eff6ff',
               border: `1px solid ${storeMode === 'RETAIL' ? '#a7f3d0' : '#bfdbfe'}`,
-              padding: '0.3rem 0.65rem',
+              padding: '0.35rem 0.65rem',
               borderRadius: '8px',
-              justifyContent: 'space-between'
+              justifyContent: 'center'
             }}>
               <span style={{ fontSize: '9.5px', color: storeMode === 'RETAIL' ? '#047857' : '#1d4ed8', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                ● {storeMode === 'RETAIL' ? 'RETAIL COUNTER MODE' : 'WHOLESALE B2B'}
+                ● {storeMode === 'RETAIL' ? 'RETAIL COUNTER MODE' : 'WHOLESALE DISTRIBUTION'}
               </span>
             </div>
           )}
