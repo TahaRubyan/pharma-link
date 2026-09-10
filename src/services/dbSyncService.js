@@ -394,6 +394,38 @@ export const dbSyncService = {
     }
   },
 
+  async findTenantById(tenantId) {
+    if (!isSupabaseConfigured || !supabase || !tenantId) return null;
+    try {
+      const { data, error } = await supabase
+        .from('tenants')
+        .select('*')
+        .eq('tenant_id', tenantId)
+        .limit(1);
+      if (error || !data || data.length === 0) return null;
+      const t = data[0];
+      return {
+        tenantId: t.tenant_id,
+        shopName: t.shop_name,
+        ownerName: t.owner_name,
+        phone: t.phone,
+        city: t.city,
+        address: t.address,
+        ntn: t.ntn,
+        gstin: t.gstin,
+        dlNumber: t.dl_number,
+        form20: t.form20,
+        form21: t.form21,
+        subscribedSystemScope: t.mode === 'RETAIL' ? 'RETAIL_ONLY' : (t.mode === 'WHOLESALE' ? 'WHOLESALE_ONLY' : 'HYBRID_BOTH'),
+        subscriptionStatus: t.subscription_status || 'Active',
+        createdDate: t.created_at ? new Date(t.created_at).toLocaleDateString('en-GB').replace(/\//g, '-') : '28-08-2026',
+      };
+    } catch (e) {
+      console.warn('[dbSync] findTenantById warning:', e.message);
+      return null;
+    }
+  },
+
   async saveTenant(tenant) {
     if (!isSupabaseConfigured || !supabase || !tenant) return;
     try {

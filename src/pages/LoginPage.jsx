@@ -85,11 +85,32 @@ export const LoginPage = ({ onLoginSuccess }) => {
         : cleanPass === 'admin123';
 
       if (isTestingMatch) {
-        loginAsClientUser('TEN-TESTING-SHOP', 'Admin', 'HYBRID');
+        const testingTenant = (tenantsList || []).find((t) => t.tenantId === 'TEN-TESTING-SHOP') || {
+          tenantId: 'TEN-TESTING-SHOP',
+          shopName: 'Testing Shop',
+          ownerName: 'Testing Administrator',
+          city: 'Lahore',
+          address: 'Main Commercial Market, Lahore',
+          phone: '0300-1234567',
+          mode: 'HYBRID',
+          subscribedSystemScope: 'HYBRID_BOTH',
+        };
+        loginAsClientUser('TEN-TESTING-SHOP', 'Admin', 'HYBRID', testingTenant, { name: 'Testing Admin', username: 'testing.admin', role: 'Admin' });
         onLoginSuccess('CLIENT_USER', 'TEN-TESTING-SHOP', 'HYBRID', 'Admin', 'dashboard');
         return;
       }
     }
+
+    // Load available tenants early for accurate tenant association
+    let allTenants = [...(tenantsList || [])];
+    try {
+      const localTenants = JSON.parse(localStorage.getItem('medistore_tenants_list') || '[]');
+      localTenants.forEach((lt) => {
+        if (!allTenants.some((t) => t.tenantId === lt.tenantId)) {
+          allTenants.push(lt);
+        }
+      });
+    } catch (e) {}
 
     // 3. Dynamic check against provisioned staff accounts (Memory + LocalStorage)
     let allStaff = [...(staffAccounts || [])];
@@ -113,6 +134,7 @@ export const LoginPage = ({ onLoginSuccess }) => {
           const staffRole = s.role || 'Cashier';
           const staffTenantId = s.tenantId || 'TEN-TESTING-SHOP';
           const targetScreen = staffRole === 'Cashier' ? 'pos' : 'dashboard';
+          const matchingTenant = allTenants.find((t) => t.tenantId === staffTenantId) || null;
 
           // First-time login: if account was created with temporary password, force reset
           if (s.mustChangePassword) {
@@ -121,13 +143,14 @@ export const LoginPage = ({ onLoginSuccess }) => {
               staffTenantId,
               staffRole,
               staffMode,
-              targetScreen
+              targetScreen,
+              matchingTenant
             });
             setIsFirstLoginModalOpen(true);
             return;
           }
 
-          loginAsClientUser(staffTenantId, staffRole, staffMode);
+          loginAsClientUser(staffTenantId, staffRole, staffMode, matchingTenant, s);
           onLoginSuccess('CLIENT_USER', staffTenantId, staffMode, staffRole, targetScreen);
           return;
         }
@@ -135,16 +158,6 @@ export const LoginPage = ({ onLoginSuccess }) => {
     }
 
     // 4. Dynamic check against onboarded pharmacy tenants (Memory + LocalStorage)
-    let allTenants = [...(tenantsList || [])];
-    try {
-      const localTenants = JSON.parse(localStorage.getItem('medistore_tenants_list') || '[]');
-      localTenants.forEach((lt) => {
-        if (!allTenants.some((t) => t.tenantId === lt.tenantId)) {
-          allTenants.push(lt);
-        }
-      });
-    } catch (e) {}
-
     for (const t of allTenants) {
       const tu = (t.adminUsername || '').toLowerCase().replace(/\s+/g, '');
       const tid = (t.tenantId || '').toLowerCase().replace(/\s+/g, '');
@@ -169,12 +182,18 @@ export const LoginPage = ({ onLoginSuccess }) => {
               staffTenantId: t.tenantId,
               staffRole: 'Admin',
               staffMode: tenantMode,
-              targetScreen
+              targetScreen,
+              matchingTenant: t
             });
             setIsFirstLoginModalOpen(true);
             return;
           }
-          loginAsClientUser(t.tenantId, 'Admin', tenantMode);
+          loginAsClientUser(t.tenantId, 'Admin', tenantMode, t, {
+            name: t.ownerName || `${t.shopName} Admin`,
+            username: t.adminUsername || cleanUser,
+            role: 'Admin',
+            title: 'Store Administrator'
+          });
           onLoginSuccess('CLIENT_USER', t.tenantId, tenantMode, 'Admin', targetScreen);
           return;
         }
@@ -192,6 +211,10 @@ export const LoginPage = ({ onLoginSuccess }) => {
           const staffRole = s.role || 'Cashier';
           const staffTenantId = s.tenantId || 'TEN-TESTING-SHOP';
           const targetScreen = staffRole === 'Cashier' ? 'pos' : 'dashboard';
+          let cloudTenant = allTenants.find((t) => t.tenantId === staffTenantId);
+          if (!cloudTenant) {
+            cloudTenant = await dbSyncService.findTenantById(staffTenantId);
+          }
 
           // Cache locally
           if (typeof setStaffAccounts === 'function') {
@@ -204,14 +227,30 @@ export const LoginPage = ({ onLoginSuccess }) => {
               staffTenantId,
               staffRole,
               staffMode,
-              targetScreen
+              targetScreen,
+              matchingTenant: cloudTenant
             });
             setIsFirstLoginModalOpen(true);
             return;
           }
 
-          loginAsClientUser(staffTenantId, staffRole, staffMode);
+          loginAsClientUser(staffTenantId, staffRole, staffMode, cloudTenant, s);
           onLoginSuccess('CLIENT_USER', staffTenantId, staffMode, staffRole, targetScreen);
+          return;
+        }
+      } else if (cloudUser && cloudUser.type === 'tenant') {
+        const t = cloudUser.record;
+        const storedPass = t.tempPassword || t.password || 'admin123';
+        const passMatch = await verifyPassword(cleanPass, storedPass);
+        if (passMatch) {
+          const tenantMode = t.subscribedSystemScope === 'RETAIL_ONLY' ? 'RETAIL' : (t.subscribedSystemScope === 'WHOLESALE_ONLY' ? 'WHOLESALE' : 'HYBRID');
+          loginAsClientUser(t.tenantId, 'Admin', tenantMode, t, {
+            name: t.ownerName || `${t.shopName} Admin`,
+            username: cleanUser,
+            role: 'Admin',
+            title: 'Store Administrator'
+          });
+          onLoginSuccess('CLIENT_USER', t.tenantId, tenantMode, 'Admin', 'dashboard');
           return;
         }
       }
@@ -241,7 +280,7 @@ export const LoginPage = ({ onLoginSuccess }) => {
     setIsSubmittingFirstLogin(true);
     try {
       const encryptedHash = await hashPassword(firstLoginNewPass);
-      const { staffRecord, staffTenantId, staffRole, staffMode, targetScreen } = pendingUserSession;
+      const { staffRecord, staffTenantId, staffRole, staffMode, targetScreen, matchingTenant } = pendingUserSession;
 
       const updatedRecord = {
         ...staffRecord,
@@ -290,7 +329,7 @@ export const LoginPage = ({ onLoginSuccess }) => {
 
       setTimeout(() => {
         setIsFirstLoginModalOpen(false);
-        loginAsClientUser(staffTenantId, staffRole, staffMode);
+        loginAsClientUser(staffTenantId, staffRole, staffMode, matchingTenant, updatedRecord);
         onLoginSuccess('CLIENT_USER', staffTenantId, staffMode, staffRole, targetScreen);
       }, 900);
     } catch (err) {

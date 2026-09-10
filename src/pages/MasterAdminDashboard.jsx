@@ -622,7 +622,15 @@ export const MasterAdminDashboard = () => {
 
                         {/* Login Test Action */}
                         <button
-                          onClick={() => loginAsClientUser(tenant.tenantId, 'Admin')}
+                          onClick={() => {
+                            const mode = tenant.subscribedSystemScope === 'RETAIL_ONLY' ? 'RETAIL' : (tenant.subscribedSystemScope === 'WHOLESALE_ONLY' ? 'WHOLESALE' : 'HYBRID');
+                            loginAsClientUser(tenant.tenantId, 'Admin', mode, tenant, {
+                              name: tenant.ownerName || `${tenant.shopName} Admin`,
+                              username: tenant.adminUsername || '',
+                              role: 'Admin',
+                              title: 'Store Administrator'
+                            });
+                          }}
                           className="btn btn-primary master-action-btn-admin"
                           style={{ fontSize: '11px', padding: '0.3rem 0.65rem', backgroundColor: '#111827' }}
                           title="Log in as Client Admin for this shop"

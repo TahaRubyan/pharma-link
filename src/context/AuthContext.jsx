@@ -220,6 +220,14 @@ export const AuthProvider = ({ children }) => {
     localStorage.setItem('pharmalink_active_shop', JSON.stringify(currentShop));
   }, [currentShop]);
 
+  const [currentUserProfile, setCurrentUserProfile] = useState(() => {
+    try {
+      const saved = localStorage.getItem('pharmalink_user_profile');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {}
+    return null;
+  });
+
   const [sessionLoginRole, setSessionLoginRole] = useState(() => {
     return localStorage.getItem('pharmalink_session_login_role') || 'Admin';
   });
@@ -229,15 +237,26 @@ export const AuthProvider = ({ children }) => {
     if (userAccountType === 'CLIENT_USER') {
       const isRetail = currentShop?.mode === 'RETAIL';
       const isHybrid = currentShop?.subscribedSystemScope === 'HYBRID_BOTH' || currentShop?.mode === 'HYBRID';
+      const isTestingShop = !currentShop?.shopId || currentShop?.shopId === 'TEN-TESTING-SHOP';
+      const shopDisplayName = currentShop?.shopName || 'Store';
+
+      const resolvedName = currentUserProfile?.name 
+        ? currentUserProfile.name 
+        : (isTestingShop 
+            ? (role === 'Admin' ? (isHybrid ? 'Testing Admin' : isRetail ? 'Testing Retail Admin' : 'Testing Wholesale Admin') : (isRetail ? 'Retail Counter Cashier' : 'Wholesale Billing Cashier'))
+            : (role === 'Admin' ? `${shopDisplayName} Admin` : `${shopDisplayName} Cashier`));
+
+      const resolvedStaffId = currentUserProfile?.staffId || currentUserProfile?.id || (role === 'Admin' ? 'EMP-001' : 'EMP-002');
+      const resolvedTitle = currentUserProfile?.title || (role === 'Admin' 
+        ? (isHybrid ? 'Store Operations Head' : isRetail ? 'Chief Pharmacist & Store Manager' : 'Distributor Operations Head')
+        : (isRetail ? 'Counter Cashier & POS Dispenser' : 'B2B Billing & Dispatch Cashier'));
+
       setUser({
-        name: role === 'Admin' 
-          ? (isHybrid ? 'Testing Admin' : isRetail ? 'Testing Retail Admin' : 'Testing Wholesale Admin')
-          : (isRetail ? 'Retail Counter Cashier' : 'Wholesale Billing Cashier'),
+        name: resolvedName,
+        username: currentUserProfile?.username || '',
         role: role,
-        staffId: role === 'Admin' ? 'EMP-001' : 'EMP-002',
-        title: role === 'Admin' 
-          ? (isHybrid ? 'Store Operations Head' : isRetail ? 'Chief Pharmacist & Store Manager' : 'Distributor Operations Head')
-          : (isRetail ? 'Counter Cashier & POS Dispenser' : 'B2B Billing & Dispatch Cashier')
+        staffId: resolvedStaffId,
+        title: resolvedTitle
       });
     } else {
       setUser({
@@ -247,7 +266,7 @@ export const AuthProvider = ({ children }) => {
         title: 'MediStore SaaS Platform Owner'
       });
     }
-  }, [role, userAccountType, currentShop?.mode, currentShop?.subscribedSystemScope]);
+  }, [role, userAccountType, currentShop?.mode, currentShop?.subscribedSystemScope, currentShop?.shopName, currentShop?.shopId, currentUserProfile]);
 
   useEffect(() => {
     localStorage.setItem('pharmalink_custom_roles', JSON.stringify(roles));
@@ -267,11 +286,15 @@ export const AuthProvider = ({ children }) => {
     setRoleState('Admin');
     setSessionLoginRole('Admin');
     setInspectingTenantId(null);
+    setCurrentUserProfile(null);
     localStorage.removeItem('pharmalink_is_auth');
     localStorage.removeItem('medistore_account_type');
     localStorage.removeItem('pharmalink_user_role');
     localStorage.removeItem('pharmalink_session_login_role');
     localStorage.removeItem('pharmalink_current_screen');
+    localStorage.removeItem('pharmalink_user_profile');
+    localStorage.removeItem('pharmalink_active_shop');
+    setCurrentShopState(MULTI_TENANT_SHOPS[0]);
   };
 
   const loginAsSuperAdmin = () => {
@@ -285,7 +308,7 @@ export const AuthProvider = ({ children }) => {
     localStorage.setItem('pharmalink_session_login_role', 'Admin');
   };
 
-  const loginAsClientUser = (tenantId = 'TEN-TESTING-SHOP', roleType = 'Admin', mode = 'HYBRID') => {
+  const loginAsClientUser = (tenantId = 'TEN-TESTING-SHOP', roleType = 'Admin', mode = null, tenantDetails = null, userDetails = null) => {
     setIsAuthenticated(true);
     setUserAccountType('CLIENT_USER');
     setRoleState(roleType);
@@ -296,35 +319,64 @@ export const AuthProvider = ({ children }) => {
     localStorage.setItem('pharmalink_user_role', roleType);
     localStorage.setItem('pharmalink_session_login_role', roleType);
 
-    const activeTenant = (tenantsList || []).find((t) => t.tenantId === tenantId) || INITIAL_TENANTS[0];
+    // 1. Resolve Active Tenant
+    let activeTenant = tenantDetails || (tenantsList || []).find((t) => t.tenantId === tenantId);
+    if (!activeTenant) {
+      try {
+        const savedTenants = JSON.parse(localStorage.getItem('medistore_tenants_list') || '[]');
+        activeTenant = savedTenants.find((t) => t.tenantId === tenantId);
+      } catch (e) {}
+    }
+    if (!activeTenant && tenantId === 'TEN-TESTING-SHOP') {
+      activeTenant = INITIAL_TENANTS[0];
+    }
 
-    let existingData = {};
+    // 2. Resolve System / Store Mode
+    const targetScope = activeTenant?.subscribedSystemScope || 'HYBRID_BOTH';
+    const resolvedMode = mode 
+      ? mode 
+      : (targetScope === 'RETAIL_ONLY' ? 'RETAIL' : (targetScope === 'WHOLESALE_ONLY' ? 'WHOLESALE' : 'HYBRID'));
+
+    // 3. Build Fresh Shop Object strictly from the Active Tenant (NEVER contaminated by old shop state)
+    const freshShop = {
+      shopId: tenantId || activeTenant?.tenantId || 'TEN-TESTING-SHOP',
+      shopName: activeTenant?.shopName || 'Testing Shop',
+      ownerName: activeTenant?.ownerName || '',
+      city: activeTenant?.city || 'Lahore',
+      dlNumber: activeTenant?.dlNumber || (activeTenant?.form20 && activeTenant?.form21 ? `${activeTenant.form20} & ${activeTenant.form21}` : (activeTenant?.form20 || activeTenant?.form21 || 'TEST-DL-20-001')),
+      form20: activeTenant?.form20 || '',
+      form21: activeTenant?.form21 || '',
+      gstin: activeTenant?.gstin || '3277876174544',
+      ntn: activeTenant?.ntn || '4442705-7',
+      address: activeTenant?.address || (activeTenant?.city ? `${activeTenant.city}, Pakistan` : 'Main Commercial Market, Lahore'),
+      phone: activeTenant?.phone || '0300-1234567',
+      mode: resolvedMode,
+      subscribedSystemScope: targetScope,
+    };
+
+    setCurrentShopState(freshShop);
     try {
-      const savedShop = localStorage.getItem('pharmalink_active_shop');
-      if (savedShop) {
-        existingData = JSON.parse(savedShop);
-      }
+      localStorage.setItem('pharmalink_active_shop', JSON.stringify(freshShop));
     } catch (e) {}
 
-    const resolvedMode = mode === 'HYBRID' || activeTenant?.subscribedSystemScope === 'HYBRID_BOTH'
-      ? 'HYBRID'
-      : mode === 'RETAIL'
-      ? 'RETAIL'
-      : 'WHOLESALE';
+    // 4. Resolve User Profile
+    const isTestingShop = freshShop.shopId === 'TEN-TESTING-SHOP';
+    const resolvedUserName = userDetails?.name 
+      || activeTenant?.ownerName 
+      || (isTestingShop ? 'Testing Admin' : `${freshShop.shopName} Admin`);
 
-    setCurrentShopState({
-      shopId: tenantId || activeTenant?.tenantId || 'TEN-TESTING-SHOP',
-      shopName: existingData.shopName || activeTenant?.shopName || 'Testing Shop',
-      city: existingData.city || activeTenant?.city || 'Lahore',
-      dlNumber: existingData.dlNumber || activeTenant?.form20 || 'TEST-DL-20-001',
-      gstin: existingData.gstin || activeTenant?.gstin || '3277876174544',
-      ntn: existingData.ntn || activeTenant?.ntn || '4442705-7',
-      address: existingData.address || activeTenant?.address || 'Main Commercial Market, Lahore',
-      phone: existingData.phone || activeTenant?.phone || '0300-1234567',
-      mode: resolvedMode,
-      subscribedSystemScope: activeTenant?.subscribedSystemScope || 'HYBRID_BOTH',
-      ...existingData
-    });
+    const profile = {
+      name: resolvedUserName,
+      username: userDetails?.username || activeTenant?.adminUsername || (isTestingShop ? 'testing.admin' : ''),
+      role: roleType,
+      staffId: userDetails?.id || userDetails?.staffId || (roleType === 'Admin' ? 'EMP-001' : 'EMP-002'),
+      title: userDetails?.title || (roleType === 'Admin' ? 'Store Administrator' : 'Counter Cashier')
+    };
+
+    setCurrentUserProfile(profile);
+    try {
+      localStorage.setItem('pharmalink_user_profile', JSON.stringify(profile));
+    } catch (e) {}
   };
 
   const onboardNewTenant = (tenantData) => {

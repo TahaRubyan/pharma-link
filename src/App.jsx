@@ -149,6 +149,21 @@ function AppContent() {
     localStorage.setItem('pharmalink_current_screen', currentScreen);
   }, [currentScreen]);
 
+  // Synchronize storeMode when active shop profile changes
+  useEffect(() => {
+    if (currentShop?.mode) {
+      if (currentShop.mode === 'RETAIL') {
+        setStoreMode('RETAIL');
+      } else if (currentShop.mode === 'WHOLESALE') {
+        setStoreMode('WHOLESALE');
+      } else if (currentShop.subscribedSystemScope === 'RETAIL_ONLY') {
+        setStoreMode('RETAIL');
+      } else if (currentShop.subscribedSystemScope === 'WHOLESALE_ONLY') {
+        setStoreMode('WHOLESALE');
+      }
+    }
+  }, [currentShop?.shopId, currentShop?.mode, currentShop?.subscribedSystemScope]);
+
   // Synchronize browser tab title dynamically with active store profile
   useEffect(() => {
     if (typeof document !== 'undefined') {
