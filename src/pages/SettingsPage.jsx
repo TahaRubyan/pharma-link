@@ -58,16 +58,28 @@ const SAMPLE_TEST_INVOICE = {
 export const SettingsPage = ({ storeMode }) => {
   const { currentShop, updateStoreProfile, user } = useAuth();
   const isRetail = (storeMode || currentShop?.mode || 'RETAIL') === 'RETAIL';
+  const tenantId = currentShop?.shopId || 'TEN-TESTING-SHOP';
   const [activeTab, setActiveTab] = useState('PROFILE'); // 'PROFILE' | 'PRINTER_PWA' | 'TAXES' | 'WARRANTY' | 'STAFF' | 'BACKUP'
 
   // Tab: Printer & POS Hardware State
-  const [printerType, setPrinterType] = useState(() => localStorage.getItem('pharmalink_printer_type') || '80MM');
-  const [receiptFooterNote, setReceiptFooterNote] = useState(
-    () => localStorage.getItem('pharmalink_receipt_footer') || '* Medicines once sold can be returned/exchanged within 7 days with original receipt. *'
-  );
-  const [autoPrintOnCheckout, setAutoPrintOnCheckout] = useState(
-    () => localStorage.getItem('pharmalink_auto_print_80mm') === 'true'
-  );
+  const [printerType, setPrinterType] = useState(() => {
+    return localStorage.getItem(`pharmalink_${tenantId}_printer_type`) 
+      || localStorage.getItem('pharmalink_printer_type') 
+      || currentShop?.printSettings?.printerType 
+      || '80MM';
+  });
+  const [receiptFooterNote, setReceiptFooterNote] = useState(() => {
+    return localStorage.getItem(`pharmalink_${tenantId}_receipt_footer`)
+      || localStorage.getItem('pharmalink_receipt_footer')
+      || currentShop?.printSettings?.receiptFooterNote
+      || '* Medicines once sold can be returned/exchanged within 7 days with original receipt. *';
+  });
+  const [autoPrintOnCheckout, setAutoPrintOnCheckout] = useState(() => {
+    const saved = localStorage.getItem(`pharmalink_${tenantId}_auto_print_80mm`);
+    if (saved !== null) return saved === 'true';
+    if (currentShop?.printSettings?.autoPrintOnCheckout !== undefined) return Boolean(currentShop.printSettings.autoPrintOnCheckout);
+    return localStorage.getItem('pharmalink_auto_print_80mm') === 'true';
+  });
   const [isTestReceiptOpen, setIsTestReceiptOpen] = useState(false);
 
   // Tab: PWA State & Hooks
@@ -81,49 +93,166 @@ export const SettingsPage = ({ storeMode }) => {
 
   const handleSelectPrinter = (type) => {
     setPrinterType(type);
-    localStorage.setItem('pharmalink_printer_type', type);
+    try {
+      localStorage.setItem(`pharmalink_${tenantId}_printer_type`, type);
+      localStorage.setItem('pharmalink_printer_type', type);
+    } catch (e) {}
+    if (typeof updateStoreProfile === 'function') {
+      updateStoreProfile({ printSettings: { printerType: type, receiptFooterNote, autoPrintOnCheckout } });
+    }
   };
 
   const handleSaveFooterNote = () => {
-    localStorage.setItem('pharmalink_receipt_footer', receiptFooterNote.trim());
-    alert('80mm Receipt return policy footer note saved successfully!');
+    try {
+      localStorage.setItem(`pharmalink_${tenantId}_receipt_footer`, receiptFooterNote.trim());
+      localStorage.setItem('pharmalink_receipt_footer', receiptFooterNote.trim());
+    } catch (e) {}
+    if (typeof updateStoreProfile === 'function') {
+      updateStoreProfile({ printSettings: { printerType, receiptFooterNote: receiptFooterNote.trim(), autoPrintOnCheckout } });
+    }
+    alert('✅ 80mm Receipt return policy footer note saved permanently!');
   };
 
   const handleToggleAutoPrint = (checked) => {
     setAutoPrintOnCheckout(checked);
-    localStorage.setItem('pharmalink_auto_print_80mm', checked ? 'true' : 'false');
+    try {
+      localStorage.setItem(`pharmalink_${tenantId}_auto_print_80mm`, checked ? 'true' : 'false');
+      localStorage.setItem('pharmalink_auto_print_80mm', checked ? 'true' : 'false');
+    } catch (e) {}
+    if (typeof updateStoreProfile === 'function') {
+      updateStoreProfile({ printSettings: { printerType, receiptFooterNote, autoPrintOnCheckout: checked } });
+    }
   };
 
   // Tab 1: Profile State
-  const [storeName, setStoreName] = useState(currentShop?.shopName || 'Testing Shop');
+  const [storeName, setStoreName] = useState(currentShop?.shopName || currentShop?.name || 'Testing Shop');
   const [storePhone, setStorePhone] = useState(currentShop?.phone || '');
   const [storeAddress, setStoreAddress] = useState(currentShop?.address || '');
   const [stnReg, setStnReg] = useState(currentShop?.gstin || '');
   const [ntnTax, setNtnTax] = useState(currentShop?.ntn || '');
   const [gstinTax, setGstinTax] = useState(currentShop?.gstin || '');
-  const [dslForm20, setDslForm20] = useState(currentShop?.dlNumber || '');
-  const [dslForm21, setDslForm21] = useState(currentShop?.dlNumber || '');
+  const [dslForm20, setDslForm20] = useState(currentShop?.form20 || currentShop?.dlNumber || '');
+  const [dslForm21, setDslForm21] = useState(currentShop?.form21 || currentShop?.dlNumber || '');
 
   // Digital Signature
-  const [signatoryName, setSignatoryName] = useState(isRetail ? '' : (currentShop?.signatoryName || 'Testing Administrator'));
-  const [signatoryRole, setSignatoryRole] = useState(isRetail ? '' : (currentShop?.signatoryRole || 'Managing Pharmacist & Owner'));
-  const [signatureImage, setSignatureImage] = useState(() => localStorage.getItem('pharmalink_sig_image') || '');
+  const [signatoryName, setSignatoryName] = useState(() => {
+    return currentShop?.signatoryName 
+      || localStorage.getItem(`pharmalink_${tenantId}_sig_name`)
+      || (isRetail ? '' : 'Testing Administrator');
+  });
+  const [signatoryRole, setSignatoryRole] = useState(() => {
+    return currentShop?.signatoryRole 
+      || localStorage.getItem(`pharmalink_${tenantId}_sig_role`)
+      || (isRetail ? '' : 'Managing Pharmacist & Owner');
+  });
+  const [signatureImage, setSignatureImage] = useState(() => {
+    return currentShop?.signatureImage 
+      || localStorage.getItem(`pharmalink_${tenantId}_sig_image`)
+      || localStorage.getItem('pharmalink_sig_image') 
+      || '';
+  });
 
-  // Tab 2: Global Taxes
-  const [enableSalesTax18, setEnableSalesTax18] = useState(true);
-  const [salesTaxRate, setSalesTaxRate] = useState('18');
-  const [enableAdvTax05, setEnableAdvTax05] = useState(true);
-  const [advTaxRate, setAdvTaxRate] = useState('0.5');
+  // Tab 2: Global Taxes State
+  const [enableSalesTax18, setEnableSalesTax18] = useState(() => {
+    try {
+      const saved = localStorage.getItem(`pharmalink_${tenantId}_tax_settings`);
+      if (saved) return JSON.parse(saved).enableSalesTax18 ?? true;
+      if (currentShop?.taxSettings?.enableSalesTax18 !== undefined) return currentShop.taxSettings.enableSalesTax18;
+    } catch (e) {}
+    return true;
+  });
+  const [salesTaxRate, setSalesTaxRate] = useState(() => {
+    try {
+      const saved = localStorage.getItem(`pharmalink_${tenantId}_tax_settings`);
+      if (saved && JSON.parse(saved).salesTaxRate !== undefined) return String(JSON.parse(saved).salesTaxRate);
+      if (currentShop?.taxSettings?.salesTaxRate !== undefined) return String(currentShop.taxSettings.salesTaxRate);
+    } catch (e) {}
+    return '18';
+  });
+  const [enableAdvTax05, setEnableAdvTax05] = useState(() => {
+    try {
+      const saved = localStorage.getItem(`pharmalink_${tenantId}_tax_settings`);
+      if (saved) return JSON.parse(saved).enableAdvTax05 ?? true;
+      if (currentShop?.taxSettings?.enableAdvTax05 !== undefined) return currentShop.taxSettings.enableAdvTax05;
+    } catch (e) {}
+    return true;
+  });
+  const [advTaxRate, setAdvTaxRate] = useState(() => {
+    try {
+      const saved = localStorage.getItem(`pharmalink_${tenantId}_tax_settings`);
+      if (saved && JSON.parse(saved).advTaxRate !== undefined) return String(JSON.parse(saved).advTaxRate);
+      if (currentShop?.taxSettings?.advTaxRate !== undefined) return String(currentShop.taxSettings.advTaxRate);
+    } catch (e) {}
+    return '0.5';
+  });
 
-  // Tab 3: Warranty Notes
-  const [enableSec23, setEnableSec23] = useState(true);
-  const [sec23Text, setSec23Text] = useState(
-    'I, being a person resident in Pakistan carrying on business under the authorized distributor license, do hereby give this warranty that the drugs here above described as sold by me and contained in this invoice prescribing the goods referred to herein do not contravene in any way the provisions of Section 23 of the Drugs Act, 1976.'
-  );
-  const [enableDrap, setEnableDrap] = useState(true);
-  const [drapText, setDrapText] = useState(
-    'Warranty under Alternative Medicines and Health Products (Enlistment) Rules 2014 [See Rules 10(3) and (5)]: We, as the authorized distributors/agents and on behalf of the principals/manufacturers/importers hereby give warranty that the supplied alternative medicines and health products mentioned herein do not contravene any provision of the prevailing DRAP Act 2012 and rules framed thereunder.'
-  );
+  // Tab 3: Warranty Notes State
+  const [enableSec23, setEnableSec23] = useState(() => {
+    try {
+      const saved = localStorage.getItem(`pharmalink_${tenantId}_warranty_settings`);
+      if (saved) return JSON.parse(saved).enableSec23 ?? true;
+      if (currentShop?.warrantySettings?.enableSec23 !== undefined) return currentShop.warrantySettings.enableSec23;
+    } catch (e) {}
+    return true;
+  });
+  const [sec23Text, setSec23Text] = useState(() => {
+    try {
+      const saved = localStorage.getItem(`pharmalink_${tenantId}_warranty_settings`);
+      if (saved && JSON.parse(saved).sec23Text) return JSON.parse(saved).sec23Text;
+      if (currentShop?.warrantySettings?.sec23Text) return currentShop.warrantySettings.sec23Text;
+    } catch (e) {}
+    return (
+      'I, being a person resident in Pakistan carrying on business under the authorized distributor license, do hereby give this warranty that the drugs here above described as sold by me and contained in this invoice prescribing the goods referred to herein do not contravene in any way the provisions of Section 23 of the Drugs Act, 1976.'
+    );
+  });
+  const [enableDrap, setEnableDrap] = useState(() => {
+    try {
+      const saved = localStorage.getItem(`pharmalink_${tenantId}_warranty_settings`);
+      if (saved) return JSON.parse(saved).enableDrap ?? true;
+      if (currentShop?.warrantySettings?.enableDrap !== undefined) return currentShop.warrantySettings.enableDrap;
+    } catch (e) {}
+    return true;
+  });
+  const [drapText, setDrapText] = useState(() => {
+    try {
+      const saved = localStorage.getItem(`pharmalink_${tenantId}_warranty_settings`);
+      if (saved && JSON.parse(saved).drapText) return JSON.parse(saved).drapText;
+      if (currentShop?.warrantySettings?.drapText) return currentShop.warrantySettings.drapText;
+    } catch (e) {}
+    return (
+      'Warranty under Alternative Medicines and Health Products (Enlistment) Rules 2014 [See Rules 10(3) and (5)]: We, as the authorized distributors/agents and on behalf of the principals/manufacturers/importers hereby give warranty that the supplied alternative medicines and health products mentioned herein do not contravene any provision of the prevailing DRAP Act 2012 and rules framed thereunder.'
+    );
+  });
+
+  // Synchronize inputs whenever active shop updates
+  useEffect(() => {
+    if (currentShop) {
+      setStoreName(currentShop.shopName || currentShop.name || 'Testing Shop');
+      setStorePhone(currentShop.phone || '');
+      setStoreAddress(currentShop.address || '');
+      setNtnTax(currentShop.ntn || '');
+      setGstinTax(currentShop.gstin || '');
+      setDslForm20(currentShop.form20 || currentShop.dlNumber || '');
+      setDslForm21(currentShop.form21 || currentShop.dlNumber || '');
+      setSignatoryName(currentShop.signatoryName || (isRetail ? '' : 'Testing Administrator'));
+      setSignatoryRole(currentShop.signatoryRole || (isRetail ? '' : 'Managing Pharmacist & Owner'));
+      if (currentShop.signatureImage) setSignatureImage(currentShop.signatureImage);
+
+      if (currentShop.taxSettings) {
+        if (currentShop.taxSettings.enableSalesTax18 !== undefined) setEnableSalesTax18(currentShop.taxSettings.enableSalesTax18);
+        if (currentShop.taxSettings.salesTaxRate !== undefined) setSalesTaxRate(String(currentShop.taxSettings.salesTaxRate));
+        if (currentShop.taxSettings.enableAdvTax05 !== undefined) setEnableAdvTax05(currentShop.taxSettings.enableAdvTax05);
+        if (currentShop.taxSettings.advTaxRate !== undefined) setAdvTaxRate(String(currentShop.taxSettings.advTaxRate));
+      }
+
+      if (currentShop.warrantySettings) {
+        if (currentShop.warrantySettings.enableSec23 !== undefined) setEnableSec23(currentShop.warrantySettings.enableSec23);
+        if (currentShop.warrantySettings.sec23Text !== undefined) setSec23Text(currentShop.warrantySettings.sec23Text);
+        if (currentShop.warrantySettings.enableDrap !== undefined) setEnableDrap(currentShop.warrantySettings.enableDrap);
+        if (currentShop.warrantySettings.drapText !== undefined) setDrapText(currentShop.warrantySettings.drapText);
+      }
+    }
+  }, [currentShop, isRetail]);
 
   // Tab 4: Staff Accounts
   const [staffAccounts, setStaffAccounts] = useState(() => {
@@ -322,25 +451,70 @@ export const SettingsPage = ({ storeMode }) => {
       shopName: storeName.trim(),
       phone: storePhone.trim(),
       address: storeAddress.trim(),
-      dlNumber: dslForm20.trim(),
+      dlNumber: (dslForm20.trim() && dslForm21.trim() && dslForm20.trim() !== dslForm21.trim())
+        ? `${dslForm20.trim()} & ${dslForm21.trim()}`
+        : (dslForm20.trim() || dslForm21.trim() || currentShop?.dlNumber || ''),
+      form20: dslForm20.trim(),
+      form21: dslForm21.trim(),
       ntn: ntnTax.trim(),
       gstin: gstinTax.trim(),
       signatoryName: signatoryName.trim(),
       signatoryRole: signatoryRole.trim(),
       signatureImage: signatureImage || '',
     };
-    localStorage.setItem('pharmalink_sig_name', signatoryName.trim());
-    localStorage.setItem('pharmalink_sig_role', signatoryRole.trim());
-    if (signatureImage) {
-      localStorage.setItem('pharmalink_sig_image', signatureImage);
-    }
+    try {
+      localStorage.setItem(`pharmalink_${tenantId}_profile`, JSON.stringify(updated));
+      localStorage.setItem(`pharmalink_${tenantId}_sig_name`, signatoryName.trim());
+      localStorage.setItem(`pharmalink_${tenantId}_sig_role`, signatoryRole.trim());
+      if (signatureImage) {
+        localStorage.setItem(`pharmalink_${tenantId}_sig_image`, signatureImage);
+      }
+      localStorage.setItem('pharmalink_sig_name', signatoryName.trim());
+      localStorage.setItem('pharmalink_sig_role', signatoryRole.trim());
+      if (signatureImage) localStorage.setItem('pharmalink_sig_image', signatureImage);
+    } catch (e) {}
+
     if (typeof updateStoreProfile === 'function') {
       updateStoreProfile(updated);
     }
     if (typeof document !== 'undefined') {
       document.title = `${storeName.trim()} | PharmaLink ERP & POS`;
     }
-    alert(`Store Profile & Digital Signature successfully updated! Shop name "${storeName}" and Signatory "${signatoryName}" will now appear on all invoices.`);
+    alert(`✅ Store Profile & Digital Signature saved permanently! Shop name "${storeName}" and Signatory "${signatoryName}" will remain active across the system.`);
+  };
+
+  const handleSaveTaxes = () => {
+    const taxPayload = {
+      enableSalesTax18,
+      salesTaxRate: Number(salesTaxRate) || 18,
+      enableAdvTax05,
+      advTaxRate: Number(advTaxRate) || 0.5,
+    };
+    try {
+      localStorage.setItem(`pharmalink_${tenantId}_tax_settings`, JSON.stringify(taxPayload));
+      localStorage.setItem('pharmalink_tax_settings', JSON.stringify(taxPayload));
+    } catch (e) {}
+    if (typeof updateStoreProfile === 'function') {
+      updateStoreProfile({ taxSettings: taxPayload });
+    }
+    alert('✅ Global Wholesale B2B Tax Rates saved permanently! These settings will remain as configured until you change them.');
+  };
+
+  const handleSaveWarranty = () => {
+    const warrantyPayload = {
+      enableSec23,
+      sec23Text: sec23Text.trim(),
+      enableDrap,
+      drapText: drapText.trim(),
+    };
+    try {
+      localStorage.setItem(`pharmalink_${tenantId}_warranty_settings`, JSON.stringify(warrantyPayload));
+      localStorage.setItem('pharmalink_warranty_settings', JSON.stringify(warrantyPayload));
+    } catch (e) {}
+    if (typeof updateStoreProfile === 'function') {
+      updateStoreProfile({ warrantySettings: warrantyPayload });
+    }
+    alert('✅ Legal Warranty configurations saved permanently! These warranties will appear on all commercial A4 invoices.');
   };
 
   const handleAddStaff = (e) => {
@@ -1087,7 +1261,7 @@ export const SettingsPage = ({ storeMode }) => {
             </div>
           </div>
 
-          <button onClick={() => alert('Global Tax Rates saved!')} className="btn btn-primary" style={{ borderRadius: '10px', backgroundColor: '#0284c7' }}>
+          <button type="button" onClick={handleSaveTaxes} className="btn btn-primary" style={{ borderRadius: '10px', backgroundColor: '#0284c7' }}>
             <CheckCircle size={15} /> Save Global Tax Rates
           </button>
         </div>
@@ -1123,7 +1297,7 @@ export const SettingsPage = ({ storeMode }) => {
             </div>
           </div>
 
-          <button onClick={() => alert('Legal Warranty configurations saved!')} className="btn btn-primary" style={{ borderRadius: '10px', backgroundColor: '#0284c7' }}>
+          <button type="button" onClick={handleSaveWarranty} className="btn btn-primary" style={{ borderRadius: '10px', backgroundColor: '#0284c7' }}>
             <CheckCircle size={15} /> Save Legal Warranty Configurations
           </button>
         </div>

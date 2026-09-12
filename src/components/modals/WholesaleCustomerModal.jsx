@@ -3,7 +3,7 @@ import { X, UserCheck, MapPin, Phone, FileText, CheckCircle } from 'lucide-react
 
 export const WholesaleCustomerModal = ({ isOpen, customerData, onClose, onSave }) => {
   const [customerName, setCustomerName] = useState(customerData?.customerName || customerData?.shopName || '');
-  const [region, setRegion] = useState(customerData?.region || 'Gujrat');
+  const [region, setRegion] = useState(customerData?.region || '');
   const [address, setAddress] = useState(customerData?.customerAddress || '');
   const [licenseNo, setLicenseNo] = useState(customerData?.licenseNo || '');
   const [ntn, setNtn] = useState(customerData?.customerNtn || '');
@@ -17,7 +17,7 @@ export const WholesaleCustomerModal = ({ isOpen, customerData, onClose, onSave }
   useEffect(() => {
     if (customerData) {
       setCustomerName(customerData.customerName || customerData.shopName || '');
-      setRegion(customerData.region || 'Gujrat');
+      setRegion(customerData.region || '');
       setAddress(customerData.customerAddress || '');
       setLicenseNo(customerData.licenseNo || '');
       setNtn(customerData.customerNtn || '');

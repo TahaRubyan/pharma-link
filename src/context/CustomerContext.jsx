@@ -162,7 +162,7 @@ export const CustomerProvider = ({ children }) => {
       name: customerData.name?.trim() || customerData.customerName?.trim() || 'New Customer',
       shopName: customerData.shopName?.trim() || customerData.name?.trim() || 'New Customer',
       customerName: customerData.name?.trim() || customerData.customerName?.trim() || 'New Customer',
-      region: customerData.region?.trim() || 'Gujrat',
+      region: customerData.region?.trim() || '',
       address: customerData.address?.trim() || customerData.customerAddress?.trim() || '',
       customerAddress: customerData.address?.trim() || customerData.customerAddress?.trim() || '',
       phone: customerData.phone?.trim() || customerData.customerPhone?.trim() || '',

@@ -416,7 +416,7 @@ export const dbSyncService = {
           name: c.name || '',
           shopName: c.shop_name || c.name || '',
           customerName: c.name || '',
-          region: c.region || 'Gujrat',
+          region: c.region || '',
           address: c.address || '',
           customerAddress: c.address || '',
           phone: c.phone || '',
@@ -451,7 +451,7 @@ export const dbSyncService = {
           tenant_id: tenantId,
           name: c.name || c.customerName || 'Customer',
           shop_name: c.shopName || c.name || '',
-          region: c.region || 'Gujrat',
+          region: c.region || '',
           address: c.address || c.customerAddress || '',
           phone: c.phone || c.customerPhone || '',
           ntn: c.ntn || c.customerNtn || '-',
@@ -551,6 +551,11 @@ export const dbSyncService = {
           dlNumber: t.dl_number,
           form20: t.form20,
           form21: t.form21,
+          signatoryName: t.signatory_name || '',
+          signatoryRole: t.signatory_role || '',
+          taxSettings: t.tax_settings || null,
+          warrantySettings: t.warranty_settings || null,
+          printSettings: t.print_settings || null,
           subscribedSystemScope: t.mode === 'RETAIL' ? 'RETAIL_ONLY' : (t.mode === 'WHOLESALE' ? 'WHOLESALE_ONLY' : 'HYBRID_BOTH'),
           subscriptionStatus: t.subscription_status || 'Active',
           createdDate: t.created_at ? new Date(t.created_at).toLocaleDateString('en-GB').replace(/\//g, '-') : '28-08-2026',
@@ -586,6 +591,11 @@ export const dbSyncService = {
         dlNumber: t.dl_number,
         form20: t.form20,
         form21: t.form21,
+        signatoryName: t.signatory_name || '',
+        signatoryRole: t.signatory_role || '',
+        taxSettings: t.tax_settings || null,
+        warrantySettings: t.warranty_settings || null,
+        printSettings: t.print_settings || null,
         mode: t.mode,
         subscribedSystemScope: t.mode === 'RETAIL' ? 'RETAIL_ONLY' : (t.mode === 'WHOLESALE' ? 'WHOLESALE_ONLY' : 'HYBRID_BOTH'),
         subscriptionStatus: t.subscription_status || 'Active',
@@ -596,6 +606,41 @@ export const dbSyncService = {
     } catch (e) {
       console.warn('[dbSync] findTenantById warning:', e.message);
       return null;
+    }
+  },
+
+  async updateTenantProfile(tenantId, profileData) {
+    if (!isSupabaseConfigured || !supabase || !tenantId || !profileData) return;
+    try {
+      const updatePayload = {
+        updated_at: new Date().toISOString(),
+      };
+      if (profileData.shopName !== undefined) updatePayload.shop_name = profileData.shopName;
+      if (profileData.name !== undefined && !profileData.shopName) updatePayload.shop_name = profileData.name;
+      if (profileData.phone !== undefined) updatePayload.phone = profileData.phone;
+      if (profileData.city !== undefined) updatePayload.city = profileData.city;
+      if (profileData.address !== undefined) updatePayload.address = profileData.address;
+      if (profileData.ntn !== undefined) updatePayload.ntn = profileData.ntn;
+      if (profileData.gstin !== undefined) updatePayload.gstin = profileData.gstin;
+      if (profileData.dlNumber !== undefined) updatePayload.dl_number = profileData.dlNumber;
+      if (profileData.form20 !== undefined) updatePayload.form20 = profileData.form20;
+      if (profileData.form21 !== undefined) updatePayload.form21 = profileData.form21;
+      if (profileData.signatoryName !== undefined) updatePayload.signatory_name = profileData.signatoryName;
+      if (profileData.signatoryRole !== undefined) updatePayload.signatory_role = profileData.signatoryRole;
+      if (profileData.taxSettings !== undefined) updatePayload.tax_settings = profileData.taxSettings;
+      if (profileData.warrantySettings !== undefined) updatePayload.warranty_settings = profileData.warrantySettings;
+      if (profileData.printSettings !== undefined) updatePayload.print_settings = profileData.printSettings;
+
+      const { error } = await supabase
+        .from('tenants')
+        .update(updatePayload)
+        .eq('tenant_id', tenantId);
+
+      if (error) {
+        console.warn('[dbSync] updateTenantProfile error:', error.message);
+      }
+    } catch (e) {
+      console.warn('[dbSync] updateTenantProfile exception:', e.message);
     }
   },
 

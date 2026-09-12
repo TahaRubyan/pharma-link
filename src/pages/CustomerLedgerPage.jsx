@@ -30,7 +30,7 @@ export const CustomerLedgerPage = () => {
         map.set(key, {
           shopName: name,
           phone: inv.customerPhone || 'N/A',
-          region: inv.region || currentShop?.city || 'Lahore',
+          region: inv.region || currentShop?.city || 'Unassigned',
           ntn: inv.customerNtn || '-',
           strn: inv.customerStrn || '-',
           creditLimit: 500000,

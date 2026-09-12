@@ -400,20 +400,33 @@ export const AuthProvider = ({ children }) => {
       ? 'WHOLESALE'
       : (targetScope === 'RETAIL_ONLY' ? 'RETAIL' : (mode || 'HYBRID'));
 
-    // 3. Build Fresh Shop Object strictly from the Active Tenant (NEVER contaminated by old shop state)
+    // 3. Build Fresh Shop Object strictly from the Active Tenant, merging any persisted profile
+    const targetShopId = tenantId || activeTenant?.tenantId || 'TEN-TESTING-SHOP';
+    let savedProfile = {};
+    try {
+      const stored = localStorage.getItem(`pharmalink_${targetShopId}_profile`);
+      if (stored) savedProfile = JSON.parse(stored);
+    } catch (e) {}
+
     const freshShop = {
-      shopId: tenantId || activeTenant?.tenantId || 'TEN-TESTING-SHOP',
-      shopName: activeTenant?.shopName || 'Testing Shop',
-      description: activeTenant?.description || '',
-      ownerName: activeTenant?.ownerName || '',
-      city: activeTenant?.city || 'Lahore',
-      dlNumber: activeTenant?.dlNumber || (activeTenant?.form20 && activeTenant?.form21 ? `${activeTenant.form20} & ${activeTenant.form21}` : (activeTenant?.form20 || activeTenant?.form21 || 'TEST-DL-20-001')),
-      form20: activeTenant?.form20 || '',
-      form21: activeTenant?.form21 || '',
-      gstin: activeTenant?.gstin || '3277876174544',
-      ntn: activeTenant?.ntn || '4442705-7',
-      address: activeTenant?.address || (activeTenant?.city ? `${activeTenant.city}, Pakistan` : 'Main Commercial Market, Lahore'),
-      phone: activeTenant?.phone || '0300-1234567',
+      shopId: targetShopId,
+      shopName: savedProfile.shopName || activeTenant?.shopName || 'Testing Shop',
+      description: savedProfile.description || activeTenant?.description || '',
+      ownerName: savedProfile.ownerName || activeTenant?.ownerName || '',
+      city: savedProfile.city || activeTenant?.city || 'Lahore',
+      dlNumber: savedProfile.dlNumber || activeTenant?.dlNumber || (activeTenant?.form20 && activeTenant?.form21 ? `${activeTenant.form20} & ${activeTenant.form21}` : (activeTenant?.form20 || activeTenant?.form21 || 'TEST-DL-20-001')),
+      form20: savedProfile.form20 || activeTenant?.form20 || '',
+      form21: savedProfile.form21 || activeTenant?.form21 || '',
+      gstin: savedProfile.gstin || activeTenant?.gstin || '3277876174544',
+      ntn: savedProfile.ntn || activeTenant?.ntn || '4442705-7',
+      address: savedProfile.address || activeTenant?.address || (activeTenant?.city ? `${activeTenant.city}, Pakistan` : 'Main Commercial Market, Lahore'),
+      phone: savedProfile.phone || activeTenant?.phone || '0300-1234567',
+      signatoryName: savedProfile.signatoryName || activeTenant?.signatoryName || '',
+      signatoryRole: savedProfile.signatoryRole || activeTenant?.signatoryRole || '',
+      signatureImage: savedProfile.signatureImage || '',
+      taxSettings: savedProfile.taxSettings || activeTenant?.taxSettings || null,
+      warrantySettings: savedProfile.warrantySettings || activeTenant?.warrantySettings || null,
+      printSettings: savedProfile.printSettings || activeTenant?.printSettings || null,
       mode: resolvedMode,
       subscribedSystemScope: targetScope,
     };
@@ -441,6 +454,58 @@ export const AuthProvider = ({ children }) => {
     try {
       localStorage.setItem('pharmalink_user_profile', JSON.stringify(profile));
     } catch (e) {}
+  };
+
+  const updateStoreProfile = async (updatedData) => {
+    if (!updatedData) return;
+    const targetShopId = currentShop?.shopId || 'TEN-TESTING-SHOP';
+
+    // 1. Update currentShop in state and local storage
+    setCurrentShopState((prev) => {
+      const next = { ...prev, ...updatedData };
+      try {
+        localStorage.setItem('pharmalink_active_shop', JSON.stringify(next));
+        localStorage.setItem(`pharmalink_${targetShopId}_profile`, JSON.stringify(next));
+      } catch (e) {}
+      return next;
+    });
+
+    // 2. Update tenant in tenantsList
+    setTenantsList((prev) => {
+      const next = prev.map((t) => {
+        if (t.tenantId === targetShopId) {
+          return {
+            ...t,
+            ...updatedData,
+            shopName: updatedData.shopName || t.shopName,
+            phone: updatedData.phone || t.phone,
+            address: updatedData.address || t.address,
+            ntn: updatedData.ntn || t.ntn,
+            gstin: updatedData.gstin || t.gstin,
+            dlNumber: updatedData.dlNumber || t.dlNumber,
+            form20: updatedData.form20 || t.form20,
+            form21: updatedData.form21 || t.form21,
+            signatoryName: updatedData.signatoryName || t.signatoryName,
+            signatoryRole: updatedData.signatoryRole || t.signatoryRole,
+            taxSettings: updatedData.taxSettings || t.taxSettings,
+            warrantySettings: updatedData.warrantySettings || t.warrantySettings,
+            printSettings: updatedData.printSettings || t.printSettings,
+          };
+        }
+        return t;
+      });
+      try {
+        localStorage.setItem('medistore_tenants_list', JSON.stringify(next));
+      } catch (e) {}
+      return next;
+    });
+
+    // 3. Persist to Supabase tenants table in background
+    try {
+      await dbSyncService.updateTenantProfile(targetShopId, updatedData);
+    } catch (e) {
+      console.warn('Could not sync store profile to cloud:', e);
+    }
   };
 
   const onboardNewTenant = (tenantData) => {
@@ -652,14 +717,6 @@ export const AuthProvider = ({ children }) => {
     canModifyStoreSettings: isAdmin,
     canAccessRTV: isAdmin,
     canViewTaxReports: isAdmin,
-  };
-
-  const updateStoreProfile = (profileData) => {
-    setCurrentShopState((prev) => {
-      const updated = { ...(prev || {}), ...profileData };
-      localStorage.setItem('pharmalink_active_shop', JSON.stringify(updated));
-      return updated;
-    });
   };
 
   const value = {

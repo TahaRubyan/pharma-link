@@ -28,20 +28,23 @@ import CustomerLedgerStatementModal from '../components/modals/CustomerLedgerSta
 export const RegionLedgerPage = () => {
   const { invoices = [], recordDebtPayment } = useSales();
   const { currentShop } = useAuth();
+  const activeTenantId = currentShop?.shopId || 'TEN-TESTING-SHOP';
+  const regionStorageKey = `pharmalink_${activeTenantId}_regions`;
 
   const [selectedRegion, setSelectedRegion] = useState('All Regions');
   const [selectedStatus, setSelectedStatus] = useState('ALL');
   const [searchQuery, setSearchQuery] = useState('');
 
+  // Custom user-defined regions scoped strictly to the active tenant (no predefined hardcoding)
   const [customRegions, setCustomRegions] = useState(() => {
-    const saved = localStorage.getItem('pharmalink_regions');
+    const saved = localStorage.getItem(regionStorageKey);
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed)) return parsed;
       } catch (e) {}
     }
-    return ['Islamabad', 'Lahore', 'Gujrat', 'Peshawar', 'Karianwala', 'Tanda'];
+    return [];
   });
 
   const [isAddRegionOpen, setIsAddRegionOpen] = useState(false);
@@ -55,17 +58,28 @@ export const RegionLedgerPage = () => {
   const [cashInputs, setCashInputs] = useState({});
 
   useEffect(() => {
-    localStorage.setItem('pharmalink_regions', JSON.stringify(customRegions));
-  }, [customRegions]);
+    localStorage.setItem(regionStorageKey, JSON.stringify(customRegions));
+  }, [customRegions, regionStorageKey]);
+
+  // Dynamically merge user-added custom regions with any regions recorded in actual invoices
+  const allAvailableRegions = useMemo(() => {
+    const set = new Set(customRegions);
+    invoices.forEach((inv) => {
+      const reg = (inv.region || '').trim();
+      if (reg) set.add(reg);
+    });
+    return Array.from(set);
+  }, [customRegions, invoices]);
 
   const handleAddRegion = (newRegionName) => {
     if (!newRegionName) return;
-    const exists = customRegions.some((r) => r.toLowerCase() === newRegionName.toLowerCase());
+    const cleanName = newRegionName.trim();
+    const exists = customRegions.some((r) => r.toLowerCase() === cleanName.toLowerCase());
     if (!exists) {
-      setCustomRegions((prev) => [...prev, newRegionName]);
-      setSelectedRegion(newRegionName);
+      setCustomRegions((prev) => [...prev, cleanName]);
+      setSelectedRegion(cleanName);
     } else {
-      setSelectedRegion(newRegionName);
+      setSelectedRegion(cleanName);
     }
   };
 
@@ -77,7 +91,7 @@ export const RegionLedgerPage = () => {
   const filteredInvoices = useMemo(() => {
     return invoices.filter((inv) => {
       if (selectedRegion !== 'All Regions') {
-        const invRegion = (inv.region || 'Gujrat').trim().toLowerCase();
+        const invRegion = (inv.region || '').trim().toLowerCase();
         if (invRegion !== selectedRegion.trim().toLowerCase()) return false;
       }
 
@@ -258,8 +272,8 @@ export const RegionLedgerPage = () => {
               onChange={(e) => setSelectedRegion(e.target.value)}
               style={{ padding: '0.35rem 0.65rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '11px', fontWeight: 700, outline: 'none', cursor: 'pointer' }}
             >
-              <option value="All Regions">All Regions</option>
-              {customRegions.map((r, idx) => (
+              <option value="All Regions">All Regions {allAvailableRegions.length > 0 ? `(${allAvailableRegions.length})` : ''}</option>
+              {allAvailableRegions.map((r, idx) => (
                 <option key={idx} value={r}>{r}</option>
               ))}
             </select>

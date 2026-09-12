@@ -131,7 +131,7 @@ export const WholesaleDashboardPage = ({ onNavigate }) => {
   const territoryBreakdown = useMemo(() => {
     const map = {};
     invoices.forEach((inv) => {
-      const reg = (inv.region || 'Gujrat').trim();
+      const reg = (inv.region || 'General').trim();
       if (!map[reg]) {
         map[reg] = { region: reg, count: 0, total: 0 };
       }

@@ -488,8 +488,20 @@ export const InventoryProvider = ({ children }) => {
 
         // Find candidate matching batches, sorted by FEFO
         const candidateIndices = [];
+        const ciMedId = String(ci.medicineId || ci.id || '').trim();
+        const ciCode = String(ci.itemCode || '').trim().toLowerCase();
+        const ciName = String(ci.name || ci.brandName || '').trim().toLowerCase();
+
         updatedBatches.forEach((b, idx) => {
-          const matchesMed = b.medicineId === ci.medicineId || b.id === ci.medicineId || (ci.name && b.medicineId === ci.name);
+          const bMedId = String(b.medicineId || b.id || '').trim();
+          const bCode = String(b.itemCode || '').trim().toLowerCase();
+          const bName = String(b.medicineName || b.name || '').trim().toLowerCase();
+
+          const matchesMed =
+            (ciMedId && bMedId === ciMedId) ||
+            (ciCode && (bMedId.toLowerCase() === ciCode || bCode === ciCode)) ||
+            (ciName && (bMedId.toLowerCase() === ciName || bName === ciName));
+
           if (matchesMed) candidateIndices.push(idx);
         });
 
@@ -550,15 +562,70 @@ export const InventoryProvider = ({ children }) => {
     });
   };
 
-  const getEarliestValidBatch = (medicineId, isWholesale = false) => {
+  const getEarliestValidBatch = (medicineOrId, isWholesale = false) => {
+    const med = typeof medicineOrId === 'object' && medicineOrId !== null
+      ? medicineOrId
+      : (medicines || []).find(
+          (m) =>
+            m.id === medicineOrId ||
+            (m.itemCode && m.itemCode.toString() === String(medicineOrId)) ||
+            m.name === medicineOrId ||
+            m.brandName === medicineOrId
+        );
+
+    const medId = med?.id || (typeof medicineOrId === 'string' ? medicineOrId : '');
+    const medCode = med?.itemCode ? String(med.itemCode).trim().toLowerCase() : '';
+    const medName = (med?.name || med?.brandName || '').trim().toLowerCase();
+
     const available = batches
       .filter((b) => {
-        if ((b.medicineId !== medicineId && b.id !== medicineId) || (b.totalTabletsAvailable !== undefined && b.totalTabletsAvailable <= 0) || b.status === 'Quarantined RTV') return false;
+        if (b.status === 'Quarantined RTV') return false;
+        if (b.totalTabletsAvailable !== undefined && Number(b.totalTabletsAvailable) <= 0) return false;
+
+        const bMedId = String(b.medicineId || b.id || '').trim();
+        const bCode = String(b.itemCode || '').trim().toLowerCase();
+        const bName = String(b.medicineName || b.name || '').trim().toLowerCase();
+
+        const matches =
+          (medId && bMedId === medId) ||
+          (medCode && (bMedId.toLowerCase() === medCode || bCode === medCode)) ||
+          (medName && (bMedId.toLowerCase() === medName || bName === medName));
+
+        if (!matches) return false;
+
         if (isWholesale && !isExpiryGreaterThan6Months(b.expiryDate)) return false;
         return true;
       })
       .sort((a, b) => new Date(a.expiryDate || '2028-01-01') - new Date(b.expiryDate || '2028-01-01'));
+
     if (available.length > 0) return available[0];
+
+    // If no existing batch has positive tablets, BUT the medicine itself has positive boxStock in the catalog:
+    const catalogStock = Number(med?.boxStock || 0);
+    if (catalogStock > 0) {
+      const tabsPerBox = Number(med?.tabletsPerBox || (Number(med?.stripsPerBox || 10) * Number(med?.tabletsPerStrip || 10)) || 200);
+      const expiry = med?.expiryDate || '2028-12-31';
+
+      if (isWholesale && !isExpiryGreaterThan6Months(expiry)) {
+        return null; // Short expiry under DRAP wholesale rule
+      }
+
+      return {
+        id: `BATCH-${med?.id || 'STOCK'}-ACTIVE`,
+        batchNo: med?.batchNo || `B26-${med?.itemCode || 'STOCK'}`,
+        batchNumber: med?.batchNo || `B26-${med?.itemCode || 'STOCK'}`,
+        medicineId: med?.id || medId,
+        distributorName: med?.manufacturer || 'Authorized Distributor',
+        expiryDate: expiry,
+        totalTabletsAvailable: catalogStock * tabsPerBox,
+        boxPrice: Number(med?.boxSellingPrice || med?.boxPrice || med?.price || 600),
+        purchasePriceBox: Number(med?.purchaseCost || med?.purchasePriceBox || 480),
+        pricePerTablet: Number(med?.pricePerTablet || 3.0),
+        status: 'Active Stock',
+        rackLocation: med?.rackLocation || '',
+      };
+    }
+
     if (isWholesale) return null;
     return {
       batchNo: 'B-9481',

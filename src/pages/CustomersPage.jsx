@@ -221,10 +221,10 @@ export const CustomersPage = ({ onNavigate }) => {
             <MapPin size={16} color="#10b981" />
           </div>
           <div style={{ fontSize: '22px', fontWeight: 800, color: '#0f172a', marginTop: '0.35rem' }}>
-            {availableRegions.length || 1} Regions
+            {availableRegions.length} Regions
           </div>
           <div style={{ fontSize: '11px', color: '#64748b', marginTop: '0.2rem' }}>
-            {availableRegions.slice(0, 3).join(', ') || 'Gujrat'}
+            {availableRegions.slice(0, 3).join(', ') || 'No custom regions added'}
           </div>
         </div>
 
@@ -408,7 +408,7 @@ export const CustomersPage = ({ onNavigate }) => {
                           fontSize: '10px'
                         }}
                       >
-                        <MapPin size={10} /> {cust.region || 'Gujrat'}
+                        <MapPin size={10} /> {cust.region || 'Unassigned'}
                       </span>
                     </td>
                     <td style={{ color: '#475569', maxWidth: '220px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>

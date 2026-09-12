@@ -95,8 +95,14 @@ export const POSPage = ({ storeMode: propStoreMode }) => {
 
   // Wholesale & Retail Discounts (% percentage)
   const [discountPercent, setDiscountPercent] = useState('0');
-  const [includeSection23Warranty, setIncludeSection23Warranty] = useState(true);
-  const [includeDrapWarranty, setIncludeDrapWarranty] = useState(true);
+  const [includeSection23Warranty, setIncludeSection23Warranty] = useState(() => {
+    if (currentShop?.warrantySettings?.enableSec23 !== undefined) return currentShop.warrantySettings.enableSec23;
+    return true;
+  });
+  const [includeDrapWarranty, setIncludeDrapWarranty] = useState(() => {
+    if (currentShop?.warrantySettings?.enableDrap !== undefined) return currentShop.warrantySettings.enableDrap;
+    return true;
+  });
 
   // Modals state
   const [isCustomerModalOpen, setIsCustomerModalOpen] = useState(false);
@@ -161,7 +167,7 @@ export const POSPage = ({ storeMode: propStoreMode }) => {
     setCustomerData({
       customerName: c.name || c.customerName || 'Customer',
       shopName: c.shopName || c.name || '',
-      region: c.region || 'Gujrat',
+      region: c.region || '',
       customerAddress: c.address || c.customerAddress || '',
       licenseNo: c.licenseNo || '',
       customerNtn: c.ntn || c.customerNtn || '',
@@ -281,11 +287,21 @@ export const POSPage = ({ storeMode: propStoreMode }) => {
   const getMedicineStockStatus = (medicine) => {
     if (!medicine) return { status: 'OUT_OF_STOCK', reason: 'Item not found' };
     const medId = medicine.id || medicine.itemCode;
+    const medCode = medicine.itemCode ? String(medicine.itemCode).trim().toLowerCase() : '';
+    const medName = (medicine.name || medicine.brandName || '').trim().toLowerCase();
 
-    // Batches linked to this medicine
-    const medBatches = batches.filter(
-      (b) => b.medicineId === medId || b.id === medId || (medicine.name && b.medicineId === medicine.name)
-    );
+    // Batches linked to this medicine using flexible matching across ID, code, and name
+    const medBatches = batches.filter((b) => {
+      const bMedId = String(b.medicineId || b.id || '').trim();
+      const bCode = String(b.itemCode || '').trim().toLowerCase();
+      const bName = String(b.medicineName || b.name || '').trim().toLowerCase();
+
+      return (
+        (medId && bMedId === medId) ||
+        (medCode && (bMedId.toLowerCase() === medCode || bCode === medCode)) ||
+        (medName && (bMedId.toLowerCase() === medName || bName === medName))
+      );
+    });
 
     // Explicit quarantine flags
     const hasQuarantinedBatch = medBatches.some(
@@ -293,15 +309,19 @@ export const POSPage = ({ storeMode: propStoreMode }) => {
     );
     const isExplicitlyQuarantined = Boolean(medicine.isQuarantined || medicine.status === 'Quarantined RTV');
 
-    // In-stock batches (totalTabletsAvailable > 0 or boxStock > 0)
+    // In-stock batches (totalTabletsAvailable > 0)
     const inStockBatches = medBatches.filter(
-      (b) => (b.totalTabletsAvailable !== undefined ? b.totalTabletsAvailable > 0 : (b.boxStock > 0))
+      (b) => (b.totalTabletsAvailable !== undefined ? Number(b.totalTabletsAvailable) > 0 : (Number(b.boxStock) > 0))
     );
 
-    const totalStockBoxes = medicine.boxStock !== undefined ? Number(medicine.boxStock) : inStockBatches.length;
+    // Calculate effective total stock in boxes from both medicine catalog and batch totals
+    const boxStockNumber = Number(medicine.boxStock);
+    const tabsPerBox = Number(medicine.tabletsPerBox || (Number(medicine.stripsPerBox || 10) * Number(medicine.tabletsPerStrip || 10)) || 200);
+    const batchBoxes = inStockBatches.reduce((acc, b) => acc + ((Number(b.totalTabletsAvailable) || 0) / tabsPerBox), 0);
+    const totalAvailableBoxes = Math.max(!isNaN(boxStockNumber) ? boxStockNumber : 0, batchBoxes);
 
-    // If stock is depleted (0 remaining)
-    if (inStockBatches.length === 0 && totalStockBoxes <= 0) {
+    // If stock is truly depleted (0 boxes both in catalog and batches)
+    if (totalAvailableBoxes <= 0 && inStockBatches.length === 0) {
       if (hasQuarantinedBatch || isExplicitlyQuarantined) {
         return { status: 'QUARANTINED', reason: 'Quarantined RTV / Regulatory Lock' };
       }
@@ -310,28 +330,45 @@ export const POSPage = ({ storeMode: propStoreMode }) => {
 
     // If all remaining in-stock batches are quarantined
     const nonQuarantinedInStock = inStockBatches.filter((b) => b.status !== 'Quarantined RTV');
-    if (nonQuarantinedInStock.length === 0 && inStockBatches.length > 0) {
+    if (inStockBatches.length > 0 && nonQuarantinedInStock.length === 0) {
       return { status: 'QUARANTINED', reason: 'Quarantined RTV / Regulatory Lock' };
     }
 
-    // Wholesale mode: check 6-month DRAP rule
-    if (!isRetail) {
-      const validWholesaleBatch = getEarliestValidBatch(medId, true);
-      if (!validWholesaleBatch) {
-        if (inStockBatches.length > 0) {
-          const earliestCandidate = inStockBatches.sort(
-            (a, b) => new Date(a.expiryDate || '2028-01-01') - new Date(b.expiryDate || '2028-01-01')
-          )[0];
-          return { status: 'SHORT_EXPIRY', batch: earliestCandidate, reason: `Expiry (${earliestCandidate.expiryDate}) is within 6 Months` };
+    // Resolve earliest valid batch (supports passing the medicine object)
+    const resolvedBatch = getEarliestValidBatch(medicine, !isRetail);
+
+    if (!resolvedBatch) {
+      // In wholesale mode, check if item has stock but expires <= 6 months
+      if (!isRetail && (inStockBatches.length > 0 || medicine.expiryDate)) {
+        const candidateExpiry = inStockBatches[0]?.expiryDate || medicine.expiryDate;
+        if (candidateExpiry && typeof isExpiryWithin6Months === 'function' && isExpiryWithin6Months(candidateExpiry)) {
+          return { status: 'SHORT_EXPIRY', batch: inStockBatches[0], reason: `Expiry (${candidateExpiry}) is within 6 Months` };
         }
-        return { status: 'OUT_OF_STOCK', reason: 'Stock Depleted (0 Boxes Available)' };
       }
-      return { status: 'AVAILABLE', batch: validWholesaleBatch };
+
+      // If positive box stock exists, provision an active batch so sale is NEVER blocked
+      if (totalAvailableBoxes > 0) {
+        const activeProvisionedBatch = {
+          id: `BATCH-${medicine.id || 'STOCK'}-ACTIVE`,
+          batchNo: medicine.batchNo || `B26-${medicine.itemCode || 'STOCK'}`,
+          batchNumber: medicine.batchNo || `B26-${medicine.itemCode || 'STOCK'}`,
+          medicineId: medicine.id || medId,
+          distributorName: medicine.manufacturer || 'Authorized Distributor',
+          expiryDate: medicine.expiryDate || '2028-12-31',
+          totalTabletsAvailable: totalAvailableBoxes * tabsPerBox,
+          boxPrice: Number(medicine.boxSellingPrice || medicine.boxPrice || medicine.price || 600),
+          purchasePriceBox: Number(medicine.purchaseCost || medicine.purchasePriceBox || 480),
+          pricePerTablet: Number(medicine.pricePerTablet || 3.0),
+          status: 'Active Stock',
+          rackLocation: medicine.rackLocation || '',
+        };
+        return { status: 'AVAILABLE', batch: activeProvisionedBatch, availableBoxes: totalAvailableBoxes };
+      }
+
+      return { status: 'OUT_OF_STOCK', reason: 'Stock Depleted (0 Boxes Available)' };
     }
 
-    // Retail mode
-    const retailBatch = getEarliestValidBatch(medId, false);
-    return { status: 'AVAILABLE', batch: retailBatch };
+    return { status: 'AVAILABLE', batch: resolvedBatch, availableBoxes: totalAvailableBoxes };
   };
 
   const handleSelectMedicine = (medicine) => {
@@ -532,7 +569,7 @@ export const POSPage = ({ storeMode: propStoreMode }) => {
       shopName: currentShop?.shopName || 'Testing Shop',
       customerPhone: rxPatient ? rxPatient.phone : (customerData.customerPhone || ''),
       customerAddress: rxPatient ? rxPatient.address : (customerData.customerAddress || ''),
-      region: isRetail ? (rxPatient?.city || currentShop?.city || 'Lahore') : (customerData.region || currentShop?.city || 'Lahore'),
+      region: isRetail ? (rxPatient?.city || currentShop?.city || '') : (customerData.region || currentShop?.city || ''),
       deliveryMan: customerData.deliveryMan || (isRetail ? 'Counter Handover' : 'Express Delivery / Rider'),
       bookingMan: customerData.bookingMan || '',
       licenseNo: customerData.licenseNo || '',
@@ -825,7 +862,7 @@ export const POSPage = ({ storeMode: propStoreMode }) => {
                     <div>
                       <div style={{ fontWeight: 700, color: '#0f172a' }}>{c.name || c.customerName}</div>
                       <div style={{ fontSize: '10px', color: '#64748b' }}>
-                        📍 {c.region || 'Gujrat'} • Ph: {c.phone || '-'} {c.ntn && c.ntn !== '-' ? `• NTN: ${c.ntn}` : ''}
+                        {c.region ? `📍 ${c.region} • ` : ''}Ph: {c.phone || '-'} {c.ntn && c.ntn !== '-' ? `• NTN: ${c.ntn}` : ''}
                       </div>
                     </div>
                     <span style={{ fontSize: '10px', color: '#0284c7', fontWeight: 700 }}>Select ↵</span>
@@ -1062,7 +1099,7 @@ export const POSPage = ({ storeMode: propStoreMode }) => {
                             ? 'RTV Return Only' 
                             : isOutOfStock 
                             ? '0 Boxes Available' 
-                            : `Stock: ${m.boxStock !== undefined ? m.boxStock : 10} Boxes`}
+                            : `Stock: ${m.boxStock !== undefined ? m.boxStock : (stockInfo.availableBoxes || 0)} Boxes`}
                         </div>
                       </div>
                     </div>

@@ -310,14 +310,14 @@ export const InventoryPage = () => {
                         )}
                       </td>
                       <td style={{ textAlign: 'center' }}>
-                        <span className={`badge ${med.boxStock > 0 ? 'badge-success' : 'badge-danger'}`}>
-                          {med.boxStock !== undefined ? med.boxStock : 10} Boxes
+                        <span className={`badge ${Number(med.boxStock || 0) > 0 ? 'badge-success' : 'badge-danger'}`}>
+                          {med.boxStock !== undefined ? med.boxStock : 0} Boxes
                         </span>
                       </td>
 
                       {isRetail && (
                         <td style={{ textAlign: 'center', fontWeight: 700, color: '#0284c7' }}>
-                          {((med.boxStock !== undefined ? med.boxStock : 10) * (med.tabletsPerBox || 200))} Tabs
+                          {((med.boxStock !== undefined ? med.boxStock : 0) * (med.tabletsPerBox || 200))} Tabs
                         </td>
                       )}
 

@@ -1,28 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { X, UserPlus, Building, MapPin, Phone, FileText, CheckCircle, CreditCard, ShieldCheck } from 'lucide-react';
 
-const COMMON_REGIONS = [
-  'Gujrat',
-  'Lahore',
-  'Islamabad',
-  'Rawalpindi',
-  'Karianwala',
-  'Tanda',
-  'Jhelum',
-  'Gujranwala',
-  'Sialkot',
-  'Faisalabad',
-  'Multan',
-  'Peshawar',
-  'Karachi',
-  'Quetta',
-];
-
 export const CustomerFormModal = ({ isOpen, customer = null, initialQuery = '', onClose, onSave }) => {
   const [name, setName] = useState('');
   const [shopName, setShopName] = useState('');
-  const [region, setRegion] = useState('Gujrat');
-  const [customRegion, setCustomRegion] = useState('');
+  const [region, setRegion] = useState('');
   const [address, setAddress] = useState('');
   const [ntn, setNtn] = useState('');
   const [gstn, setGstn] = useState('');
@@ -35,15 +17,7 @@ export const CustomerFormModal = ({ isOpen, customer = null, initialQuery = '', 
     if (customer) {
       setName(customer.name || customer.customerName || '');
       setShopName(customer.shopName || customer.name || '');
-      if (COMMON_REGIONS.includes(customer.region)) {
-        setRegion(customer.region);
-        setCustomRegion('');
-      } else if (customer.region) {
-        setRegion('OTHER');
-        setCustomRegion(customer.region);
-      } else {
-        setRegion('Gujrat');
-      }
+      setRegion(customer.region || '');
       setAddress(customer.address || customer.customerAddress || '');
       setNtn(customer.ntn || customer.customerNtn || '');
       setGstn(customer.gstn || customer.customerStrn || customer.strn || '');
@@ -54,8 +28,7 @@ export const CustomerFormModal = ({ isOpen, customer = null, initialQuery = '', 
     } else {
       setName(initialQuery || '');
       setShopName(initialQuery || '');
-      setRegion('Gujrat');
-      setCustomRegion('');
+      setRegion('');
       setAddress('');
       setNtn('');
       setGstn('');
@@ -72,7 +45,7 @@ export const CustomerFormModal = ({ isOpen, customer = null, initialQuery = '', 
     e.preventDefault();
     if (!name.trim()) return;
 
-    const resolvedRegion = region === 'OTHER' ? (customRegion.trim() || 'General') : region;
+    const resolvedRegion = region.trim() || 'General';
 
     const savedRecord = {
       id: customer?.id || `CUST-${Date.now().toString().slice(-6)}`,
@@ -235,9 +208,12 @@ export const CustomerFormModal = ({ isOpen, customer = null, initialQuery = '', 
               <label style={{ fontSize: '11px', fontWeight: 700, color: '#334155', display: 'block', marginBottom: '0.25rem' }}>
                 Region / Territory <span style={{ color: '#dc2626' }}>*</span>
               </label>
-              <select
+              <input
+                type="text"
                 value={region}
                 onChange={(e) => setRegion(e.target.value)}
+                placeholder="e.g. Gujrat / Dinga / Rawalpindi / Market Zone"
+                required
                 style={{
                   width: '100%',
                   padding: '0.5rem 0.75rem',
@@ -247,31 +223,7 @@ export const CustomerFormModal = ({ isOpen, customer = null, initialQuery = '', 
                   outline: 'none',
                   backgroundColor: '#ffffff',
                 }}
-              >
-                {COMMON_REGIONS.map((r) => (
-                  <option key={r} value={r}>{r}</option>
-                ))}
-                <option value="OTHER">+ Enter Other Region...</option>
-              </select>
-
-              {region === 'OTHER' && (
-                <input
-                  type="text"
-                  value={customRegion}
-                  onChange={(e) => setCustomRegion(e.target.value)}
-                  placeholder="Type Custom City / Territory Name"
-                  required
-                  style={{
-                    width: '100%',
-                    marginTop: '0.35rem',
-                    padding: '0.45rem 0.75rem',
-                    borderRadius: '8px',
-                    border: '1px solid #0284c7',
-                    fontSize: '12px',
-                    outline: 'none',
-                  }}
-                />
-              )}
+              />
             </div>
 
             {/* Phone / Mobile */}

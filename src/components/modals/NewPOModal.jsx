@@ -57,7 +57,7 @@ export const NewPOModal = ({ isOpen, onClose }) => {
   const [isAddingNewCompany, setIsAddingNewCompany] = useState(false);
   const [newCompName, setNewCompName] = useState('');
   const [newCompPhone, setNewCompPhone] = useState('');
-  const [newCompCity, setNewCompCity] = useState('Gujrat');
+  const [newCompCity, setNewCompCity] = useState('');
   const [newCompLicense, setNewCompLicense] = useState('');
   const [newCompNtn, setNewCompNtn] = useState('');
   const [newCompGst, setNewCompGst] = useState('');
@@ -137,7 +137,7 @@ export const NewPOModal = ({ isOpen, onClose }) => {
       name: newCompName.trim(),
       companyName: newCompName.trim(),
       phone: newCompPhone.trim() || '0300-1234567',
-      city: newCompCity.trim() || 'Gujrat',
+      city: newCompCity.trim() || '',
       licenseNo: newCompLicense.trim() || 'DL-FORM-20/21',
       ntn: newCompNtn.trim() || 'NTN-00000-0',
       gstin: newCompGst.trim() || 'STRN-0000-0',

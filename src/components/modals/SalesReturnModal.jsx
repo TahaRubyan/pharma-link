@@ -100,7 +100,7 @@ export const SalesReturnModal = ({ isOpen, onClose }) => {
                 Invoice #{selectedInvoice.invoiceNo} — {selectedInvoice.customerName || selectedInvoice.shopName}
               </div>
               <div style={{ fontSize: '11px', color: '#64748b' }}>
-                Date: {selectedInvoice.date} | Region: {selectedInvoice.region || 'Gujrat'} | Total: Rs. {Number(selectedInvoice.netTotal || 0).toFixed(2)}
+                Date: {selectedInvoice.date} | Region: {selectedInvoice.region || 'Unassigned'} | Total: Rs. {Number(selectedInvoice.netTotal || 0).toFixed(2)}
               </div>
             </div>
 
