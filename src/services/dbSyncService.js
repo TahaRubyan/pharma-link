@@ -28,7 +28,7 @@ export const dbSyncService = {
       if (data && data.length > 0) {
         // Map database snake_case to app camelCase
         return data.map((m) => ({
-          id: m.id,
+          id: m.id.startsWith(`${tenantId}_`) ? m.id.slice(tenantId.length + 1) : m.id,
           tenantId: m.tenant_id,
           itemCode: m.item_code,
           barcode: m.barcode,
@@ -51,7 +51,7 @@ export const dbSyncService = {
           controlledType: m.controlled_type,
         }));
       }
-      return null;
+      return [];
     } catch (err) {
       console.warn('[dbSync] fetchMedicines network exception:', err.message);
       return null;
@@ -61,27 +61,31 @@ export const dbSyncService = {
   async syncMedicinesUpstream(tenantId, medicines = []) {
     if (!isSupabaseConfigured || !supabase || !medicines.length) return;
     try {
-      const rows = medicines.map((m) => ({
-        id: m.id || `MED-${m.itemCode || Math.floor(1000 + Math.random() * 9000)}`,
-        tenant_id: tenantId,
-        item_code: m.itemCode || '',
-        barcode: m.barcode || '',
-        name: m.name || m.brandName,
-        brand_name: m.brandName || m.name,
-        generic_formula: m.genericFormula || m.formula || '',
-        category: m.category || 'General',
-        rack_location: m.rackLocation || 'Rack A-01',
-        box_stock: Number(m.boxStock || 0),
-        loose_units_stock: Number(m.looseUnitsStock || 0),
-        tablets_per_box: Number(m.tabletsPerBox || 100),
-        strips_per_box: Number(m.stripsPerBox || 10),
-        box_price: Number(m.boxSellingPrice || m.boxPrice || m.price || 0),
-        strip_price: Number(m.stripPrice || 0),
-        price_per_tablet: Number(m.pricePerTablet || 0),
-        requires_prescription: Boolean(m.requiresPrescription),
-        controlled_type: m.controlledType || 'OTC',
-        updated_at: new Date().toISOString(),
-      }));
+      const rows = medicines.map((m) => {
+        const rawId = m.id || `MED-${m.itemCode || Math.floor(1000 + Math.random() * 9000)}`;
+        const scopedId = rawId.startsWith(`${tenantId}_`) ? rawId : `${tenantId}_${rawId}`;
+        return {
+          id: scopedId,
+          tenant_id: tenantId,
+          item_code: m.itemCode || '',
+          barcode: m.barcode || '',
+          name: m.name || m.brandName,
+          brand_name: m.brandName || m.name,
+          generic_formula: m.genericFormula || m.formula || '',
+          category: m.category || 'General',
+          rack_location: m.rackLocation || 'Rack A-01',
+          box_stock: Number(m.boxStock || 0),
+          loose_units_stock: Number(m.looseUnitsStock || 0),
+          tablets_per_box: Number(m.tabletsPerBox || 100),
+          strips_per_box: Number(m.stripsPerBox || 10),
+          box_price: Number(m.boxSellingPrice || m.boxPrice || m.price || 0),
+          strip_price: Number(m.stripPrice || 0),
+          price_per_tablet: Number(m.pricePerTablet || 0),
+          requires_prescription: Boolean(m.requiresPrescription),
+          controlled_type: m.controlledType || 'OTC',
+          updated_at: new Date().toISOString(),
+        };
+      });
 
       const { error } = await supabase
         .from('medicines')
@@ -92,6 +96,86 @@ export const dbSyncService = {
       }
     } catch (err) {
       console.warn('[dbSync] syncMedicinesUpstream exception:', err.message);
+    }
+  },
+
+  async fetchBatches(tenantId = 'TEN-TESTING-SHOP') {
+    if (!isSupabaseConfigured || !supabase) return null;
+    try {
+      const { data, error } = await supabase
+        .from('batches')
+        .select('*')
+        .eq('tenant_id', tenantId);
+
+      if (error) {
+        console.warn('[dbSync] fetchBatches error:', error.message);
+        return null;
+      }
+      if (data && data.length > 0) {
+        return data.map((b) => ({
+          id: b.id.startsWith(`${tenantId}_`) ? b.id.slice(tenantId.length + 1) : b.id,
+          tenantId: b.tenant_id,
+          medicineId: b.medicine_id ? (b.medicine_id.startsWith(`${tenantId}_`) ? b.medicine_id.slice(tenantId.length + 1) : b.medicine_id) : '',
+          batchNo: b.batch_no,
+          batchNumber: b.batch_no,
+          expiryDate: b.expiry_date,
+          boxStock: Number(b.box_stock || 0),
+          totalTabletsAvailable: Number(b.total_tablets_available || 0),
+          boxPrice: Number(b.box_price || 0),
+          purchasePriceBox: Number(b.purchase_price_box || 0),
+          pricePerTablet: Number(b.price_per_tablet || 0),
+          status: b.status || 'Active Stock',
+          rackLocation: b.rack_location || '',
+        }));
+      }
+      return [];
+    } catch (err) {
+      console.warn('[dbSync] fetchBatches network exception:', err.message);
+      return null;
+    }
+  },
+
+  async syncBatchesUpstream(tenantId, batches = []) {
+    if (!isSupabaseConfigured || !supabase || !batches.length) return;
+    try {
+      const rows = batches.map((b) => {
+        const rawId = b.id || b.batchNo || b.batchNumber || String(Math.floor(1000 + Math.random() * 9000));
+        const scopedId = rawId.startsWith(`${tenantId}_`) ? rawId : `${tenantId}_${rawId}`;
+        const rawMedId = b.medicineId || '';
+        const scopedMedId = rawMedId.startsWith(`${tenantId}_`) ? rawMedId : (rawMedId ? `${tenantId}_${rawMedId}` : '');
+        
+        let validExpiry = b.expiryDate || '2028-12-31';
+        if (validExpiry.includes('-') && validExpiry.split('-')[0].length === 2) {
+          const parts = validExpiry.split('-');
+          validExpiry = `${parts[1]}-${parts[0]}-01`;
+        }
+
+        return {
+          id: scopedId,
+          tenant_id: tenantId,
+          medicine_id: scopedMedId,
+          batch_no: b.batchNo || b.batchNumber || 'BN-101',
+          expiry_date: validExpiry,
+          box_stock: Number(b.boxStock || 0),
+          total_tablets_available: Number(b.totalTabletsAvailable || b.totalTablets || 0),
+          box_price: Number(b.boxPrice || 0),
+          purchase_price_box: Number(b.purchasePriceBox || 0),
+          price_per_tablet: Number(b.pricePerTablet || 0),
+          status: b.status || 'Active Stock',
+          rack_location: b.rackLocation || '',
+          created_at: new Date().toISOString(),
+        };
+      });
+
+      const { error } = await supabase
+        .from('batches')
+        .upsert(rows, { onConflict: 'id' });
+
+      if (error) {
+        console.warn('[dbSync] syncBatchesUpstream error:', error.message);
+      }
+    } catch (err) {
+      console.warn('[dbSync] syncBatchesUpstream exception:', err.message);
     }
   },
 
@@ -149,7 +233,7 @@ export const dbSyncService = {
           items: inv.items || [],
         }));
       }
-      return null;
+      return [];
     } catch (err) {
       console.warn('[dbSync] fetchInvoices exception:', err.message);
       return null;
@@ -215,8 +299,9 @@ export const dbSyncService = {
       if (error) return null;
       if (data && data.length > 0) {
         return data.map((s) => ({
-          id: s.id,
+          id: s.id.startsWith(`${tenantId}_`) ? s.id.slice(tenantId.length + 1) : s.id,
           name: s.name,
+          companyName: s.name,
           contactPerson: s.contact_person,
           phone: s.phone,
           ntn: s.ntn,
@@ -226,7 +311,7 @@ export const dbSyncService = {
           paymentTerms: s.payment_terms,
         }));
       }
-      return null;
+      return [];
     } catch (e) {
       return null;
     }
@@ -235,10 +320,12 @@ export const dbSyncService = {
   async saveSupplier(tenantId, supplier) {
     if (!isSupabaseConfigured || !supabase || !supplier) return;
     try {
+      const rawId = supplier.id || `SUP-${Date.now()}`;
+      const scopedId = rawId.startsWith(`${tenantId}_`) ? rawId : `${tenantId}_${rawId}`;
       const row = {
-        id: supplier.id || `SUP-${Date.now()}`,
+        id: scopedId,
         tenant_id: tenantId,
-        name: supplier.name,
+        name: supplier.name || supplier.companyName || 'Supplier',
         contact_person: supplier.contactPerson || supplier.contact || '',
         phone: supplier.phone || '',
         ntn: supplier.ntn || '',
@@ -262,9 +349,14 @@ export const dbSyncService = {
         return data.map((p) => ({
           id: p.po_number,
           poNumber: p.po_number,
+          poReference: p.po_number,
           supplierId: p.supplier_id,
           supplierName: p.supplier_name,
+          distributor: p.supplier_name,
+          distributorName: p.supplier_name,
           orderDate: p.order_date,
+          date: p.order_date,
+          inwardDate: p.order_date,
           deliveryDate: p.delivery_date,
           paymentMethod: p.payment_method,
           paymentStatus: p.payment_status,
@@ -274,7 +366,7 @@ export const dbSyncService = {
           items: p.items || [],
         }));
       }
-      return null;
+      return [];
     } catch (e) {
       return null;
     }
@@ -287,14 +379,14 @@ export const dbSyncService = {
         po_number: po.poNumber || po.id,
         tenant_id: tenantId,
         supplier_id: po.supplierId || null,
-        supplier_name: po.supplierName || '',
-        order_date: po.orderDate || new Date().toISOString().split('T')[0],
+        supplier_name: po.supplierName || po.distributorName || po.distributor || '',
+        order_date: po.inwardDate || po.date || po.orderDate || new Date().toISOString().split('T')[0],
         delivery_date: po.deliveryDate || '',
-        payment_method: po.paymentMethod || 'Bank IBFT',
+        payment_method: po.paymentMethod || po.paymentMode || 'Bank IBFT',
         payment_status: po.paymentStatus || 'PAID',
-        gross_cost: Number(po.grossCost || po.totalAmount || 0),
+        gross_cost: Number(po.grossCost || po.totalCost || po.totalAmount || 0),
         input_tax: Number(po.inputTax || 0),
-        total_amount: Number(po.totalAmount || po.grossCost || 0),
+        total_amount: Number(po.totalAmount || po.totalCost || po.grossCost || 0),
         items: po.items || [],
       };
       await supabase.from('purchase_orders').upsert(row, { onConflict: 'po_number' });

@@ -28,7 +28,7 @@ import WholesaleDashboardPage from './pages/WholesaleDashboardPage';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
 
 // Clean-slate deployment migration: Purge old test cache so user starts completely clean
-if (typeof window !== 'undefined' && !localStorage.getItem('pharmalink_clean_slate_v7')) {
+if (typeof window !== 'undefined' && !localStorage.getItem('pharmalink_clean_slate_v8_isolation')) {
   [
     'pharmalink_medicines',
     'pharmalink_pk_medicines',
@@ -59,24 +59,27 @@ if (typeof window !== 'undefined' && !localStorage.getItem('pharmalink_clean_sla
     'pharmalink_hold_carts',
     'pharmalink_last_invoice',
     'pharmalink_last_sale',
-    'pharmalink_staff_accounts',
-    'pharmalink_staff_list',
-    'medistore_tenants_list',
-    'medistore_client_payment_logs',
-    'pharmalink_active_shop',
-    'pharmalink_is_auth',
-    'medistore_account_type',
-    'pharmalink_user_role',
-    'pharmalink_session_login_role',
-    'pharmalink_current_screen'
   ].forEach((key) => {
     try {
       localStorage.removeItem(key);
     } catch (e) {}
   });
-  localStorage.setItem('pharmalink_wholesale_cleared', 'true');
-  localStorage.setItem('pharmalink_retail_cleared', 'true');
-  localStorage.setItem('pharmalink_clean_slate_v7', 'true');
+
+  // Purge any contaminated tenant-prefixed inventory keys from prior cache
+  try {
+    const allKeys = Object.keys(localStorage);
+    allKeys.forEach((k) => {
+      if (
+        k.startsWith('pharmalink_TEN-IDREES-PHARMA_wholesale_') ||
+        k.startsWith('pharmalink_TEN-IDREES-PHARMA_retail_') ||
+        k.startsWith('pharmalink_CP-')
+      ) {
+        localStorage.removeItem(k);
+      }
+    });
+  } catch (e) {}
+
+  localStorage.setItem('pharmalink_clean_slate_v8_isolation', 'true');
 }
 
 // Error Boundary Fallback
@@ -272,24 +275,35 @@ function AppContent() {
   );
 }
 
+function TenantDataProviders({ children }) {
+  const { currentShop } = useAuth();
+  const activeTenantId = currentShop?.shopId || 'TEN-TESTING-SHOP';
+
+  return (
+    <InventoryProvider key={`inv-${activeTenantId}`}>
+      <SupplierProvider key={`sup-${activeTenantId}`}>
+        <PatientProvider key={`pat-${activeTenantId}`}>
+          <SalesProvider key={`sales-${activeTenantId}`}>
+            <CartProvider key={`cart-${activeTenantId}`}>
+              <CustomerDebtProvider key={`debt-${activeTenantId}`}>
+                {children}
+              </CustomerDebtProvider>
+            </CartProvider>
+          </SalesProvider>
+        </PatientProvider>
+      </SupplierProvider>
+    </InventoryProvider>
+  );
+}
+
 export function App() {
   return (
     <ErrorBoundary>
       <PWAProvider>
         <AuthProvider>
-          <InventoryProvider>
-            <SupplierProvider>
-              <PatientProvider>
-                <SalesProvider>
-                  <CartProvider>
-                    <CustomerDebtProvider>
-                      <AppContent />
-                    </CustomerDebtProvider>
-                  </CartProvider>
-                </SalesProvider>
-              </PatientProvider>
-            </SupplierProvider>
-          </InventoryProvider>
+          <TenantDataProviders>
+            <AppContent />
+          </TenantDataProviders>
         </AuthProvider>
       </PWAProvider>
     </ErrorBoundary>

@@ -5,38 +5,54 @@ import { dbSyncService } from '../services/dbSyncService';
 
 const SupplierContext = createContext();
 
+const getSupplierStorageKey = (tenantId, type, mode) => {
+  const tid = tenantId || 'TEN-TESTING-SHOP';
+  if (tid === 'TEN-TESTING-SHOP') {
+    return mode === 'RETAIL' ? `pharmalink_retail_${type}` : `pharmalink_pk_${type}`;
+  }
+  return `pharmalink_${tid}_${mode === 'RETAIL' ? 'retail' : 'wholesale'}_${type}`;
+};
+
 export const SupplierProvider = ({ children }) => {
   const auth = useContext(AuthContext);
+  const activeTenantId = auth?.currentShop?.shopId || 'TEN-TESTING-SHOP';
+  const isTestingShop = activeTenantId === 'TEN-TESTING-SHOP';
   const isRetail = auth?.currentShop?.mode === 'RETAIL';
 
+  // Wholesale Suppliers: strictly scoped per-tenant. Non-testing shops start blank [].
   const [wholesaleSuppliers, setWholesaleSuppliers] = useState(() => {
-    const isCleared = typeof localStorage !== 'undefined' && localStorage.getItem('pharmalink_wholesale_cleared') === 'true';
-    if (isCleared) return [];
-
-    const saved = localStorage.getItem('pharmalink_pk_suppliers');
+    const wsKey = getSupplierStorageKey(activeTenantId, 'suppliers', 'WHOLESALE');
+    const saved = localStorage.getItem(wsKey);
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      } catch (e) {
-        console.error('Failed to parse saved suppliers', e);
-      }
+      } catch (e) {}
     }
-    return INITIAL_SUPPLIERS;
+    if (isTestingShop) {
+      const isCleared = typeof localStorage !== 'undefined' && localStorage.getItem('pharmalink_wholesale_cleared') === 'true';
+      if (isCleared) return [];
+      return INITIAL_SUPPLIERS;
+    }
+    return [];
   });
 
+  // Retail Suppliers: strictly scoped per-tenant. Non-testing shops start blank [].
   const [retailSuppliers, setRetailSuppliers] = useState(() => {
-    const isCleared = typeof localStorage !== 'undefined' && localStorage.getItem('pharmalink_retail_cleared') === 'true';
-    if (isCleared) return [];
-
-    const saved = typeof localStorage !== 'undefined' ? localStorage.getItem('pharmalink_retail_suppliers') : null;
+    const retKey = getSupplierStorageKey(activeTenantId, 'suppliers', 'RETAIL');
+    const saved = localStorage.getItem(retKey);
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
       } catch (e) {}
     }
-    return INITIAL_SUPPLIERS;
+    if (isTestingShop) {
+      const isCleared = typeof localStorage !== 'undefined' && localStorage.getItem('pharmalink_retail_cleared') === 'true';
+      if (isCleared) return [];
+      return INITIAL_SUPPLIERS;
+    }
+    return [];
   });
 
   const suppliers = isRetail ? retailSuppliers : wholesaleSuppliers;
@@ -45,83 +61,40 @@ export const SupplierProvider = ({ children }) => {
     else setWholesaleSuppliers(updater);
   };
 
-  const activeTenantId = auth?.currentShop?.shopId || 'TEN-TESTING-SHOP';
-  const prevTenantRef = useRef(activeTenantId);
-
-  useEffect(() => {
-    if (prevTenantRef.current !== activeTenantId) {
-      prevTenantRef.current = activeTenantId;
-
-      if (activeTenantId === 'TEN-TESTING-SHOP') {
-        const savedWs = localStorage.getItem('pharmalink_pk_suppliers');
-        const savedRet = localStorage.getItem('pharmalink_retail_suppliers');
-        setWholesaleSuppliers(savedWs ? JSON.parse(savedWs) : INITIAL_SUPPLIERS);
-        setRetailSuppliers(savedRet ? JSON.parse(savedRet) : INITIAL_SUPPLIERS);
-
-        const savedWsPO = localStorage.getItem('pharmalink_pk_purchase_orders');
-        const savedRetPO = localStorage.getItem('pharmalink_retail_purchase_orders');
-        setWholesalePurchaseOrders(savedWsPO ? JSON.parse(savedWsPO) : INITIAL_PURCHASE_ORDERS);
-        setRetailPurchaseOrders(savedRetPO ? JSON.parse(savedRetPO) : INITIAL_PURCHASE_ORDERS);
-      } else {
-        const wsKey = `pharmalink_${activeTenantId}_wholesale_suppliers`;
-        const retKey = `pharmalink_${activeTenantId}_retail_suppliers`;
-        const savedWs = localStorage.getItem(wsKey);
-        const savedRet = localStorage.getItem(retKey);
-        setWholesaleSuppliers(savedWs ? JSON.parse(savedWs) : []);
-        setRetailSuppliers(savedRet ? JSON.parse(savedRet) : []);
-
-        const wsPOKey = `pharmalink_${activeTenantId}_wholesale_purchase_orders`;
-        const retPOKey = `pharmalink_${activeTenantId}_retail_purchase_orders`;
-        const savedWsPO = localStorage.getItem(wsPOKey);
-        const savedRetPO = localStorage.getItem(retPOKey);
-        setWholesalePurchaseOrders(savedWsPO ? JSON.parse(savedWsPO) : []);
-        setRetailPurchaseOrders(savedRetPO ? JSON.parse(savedRetPO) : []);
-      }
-    }
-  }, [activeTenantId]);
-
-  useEffect(() => {
-    try {
-      const key = activeTenantId === 'TEN-TESTING-SHOP' ? 'pharmalink_pk_suppliers' : `pharmalink_${activeTenantId}_wholesale_suppliers`;
-      localStorage.setItem(key, JSON.stringify(wholesaleSuppliers));
-    } catch (e) {}
-  }, [wholesaleSuppliers, activeTenantId]);
-
-  useEffect(() => {
-    try {
-      const key = activeTenantId === 'TEN-TESTING-SHOP' ? 'pharmalink_retail_suppliers' : `pharmalink_${activeTenantId}_retail_suppliers`;
-      localStorage.setItem(key, JSON.stringify(retailSuppliers));
-    } catch (e) {}
-  }, [retailSuppliers, activeTenantId]);
-
+  // Wholesale Purchase Orders: strictly scoped per-tenant. Non-testing shops start blank [].
   const [wholesalePurchaseOrders, setWholesalePurchaseOrders] = useState(() => {
-    const isCleared = typeof localStorage !== 'undefined' && localStorage.getItem('pharmalink_wholesale_cleared') === 'true';
-    if (isCleared) return [];
-
-    const saved = localStorage.getItem('pharmalink_pk_purchase_orders');
+    const wsPOKey = getSupplierStorageKey(activeTenantId, 'purchase_orders', 'WHOLESALE');
+    const saved = localStorage.getItem(wsPOKey);
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      } catch (e) {
-        console.error('Failed to parse saved purchase orders', e);
-      }
+      } catch (e) {}
     }
-    return INITIAL_PURCHASE_ORDERS;
+    if (isTestingShop) {
+      const isCleared = typeof localStorage !== 'undefined' && localStorage.getItem('pharmalink_wholesale_cleared') === 'true';
+      if (isCleared) return [];
+      return INITIAL_PURCHASE_ORDERS;
+    }
+    return [];
   });
 
+  // Retail Purchase Orders: strictly scoped per-tenant. Non-testing shops start blank [].
   const [retailPurchaseOrders, setRetailPurchaseOrders] = useState(() => {
-    const isCleared = typeof localStorage !== 'undefined' && localStorage.getItem('pharmalink_retail_cleared') === 'true';
-    if (isCleared) return [];
-
-    const saved = typeof localStorage !== 'undefined' ? localStorage.getItem('pharmalink_retail_purchase_orders') : null;
+    const retPOKey = getSupplierStorageKey(activeTenantId, 'purchase_orders', 'RETAIL');
+    const saved = localStorage.getItem(retPOKey);
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
       } catch (e) {}
     }
-    return INITIAL_PURCHASE_ORDERS;
+    if (isTestingShop) {
+      const isCleared = typeof localStorage !== 'undefined' && localStorage.getItem('pharmalink_retail_cleared') === 'true';
+      if (isCleared) return [];
+      return INITIAL_PURCHASE_ORDERS;
+    }
+    return [];
   });
 
   const purchaseOrders = isRetail ? retailPurchaseOrders : wholesalePurchaseOrders;
@@ -130,41 +103,62 @@ export const SupplierProvider = ({ children }) => {
     else setWholesalePurchaseOrders(updater);
   };
 
+  // Sync to local storage strictly with tenant-scoped keys
   useEffect(() => {
     try {
-      localStorage.setItem('pharmalink_pk_purchase_orders', JSON.stringify(wholesalePurchaseOrders));
+      const key = getSupplierStorageKey(activeTenantId, 'suppliers', 'WHOLESALE');
+      localStorage.setItem(key, JSON.stringify(wholesaleSuppliers));
     } catch (e) {}
-  }, [wholesalePurchaseOrders]);
+  }, [wholesaleSuppliers, activeTenantId]);
 
   useEffect(() => {
     try {
-      localStorage.setItem('pharmalink_retail_purchase_orders', JSON.stringify(retailPurchaseOrders));
+      const key = getSupplierStorageKey(activeTenantId, 'suppliers', 'RETAIL');
+      localStorage.setItem(key, JSON.stringify(retailSuppliers));
     } catch (e) {}
-  }, [retailPurchaseOrders]);
+  }, [retailSuppliers, activeTenantId]);
+
+  useEffect(() => {
+    try {
+      const key = getSupplierStorageKey(activeTenantId, 'purchase_orders', 'WHOLESALE');
+      localStorage.setItem(key, JSON.stringify(wholesalePurchaseOrders));
+    } catch (e) {}
+  }, [wholesalePurchaseOrders, activeTenantId]);
+
+  useEffect(() => {
+    try {
+      const key = getSupplierStorageKey(activeTenantId, 'purchase_orders', 'RETAIL');
+      localStorage.setItem(key, JSON.stringify(retailPurchaseOrders));
+    } catch (e) {}
+  }, [retailPurchaseOrders, activeTenantId]);
 
   // Initial cloud sync from Supabase
   useEffect(() => {
-    const tenantId = auth?.currentShop?.shopId || 'TEN-TESTING-SHOP';
-    dbSyncService.fetchSuppliers(tenantId).then((cloudSuppliers) => {
-      if (cloudSuppliers && cloudSuppliers.length > 0) {
-        setSuppliers((prev) => {
-          const map = new Map(prev.map((s) => [s.id, s]));
-          cloudSuppliers.forEach((s) => map.set(s.id, s));
-          return Array.from(map.values());
-        });
+    let isMounted = true;
+    dbSyncService.fetchSuppliers(activeTenantId).then((cloudSuppliers) => {
+      if (!isMounted) return;
+      if (cloudSuppliers && Array.isArray(cloudSuppliers) && cloudSuppliers.length > 0) {
+        if (isRetail) {
+          setRetailSuppliers(cloudSuppliers);
+        } else {
+          setWholesaleSuppliers(cloudSuppliers);
+        }
       }
     }).catch(() => {});
 
-    dbSyncService.fetchPurchaseOrders(tenantId).then((cloudPOs) => {
-      if (cloudPOs && cloudPOs.length > 0) {
-        setPurchaseOrders((prev) => {
-          const map = new Map(prev.map((p) => [p.poNumber || p.id, p]));
-          cloudPOs.forEach((p) => map.set(p.poNumber || p.id, p));
-          return Array.from(map.values());
-        });
+    dbSyncService.fetchPurchaseOrders(activeTenantId).then((cloudPOs) => {
+      if (!isMounted) return;
+      if (cloudPOs && Array.isArray(cloudPOs) && cloudPOs.length > 0) {
+        if (isRetail) {
+          setRetailPurchaseOrders(cloudPOs);
+        } else {
+          setWholesalePurchaseOrders(cloudPOs);
+        }
       }
     }).catch(() => {});
-  }, [auth?.currentShop?.shopId]);
+
+    return () => { isMounted = false; };
+  }, [activeTenantId, isRetail]);
 
   // Helper to generate PO Number: PO-YYYYMMDD-XXXX
   const generatePONumber = () => {

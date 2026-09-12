@@ -1,22 +1,25 @@
 import React, { createContext, useContext, useState, useMemo, useEffect, useCallback } from 'react';
 import { useInventory } from './InventoryContext';
 import { useSales } from './SalesContext';
+import { AuthContext } from './AuthContext';
 import { storageManager } from '../services/storageManager';
 
 const CartContext = createContext();
 
 export const CartProvider = ({ children }) => {
+  const auth = useContext(AuthContext);
+  const activeTenantId = auth?.currentShop?.shopId || 'TEN-TESTING-SHOP';
   const { deductStock } = useInventory();
   const { recordSale } = useSales();
 
-  // Persistent state for cart items so navigating screens doesn't clear cart
+  // Persistent state for cart items strictly scoped to active tenant
   const [cart, setCart] = useState(() => {
-    const saved = localStorage.getItem('pharmalink_pos_cart');
+    const saved = localStorage.getItem(`pharmalink_${activeTenantId}_pos_cart`);
     return saved ? JSON.parse(saved) : [];
   });
 
-  const [customerName, setCustomerName] = useState(() => localStorage.getItem('pharmalink_pos_cust') || '');
-  const [doctorName, setDoctorName] = useState(() => localStorage.getItem('pharmalink_pos_doc') || '');
+  const [customerName, setCustomerName] = useState(() => localStorage.getItem(`pharmalink_${activeTenantId}_pos_cust`) || '');
+  const [doctorName, setDoctorName] = useState(() => localStorage.getItem(`pharmalink_${activeTenantId}_pos_doc`) || '');
   const [rxPatient, setRxPatient] = useState(null);
   const [activeModal, setActiveModal] = useState(null);
   const [saleType, setSaleType] = useState('Retail'); // 'Retail' vs 'Bulk'
@@ -27,18 +30,18 @@ export const CartProvider = ({ children }) => {
   const [lastCompletedSale, setLastCompletedSale] = useState(null);
   const [isProcessingCheckout, setIsProcessingCheckout] = useState(false);
 
-  // Sync cart to storage
+  // Sync cart to storage strictly scoped to active tenant
   useEffect(() => {
-    storageManager.safeSetItem('pharmalink_pos_cart', cart);
-  }, [cart]);
+    storageManager.safeSetItem(`pharmalink_${activeTenantId}_pos_cart`, cart);
+  }, [cart, activeTenantId]);
 
   useEffect(() => {
-    storageManager.safeSetItem('pharmalink_pos_cust', customerName);
-  }, [customerName]);
+    storageManager.safeSetItem(`pharmalink_${activeTenantId}_pos_cust`, customerName);
+  }, [customerName, activeTenantId]);
 
   useEffect(() => {
-    storageManager.safeSetItem('pharmalink_pos_doc', doctorName);
-  }, [doctorName]);
+    storageManager.safeSetItem(`pharmalink_${activeTenantId}_pos_doc`, doctorName);
+  }, [doctorName, activeTenantId]);
 
   const round2 = (num) => Math.round((Number(num || 0) + Number.EPSILON) * 100) / 100;
 

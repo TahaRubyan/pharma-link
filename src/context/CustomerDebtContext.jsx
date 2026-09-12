@@ -4,36 +4,54 @@ import { AuthContext, useAuth } from './AuthContext';
 
 const CustomerDebtContext = createContext();
 
+const getDebtStorageKey = (tenantId, mode) => {
+  const tid = tenantId || 'TEN-TESTING-SHOP';
+  if (tid === 'TEN-TESTING-SHOP') {
+    return mode === 'RETAIL' ? 'pharmalink_retail_debt_customers' : 'pharmalink_debt_customers';
+  }
+  return `pharmalink_${tid}_${mode === 'RETAIL' ? 'retail' : 'wholesale'}_customers`;
+};
+
 export const CustomerDebtProvider = ({ children }) => {
   const auth = useContext(AuthContext);
+  const activeTenantId = auth?.currentShop?.shopId || 'TEN-TESTING-SHOP';
+  const isTestingShop = activeTenantId === 'TEN-TESTING-SHOP';
   const isRetail = auth?.currentShop?.mode === 'RETAIL';
 
+  // Wholesale Debt Customers: strictly scoped per-tenant. Non-testing shops start blank [].
   const [wholesaleDebtCustomers, setWholesaleDebtCustomers] = useState(() => {
-    const isCleared = typeof localStorage !== 'undefined' && localStorage.getItem('pharmalink_wholesale_cleared') === 'true';
-    if (isCleared) return [];
-
-    const saved = localStorage.getItem('pharmalink_debt_customers');
+    const wsKey = getDebtStorageKey(activeTenantId, 'WHOLESALE');
+    const saved = localStorage.getItem(wsKey);
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) return parsed;
       } catch (e) {}
     }
-    return INITIAL_DEBT_CUSTOMERS;
+    if (isTestingShop) {
+      const isCleared = typeof localStorage !== 'undefined' && localStorage.getItem('pharmalink_wholesale_cleared') === 'true';
+      if (isCleared) return [];
+      return INITIAL_DEBT_CUSTOMERS;
+    }
+    return [];
   });
 
+  // Retail Debt Customers: strictly scoped per-tenant. Non-testing shops start blank [].
   const [retailDebtCustomers, setRetailDebtCustomers] = useState(() => {
-    const isCleared = typeof localStorage !== 'undefined' && localStorage.getItem('pharmalink_retail_cleared') === 'true';
-    if (isCleared) return [];
-
-    const saved = typeof localStorage !== 'undefined' ? localStorage.getItem('pharmalink_retail_debt_customers') : null;
+    const retKey = getDebtStorageKey(activeTenantId, 'RETAIL');
+    const saved = localStorage.getItem(retKey);
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
       } catch (e) {}
     }
-    return INITIAL_DEBT_CUSTOMERS;
+    if (isTestingShop) {
+      const isCleared = typeof localStorage !== 'undefined' && localStorage.getItem('pharmalink_retail_cleared') === 'true';
+      if (isCleared) return [];
+      return INITIAL_DEBT_CUSTOMERS;
+    }
+    return [];
   });
 
   const debtCustomers = isRetail ? retailDebtCustomers : wholesaleDebtCustomers;
@@ -42,40 +60,13 @@ export const CustomerDebtProvider = ({ children }) => {
     else setWholesaleDebtCustomers(updater);
   };
 
-  const activeTenantId = auth?.currentShop?.shopId || 'TEN-TESTING-SHOP';
-  const prevTenantRef = useRef(activeTenantId);
-
   useEffect(() => {
-    if (prevTenantRef.current !== activeTenantId) {
-      prevTenantRef.current = activeTenantId;
-
-      if (activeTenantId === 'TEN-TESTING-SHOP') {
-        try {
-          const savedWs = localStorage.getItem('pharmalink_debt_customers');
-          const savedRet = localStorage.getItem('pharmalink_retail_debt_customers');
-          setWholesaleDebtCustomers(savedWs ? JSON.parse(savedWs) : INITIAL_DEBT_CUSTOMERS);
-          setRetailDebtCustomers(savedRet ? JSON.parse(savedRet) : INITIAL_DEBT_CUSTOMERS);
-        } catch (e) {}
-      } else {
-        try {
-          const wsKey = `pharmalink_${activeTenantId}_wholesale_customers`;
-          const retKey = `pharmalink_${activeTenantId}_retail_customers`;
-          const savedWs = localStorage.getItem(wsKey);
-          const savedRet = localStorage.getItem(retKey);
-          setWholesaleDebtCustomers(savedWs ? JSON.parse(savedWs) : []);
-          setRetailDebtCustomers(savedRet ? JSON.parse(savedRet) : []);
-        } catch (e) {}
-      }
-    }
-  }, [activeTenantId]);
-
-  useEffect(() => {
-    const key = activeTenantId === 'TEN-TESTING-SHOP' ? 'pharmalink_debt_customers' : `pharmalink_${activeTenantId}_wholesale_customers`;
+    const key = getDebtStorageKey(activeTenantId, 'WHOLESALE');
     localStorage.setItem(key, JSON.stringify(wholesaleDebtCustomers));
   }, [wholesaleDebtCustomers, activeTenantId]);
 
   useEffect(() => {
-    const key = activeTenantId === 'TEN-TESTING-SHOP' ? 'pharmalink_retail_debt_customers' : `pharmalink_${activeTenantId}_retail_customers`;
+    const key = getDebtStorageKey(activeTenantId, 'RETAIL');
     localStorage.setItem(key, JSON.stringify(retailDebtCustomers));
   }, [retailDebtCustomers, activeTenantId]);
 

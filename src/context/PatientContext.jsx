@@ -4,38 +4,52 @@ import { AuthContext, useAuth } from './AuthContext';
 
 const PatientContext = createContext();
 
+const getPatientStorageKey = (tenantId, mode) => {
+  const tid = tenantId || 'TEN-TESTING-SHOP';
+  if (tid === 'TEN-TESTING-SHOP') {
+    return mode === 'RETAIL' ? 'pharmalink_retail_patients' : 'pharmalink_pk_patients';
+  }
+  return `pharmalink_${tid}_${mode === 'RETAIL' ? 'retail' : 'wholesale'}_patients`;
+};
+
 export const PatientProvider = ({ children }) => {
   const auth = useContext(AuthContext);
+  const activeTenantId = auth?.currentShop?.shopId || 'TEN-TESTING-SHOP';
+  const isTestingShop = activeTenantId === 'TEN-TESTING-SHOP';
   const isRetail = auth?.currentShop?.mode === 'RETAIL';
 
   const [wholesalePatients, setWholesalePatients] = useState(() => {
-    const isCleared = typeof localStorage !== 'undefined' && localStorage.getItem('pharmalink_wholesale_cleared') === 'true';
-    if (isCleared) return [];
-
-    const saved = localStorage.getItem('pharmalink_pk_patients');
+    const wsKey = getPatientStorageKey(activeTenantId, 'WHOLESALE');
+    const saved = localStorage.getItem(wsKey);
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      } catch (e) {
-        console.error('Failed to parse saved patients', e);
-      }
+      } catch (e) {}
     }
-    return INITIAL_PATIENTS;
+    if (isTestingShop) {
+      const isCleared = typeof localStorage !== 'undefined' && localStorage.getItem('pharmalink_wholesale_cleared') === 'true';
+      if (isCleared) return [];
+      return INITIAL_PATIENTS;
+    }
+    return [];
   });
 
   const [retailPatients, setRetailPatients] = useState(() => {
-    const isCleared = typeof localStorage !== 'undefined' && localStorage.getItem('pharmalink_retail_cleared') === 'true';
-    if (isCleared) return [];
-
-    const saved = typeof localStorage !== 'undefined' ? localStorage.getItem('pharmalink_retail_patients') : null;
+    const retKey = getPatientStorageKey(activeTenantId, 'RETAIL');
+    const saved = localStorage.getItem(retKey);
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
       } catch (e) {}
     }
-    return INITIAL_PATIENTS;
+    if (isTestingShop) {
+      const isCleared = typeof localStorage !== 'undefined' && localStorage.getItem('pharmalink_retail_cleared') === 'true';
+      if (isCleared) return [];
+      return INITIAL_PATIENTS;
+    }
+    return [];
   });
 
   const patients = isRetail ? retailPatients : wholesalePatients;
@@ -48,15 +62,17 @@ export const PatientProvider = ({ children }) => {
 
   useEffect(() => {
     try {
-      localStorage.setItem('pharmalink_pk_patients', JSON.stringify(wholesalePatients));
+      const key = getPatientStorageKey(activeTenantId, 'WHOLESALE');
+      localStorage.setItem(key, JSON.stringify(wholesalePatients));
     } catch (e) {}
-  }, [wholesalePatients]);
+  }, [wholesalePatients, activeTenantId]);
 
   useEffect(() => {
     try {
-      localStorage.setItem('pharmalink_retail_patients', JSON.stringify(retailPatients));
+      const key = getPatientStorageKey(activeTenantId, 'RETAIL');
+      localStorage.setItem(key, JSON.stringify(retailPatients));
     } catch (e) {}
-  }, [retailPatients]);
+  }, [retailPatients, activeTenantId]);
 
   const addPatient = (patientData) => {
     if (!patientData || !patientData.name) return null;

@@ -10,50 +10,48 @@ const InventoryContext = createContext();
 const INITIAL_AUDIT_LOGS = [];
 const INITIAL_PO_TAX_LOGS = [];
 
+const getInventoryStorageKey = (tenantId, type, mode) => {
+  const tid = tenantId || 'TEN-TESTING-SHOP';
+  if (tid === 'TEN-TESTING-SHOP') {
+    return mode === 'RETAIL' ? `pharmalink_retail_${type}` : `pharmalink_pk_${type}`;
+  }
+  return `pharmalink_${tid}_${mode === 'RETAIL' ? 'retail' : 'wholesale'}_${type}`;
+};
+
 export const InventoryProvider = ({ children }) => {
   const auth = useContext(AuthContext);
+  const activeTenantId = auth?.currentShop?.shopId || 'TEN-TESTING-SHOP';
+  const isTestingShop = activeTenantId === 'TEN-TESTING-SHOP';
   const isRetail = auth?.currentShop?.mode === 'RETAIL';
 
-  // Wholesale Medicines: Pre-stocked with master catalog unless cleared
+  // Wholesale Medicines: strictly scoped per-tenant. Non-testing shops start blank [].
   const [wholesaleMedicines, setWholesaleMedicines] = useState(() => {
-    const isCleared = typeof localStorage !== 'undefined' && localStorage.getItem('pharmalink_wholesale_cleared') === 'true';
-    if (isCleared) return [];
-
-    const saved = localStorage.getItem('pharmalink_pk_medicines');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed.map((m, idx) => {
-            if (!m.itemCode || m.itemCode.startsWith('MED-') || isNaN(Number(m.itemCode))) {
-              const codeNum = (1001 + idx).toString();
-              return { ...m, itemCode: codeNum };
-            }
-            return m;
-          });
-        }
-      } catch (e) {
-        console.error('Failed to parse saved wholesale medicines', e);
-      }
+    const wsKey = getInventoryStorageKey(activeTenantId, 'medicines', 'WHOLESALE');
+    const saved = storageManager.safeGetItem(wsKey, null);
+    if (saved && Array.isArray(saved) && saved.length > 0) {
+      return saved;
     }
-    return INITIAL_MEDICINES;
+    if (isTestingShop) {
+      const isCleared = typeof localStorage !== 'undefined' && localStorage.getItem('pharmalink_wholesale_cleared') === 'true';
+      if (isCleared) return [];
+      return INITIAL_MEDICINES;
+    }
+    return [];
   });
 
-  // Retail Medicines: Pre-stocked with sample data for testing unless explicitly cleared by user
+  // Retail Medicines: strictly scoped per-tenant. Non-testing shops start blank [].
   const [retailMedicines, setRetailMedicines] = useState(() => {
-    const isCleared = typeof localStorage !== 'undefined' && localStorage.getItem('pharmalink_retail_cleared') === 'true';
-    if (isCleared) return [];
-
-    const saved = typeof localStorage !== 'undefined' ? localStorage.getItem('pharmalink_retail_medicines') : null;
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) return parsed;
-      } catch (e) {
-        console.error('Failed to parse saved retail medicines', e);
-      }
+    const retKey = getInventoryStorageKey(activeTenantId, 'medicines', 'RETAIL');
+    const saved = storageManager.safeGetItem(retKey, null);
+    if (saved && Array.isArray(saved) && saved.length > 0) {
+      return saved;
     }
-    return INITIAL_MEDICINES;
+    if (isTestingShop) {
+      const isCleared = typeof localStorage !== 'undefined' && localStorage.getItem('pharmalink_retail_cleared') === 'true';
+      if (isCleared) return [];
+      return INITIAL_MEDICINES;
+    }
+    return [];
   });
 
   const medicines = isRetail ? retailMedicines : wholesaleMedicines;
@@ -65,116 +63,34 @@ export const InventoryProvider = ({ children }) => {
     }
   };
 
-  const activeTenantId = auth?.currentShop?.shopId || 'TEN-TESTING-SHOP';
-  const prevTenantRef = useRef(activeTenantId);
-
-  // Synchronize inventory when switching between different pharmacy tenant shops
-  useEffect(() => {
-    if (prevTenantRef.current !== activeTenantId) {
-      prevTenantRef.current = activeTenantId;
-
-      if (activeTenantId === 'TEN-TESTING-SHOP') {
-        const savedWs = storageManager.safeGetItem('pharmalink_pk_medicines', INITIAL_MEDICINES);
-        const savedRet = storageManager.safeGetItem('pharmalink_retail_medicines', INITIAL_MEDICINES);
-        setWholesaleMedicines(savedWs || []);
-        setRetailMedicines(savedRet || []);
-
-        const savedWsBatches = storageManager.safeGetItem('pharmalink_pk_batches', INITIAL_BATCHES);
-        const savedRetBatches = storageManager.safeGetItem('pharmalink_retail_batches', INITIAL_BATCHES);
-        setWholesaleBatches(savedWsBatches || []);
-        setRetailBatches(savedRetBatches || []);
-      } else {
-        // Clean-slate tenant isolation: load tenant's specific local store (defaults to empty [] for blank new shops)
-        const wsKey = `pharmalink_${activeTenantId}_wholesale_medicines`;
-        const retKey = `pharmalink_${activeTenantId}_retail_medicines`;
-        const savedWs = storageManager.safeGetItem(wsKey, []);
-        const savedRet = storageManager.safeGetItem(retKey, []);
-        setWholesaleMedicines(savedWs || []);
-        setRetailMedicines(savedRet || []);
-
-        const wsBatchKey = `pharmalink_${activeTenantId}_wholesale_batches`;
-        const retBatchKey = `pharmalink_${activeTenantId}_retail_batches`;
-        const savedWsBatches = storageManager.safeGetItem(wsBatchKey, []);
-        const savedRetBatches = storageManager.safeGetItem(retBatchKey, []);
-        setWholesaleBatches(savedWsBatches || []);
-        setRetailBatches(savedRetBatches || []);
-      }
-
-      // Fetch cloud records for this tenant from Supabase
-      dbSyncService.fetchMedicines(activeTenantId).then((cloudMeds) => {
-        if (cloudMeds && Array.isArray(cloudMeds)) {
-          if (isRetail) {
-            setRetailMedicines(cloudMeds);
-          } else {
-            setWholesaleMedicines(cloudMeds);
-          }
-        }
-      }).catch(() => {});
-    }
-  }, [activeTenantId, isRetail]);
-
-  useEffect(() => {
-    const tenantId = auth?.currentShop?.shopId || 'TEN-TESTING-SHOP';
-    const key = tenantId === 'TEN-TESTING-SHOP' ? 'pharmalink_pk_medicines' : `pharmalink_${tenantId}_wholesale_medicines`;
-    storageManager.safeSetItem(key, wholesaleMedicines);
-    if (wholesaleMedicines.length > 0) {
-      dbSyncService.syncMedicinesUpstream(tenantId, wholesaleMedicines).catch(() => {});
-    }
-  }, [wholesaleMedicines, auth?.currentShop?.shopId]);
-
-  useEffect(() => {
-    const tenantId = auth?.currentShop?.shopId || 'TEN-TESTING-SHOP';
-    const key = tenantId === 'TEN-TESTING-SHOP' ? 'pharmalink_retail_medicines' : `pharmalink_${tenantId}_retail_medicines`;
-    storageManager.safeSetItem(key, retailMedicines);
-    if (retailMedicines.length > 0) {
-      dbSyncService.syncMedicinesUpstream(tenantId, retailMedicines).catch(() => {});
-    }
-  }, [retailMedicines, auth?.currentShop?.shopId]);
-
-  // Initial cloud sync from Supabase
-  useEffect(() => {
-    const tenantId = auth?.currentShop?.shopId || 'TEN-TESTING-SHOP';
-    dbSyncService.fetchMedicines(tenantId).then((cloudMeds) => {
-      if (cloudMeds && cloudMeds.length > 0) {
-        setMedicines((prev) => {
-          const map = new Map(prev.map((m) => [m.id, m]));
-          cloudMeds.forEach((m) => map.set(m.id, m));
-          return Array.from(map.values());
-        });
-      }
-    }).catch(() => {});
-  }, [auth?.currentShop?.shopId]);
-
-  // Wholesale Batches
+  // Wholesale Batches: strictly scoped per-tenant. Non-testing shops start blank [].
   const [wholesaleBatches, setWholesaleBatches] = useState(() => {
-    const isCleared = typeof localStorage !== 'undefined' && localStorage.getItem('pharmalink_wholesale_cleared') === 'true';
-    if (isCleared) return [];
-
-    const saved = localStorage.getItem('pharmalink_pk_batches');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      } catch (e) {
-        console.error('Failed to parse saved wholesale batches', e);
-      }
+    const wsBatchKey = getInventoryStorageKey(activeTenantId, 'batches', 'WHOLESALE');
+    const saved = storageManager.safeGetItem(wsBatchKey, null);
+    if (saved && Array.isArray(saved) && saved.length > 0) {
+      return saved;
     }
-    return INITIAL_BATCHES;
+    if (isTestingShop) {
+      const isCleared = typeof localStorage !== 'undefined' && localStorage.getItem('pharmalink_wholesale_cleared') === 'true';
+      if (isCleared) return [];
+      return INITIAL_BATCHES;
+    }
+    return [];
   });
 
-  // Retail Batches: Pre-stocked with sample batches for testing unless explicitly cleared by user
+  // Retail Batches: strictly scoped per-tenant. Non-testing shops start blank [].
   const [retailBatches, setRetailBatches] = useState(() => {
-    const isCleared = typeof localStorage !== 'undefined' && localStorage.getItem('pharmalink_retail_cleared') === 'true';
-    if (isCleared) return [];
-
-    const saved = typeof localStorage !== 'undefined' ? localStorage.getItem('pharmalink_retail_batches') : null;
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) return parsed;
-      } catch (e) {}
+    const retBatchKey = getInventoryStorageKey(activeTenantId, 'batches', 'RETAIL');
+    const saved = storageManager.safeGetItem(retBatchKey, null);
+    if (saved && Array.isArray(saved) && saved.length > 0) {
+      return saved;
     }
-    return INITIAL_BATCHES;
+    if (isTestingShop) {
+      const isCleared = typeof localStorage !== 'undefined' && localStorage.getItem('pharmalink_retail_cleared') === 'true';
+      if (isCleared) return [];
+      return INITIAL_BATCHES;
+    }
+    return [];
   });
 
   const batches = isRetail ? retailBatches : wholesaleBatches;
@@ -186,45 +102,21 @@ export const InventoryProvider = ({ children }) => {
     }
   };
 
-  useEffect(() => {
-    const tenantId = auth?.currentShop?.shopId || 'TEN-TESTING-SHOP';
-    const key = tenantId === 'TEN-TESTING-SHOP' ? 'pharmalink_pk_batches' : `pharmalink_${tenantId}_wholesale_batches`;
-    storageManager.safeSetItem(key, wholesaleBatches);
-  }, [wholesaleBatches, auth?.currentShop?.shopId]);
-
-  useEffect(() => {
-    const tenantId = auth?.currentShop?.shopId || 'TEN-TESTING-SHOP';
-    const key = tenantId === 'TEN-TESTING-SHOP' ? 'pharmalink_retail_batches' : `pharmalink_${tenantId}_retail_batches`;
-    storageManager.safeSetItem(key, retailBatches);
-  }, [retailBatches, auth?.currentShop?.shopId]);
-
-  // Wholesale & Retail Vendor Returns
+  // Wholesale & Retail Vendor Returns: strictly scoped per-tenant
   const [wholesaleVendorReturns, setWholesaleVendorReturns] = useState(() => {
-    const isCleared = typeof localStorage !== 'undefined' && localStorage.getItem('pharmalink_wholesale_cleared') === 'true';
-    if (isCleared) return [];
-
-    const saved = localStorage.getItem('pharmalink_pk_vendor_returns');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      } catch (e) {}
-    }
-    return INITIAL_VENDOR_RETURNS;
+    const key = getInventoryStorageKey(activeTenantId, 'vendor_returns', 'WHOLESALE');
+    const saved = storageManager.safeGetItem(key, null);
+    if (saved && Array.isArray(saved)) return saved;
+    if (isTestingShop) return INITIAL_VENDOR_RETURNS;
+    return [];
   });
 
   const [retailVendorReturns, setRetailVendorReturns] = useState(() => {
-    const isCleared = typeof localStorage !== 'undefined' && localStorage.getItem('pharmalink_retail_cleared') === 'true';
-    if (isCleared) return [];
-
-    const saved = typeof localStorage !== 'undefined' ? localStorage.getItem('pharmalink_retail_vendor_returns') : null;
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) return parsed;
-      } catch (e) {}
-    }
-    return INITIAL_VENDOR_RETURNS;
+    const key = getInventoryStorageKey(activeTenantId, 'vendor_returns', 'RETAIL');
+    const saved = storageManager.safeGetItem(key, null);
+    if (saved && Array.isArray(saved)) return saved;
+    if (isTestingShop) return INITIAL_VENDOR_RETURNS;
+    return [];
   });
 
   const vendorReturns = isRetail ? retailVendorReturns : wholesaleVendorReturns;
@@ -233,46 +125,98 @@ export const InventoryProvider = ({ children }) => {
     else setWholesaleVendorReturns(updater);
   };
 
-  useEffect(() => {
-    localStorage.setItem('pharmalink_pk_vendor_returns', JSON.stringify(wholesaleVendorReturns));
-  }, [wholesaleVendorReturns]);
-
-  useEffect(() => {
-    localStorage.setItem('pharmalink_retail_vendor_returns', JSON.stringify(retailVendorReturns));
-  }, [retailVendorReturns]);
-
   const [auditLogs, setAuditLogs] = useState(() => {
-    const key = isRetail ? 'pharmalink_retail_audit_logs' : 'pharmalink_pk_audit_logs';
-    const saved = localStorage.getItem(key);
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) return parsed;
-      } catch (e) {}
-    }
-    return INITIAL_AUDIT_LOGS;
+    const key = getInventoryStorageKey(activeTenantId, 'audit_logs', isRetail ? 'RETAIL' : 'WHOLESALE');
+    const saved = storageManager.safeGetItem(key, null);
+    return (saved && Array.isArray(saved)) ? saved : INITIAL_AUDIT_LOGS;
   });
-
-  useEffect(() => {
-    const key = isRetail ? 'pharmalink_retail_audit_logs' : 'pharmalink_pk_audit_logs';
-    localStorage.setItem(key, JSON.stringify(auditLogs));
-  }, [auditLogs, isRetail]);
 
   const [poTaxLogs, setPoTaxLogs] = useState(() => {
-    const key = isRetail ? 'pharmalink_retail_po_tax_logs' : 'pharmalink_po_tax_logs';
-    const saved = localStorage.getItem(key);
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch (e) {}
-    }
-    return INITIAL_PO_TAX_LOGS;
+    const key = getInventoryStorageKey(activeTenantId, 'po_tax_logs', isRetail ? 'RETAIL' : 'WHOLESALE');
+    const saved = storageManager.safeGetItem(key, null);
+    return (saved && Array.isArray(saved)) ? saved : INITIAL_PO_TAX_LOGS;
   });
 
+  // Persist inventory state strictly scoped to active tenant
   useEffect(() => {
-    const key = isRetail ? 'pharmalink_retail_po_tax_logs' : 'pharmalink_po_tax_logs';
-    localStorage.setItem(key, JSON.stringify(poTaxLogs));
-  }, [poTaxLogs, isRetail]);
+    const key = getInventoryStorageKey(activeTenantId, 'medicines', 'WHOLESALE');
+    storageManager.safeSetItem(key, wholesaleMedicines);
+    if (wholesaleMedicines.length > 0) {
+      dbSyncService.syncMedicinesUpstream(activeTenantId, wholesaleMedicines).catch(() => {});
+    }
+  }, [wholesaleMedicines, activeTenantId]);
+
+  useEffect(() => {
+    const key = getInventoryStorageKey(activeTenantId, 'medicines', 'RETAIL');
+    storageManager.safeSetItem(key, retailMedicines);
+    if (retailMedicines.length > 0) {
+      dbSyncService.syncMedicinesUpstream(activeTenantId, retailMedicines).catch(() => {});
+    }
+  }, [retailMedicines, activeTenantId]);
+
+  useEffect(() => {
+    const key = getInventoryStorageKey(activeTenantId, 'batches', 'WHOLESALE');
+    storageManager.safeSetItem(key, wholesaleBatches);
+    if (wholesaleBatches.length > 0) {
+      dbSyncService.syncBatchesUpstream(activeTenantId, wholesaleBatches).catch(() => {});
+    }
+  }, [wholesaleBatches, activeTenantId]);
+
+  useEffect(() => {
+    const key = getInventoryStorageKey(activeTenantId, 'batches', 'RETAIL');
+    storageManager.safeSetItem(key, retailBatches);
+    if (retailBatches.length > 0) {
+      dbSyncService.syncBatchesUpstream(activeTenantId, retailBatches).catch(() => {});
+    }
+  }, [retailBatches, activeTenantId]);
+
+  useEffect(() => {
+    const key = getInventoryStorageKey(activeTenantId, 'vendor_returns', 'WHOLESALE');
+    storageManager.safeSetItem(key, wholesaleVendorReturns);
+  }, [wholesaleVendorReturns, activeTenantId]);
+
+  useEffect(() => {
+    const key = getInventoryStorageKey(activeTenantId, 'vendor_returns', 'RETAIL');
+    storageManager.safeSetItem(key, retailVendorReturns);
+  }, [retailVendorReturns, activeTenantId]);
+
+  useEffect(() => {
+    const key = getInventoryStorageKey(activeTenantId, 'audit_logs', isRetail ? 'RETAIL' : 'WHOLESALE');
+    storageManager.safeSetItem(key, auditLogs);
+  }, [auditLogs, activeTenantId, isRetail]);
+
+  useEffect(() => {
+    const key = getInventoryStorageKey(activeTenantId, 'po_tax_logs', isRetail ? 'RETAIL' : 'WHOLESALE');
+    storageManager.safeSetItem(key, poTaxLogs);
+  }, [poTaxLogs, activeTenantId, isRetail]);
+
+  // Cloud sync from Supabase: load cloud records strictly for active tenant
+  useEffect(() => {
+    let isMounted = true;
+    dbSyncService.fetchMedicines(activeTenantId).then((cloudMeds) => {
+      if (!isMounted) return;
+      if (cloudMeds && Array.isArray(cloudMeds) && cloudMeds.length > 0) {
+        if (isRetail) {
+          setRetailMedicines(cloudMeds);
+        } else {
+          setWholesaleMedicines(cloudMeds);
+        }
+      }
+    }).catch(() => {});
+
+    dbSyncService.fetchBatches(activeTenantId).then((cloudBatches) => {
+      if (!isMounted) return;
+      if (cloudBatches && Array.isArray(cloudBatches) && cloudBatches.length > 0) {
+        if (isRetail) {
+          setRetailBatches(cloudBatches);
+        } else {
+          setWholesaleBatches(cloudBatches);
+        }
+      }
+    }).catch(() => {});
+
+    return () => { isMounted = false; };
+  }, [activeTenantId, isRetail]);
 
   const addAuditLog = (actionTitle, itemBrandName, details, type = 'INFO', performedBy = 'Store Admin') => {
     const now = new Date();
