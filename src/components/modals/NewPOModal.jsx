@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { useSupplier } from '../../context/SupplierContext';
 import { useInventory } from '../../context/InventoryContext';
+import AppAlertModal from './AppAlertModal';
 
 export const NewPOModal = ({ isOpen, onClose }) => {
   const { suppliers = [], addSupplier, createPurchaseOrder, generatePONumber } = useSupplier();
@@ -27,6 +28,18 @@ export const NewPOModal = ({ isOpen, onClose }) => {
 
   // Wizard Step: 1 = Company & Dates, 2 = Items, 3 = Payment & Confirmation
   const [currentStep, setCurrentStep] = useState(1);
+
+  // Pre-defined Designed Alert Modal state
+  const [alertConfig, setAlertConfig] = useState({
+    isOpen: false,
+    type: 'QUARANTINED',
+    title: '',
+    message: '',
+    itemDetails: null,
+  });
+
+  const showAlert = (opts) => setAlertConfig({ isOpen: true, ...opts });
+  const closeAlert = () => setAlertConfig((prev) => ({ ...prev, isOpen: false }));
 
   // Step 1: Company Search & Metadata
   const [supplierSearch, setSupplierSearch] = useState('');
@@ -186,6 +199,27 @@ export const NewPOModal = ({ isOpen, onClose }) => {
           if (field === 'tradeName') {
             const matchedMed = medicines.find(m => (m.name || m.brandName || '').toLowerCase() === val.toLowerCase());
             if (matchedMed) {
+              const isQuarantined = matchedMed.status === 'Quarantined RTV' || Boolean(matchedMed.isQuarantined);
+              if (isQuarantined) {
+                showAlert({
+                  type: 'QUARANTINED',
+                  title: 'Item Quarantined — Purchase Order Blocked',
+                  message: `You cannot make a Purchase Order (PO) on "${matchedMed.brandName || matchedMed.name}". This pharmaceutical product is currently placed under Quarantine / Regulatory Lock (DRAP/RTV) and inward purchasing is restricted.`,
+                  itemDetails: {
+                    name: matchedMed.brandName || matchedMed.name,
+                    itemCode: matchedMed.itemCode || matchedMed.id,
+                    status: 'Quarantined RTV',
+                    expiryDate: matchedMed.expiryDate || 'N/A',
+                  }
+                });
+                return {
+                  ...item,
+                  tradeName: '',
+                  itemCode: '',
+                  genericFormula: '',
+                };
+              }
+
               updated.itemCode = matchedMed.itemCode || matchedMed.id || updated.itemCode;
               updated.genericFormula = matchedMed.formula || matchedMed.genericFormula || updated.genericFormula;
               updated.purchaseCost = String(matchedMed.purchaseCost || matchedMed.purchasePriceBox || updated.purchaseCost);
@@ -1353,6 +1387,16 @@ export const NewPOModal = ({ isOpen, onClose }) => {
           </div>
         )}
       </div>
+
+      {/* Pre-defined Designed Alert Modal */}
+      <AppAlertModal
+        isOpen={alertConfig.isOpen}
+        type={alertConfig.type}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        itemDetails={alertConfig.itemDetails}
+        onClose={closeAlert}
+      />
     </div>
   );
 };

@@ -30,6 +30,7 @@ import { useSales } from '../context/SalesContext';
 import { useAuth } from '../context/AuthContext';
 import { useCustomerDebt } from '../context/CustomerDebtContext';
 import { usePatient } from '../context/PatientContext';
+import { useCustomer } from '../context/CustomerContext';
 import { loadRetailMockData } from '../services/mockDataManager';
 import A4InvoicePrintModal from '../components/modals/A4InvoicePrintModal';
 import EditLineDiscountTaxModal from '../components/modals/EditLineDiscountTaxModal';
@@ -40,6 +41,8 @@ import PatientRxDrawer from '../components/modals/PatientRxDrawer';
 import RetailSalesReturnModal from '../components/modals/RetailSalesReturnModal';
 import POSDebtCustomerModal from '../components/modals/POSDebtCustomerModal';
 import WhatsAppCreditModal from '../components/modals/WhatsAppCreditModal';
+import AppAlertModal from '../components/modals/AppAlertModal';
+import CustomerFormModal from '../components/modals/CustomerFormModal';
 
 export const POSPage = ({ storeMode: propStoreMode }) => {
   const { medicines = [], batches = [], getEarliestValidBatch, deductStock, isExpiryGreaterThan6Months, isExpiryWithin6Months } = useInventory();
@@ -109,6 +112,70 @@ export const POSPage = ({ storeMode: propStoreMode }) => {
   const [completedDebtSale, setCompletedDebtSale] = useState(null);
   const [isCheckingOut, setIsCheckingOut] = useState(false);
 
+  // Customer Context & Instant POS Customer Search State
+  const { customers = [], addCustomer } = useCustomer();
+  const [customerSearchInput, setCustomerSearchInput] = useState('');
+  const [isCustomerSearchOpen, setIsCustomerSearchOpen] = useState(false);
+  const [isCustomerFormModalOpen, setIsCustomerFormModalOpen] = useState(false);
+
+  // Pre-defined Designed Alert Modal State
+  const [alertConfig, setAlertConfig] = useState({
+    isOpen: false,
+    type: 'QUARANTINED',
+    title: '',
+    message: '',
+    itemDetails: null,
+    actionLabel: null,
+    onAction: null,
+  });
+
+  const showAlert = ({ type = 'QUARANTINED', title = '', message = '', itemDetails = null, actionLabel = null, onAction = null }) => {
+    setAlertConfig({
+      isOpen: true,
+      type,
+      title,
+      message,
+      itemDetails,
+      actionLabel,
+      onAction,
+    });
+  };
+
+  const closeAlert = () => {
+    setAlertConfig((prev) => ({ ...prev, isOpen: false }));
+  };
+
+  const filteredCustomerOptions = useMemo(() => {
+    if (!customerSearchInput.trim()) return customers.slice(0, 8);
+    const q = customerSearchInput.toLowerCase().trim();
+    return customers.filter((c) =>
+      (c.name && c.name.toLowerCase().includes(q)) ||
+      (c.shopName && c.shopName.toLowerCase().includes(q)) ||
+      (c.region && c.region.toLowerCase().includes(q)) ||
+      (c.phone && c.phone.includes(q)) ||
+      (c.ntn && c.ntn.toLowerCase().includes(q))
+    ).slice(0, 8);
+  }, [customers, customerSearchInput]);
+
+  const handleSelectCustomerRecord = (c) => {
+    setCustomerData({
+      customerName: c.name || c.customerName || 'Customer',
+      shopName: c.shopName || c.name || '',
+      region: c.region || 'Gujrat',
+      customerAddress: c.address || c.customerAddress || '',
+      licenseNo: c.licenseNo || '',
+      customerNtn: c.ntn || c.customerNtn || '',
+      customerStrn: c.gstn || c.customerStrn || c.strn || '',
+      filerStatus: c.filerStatus || 'FILER',
+      customerPhone: c.phone || c.customerPhone || '',
+      bookingMan: customerData.bookingMan || '',
+      refNo: customerData.refNo || '',
+      deliveryMan: customerData.deliveryMan || 'Express Delivery / Rider',
+    });
+    setCustomerSearchInput('');
+    setIsCustomerSearchOpen(false);
+  };
+
   const searchInputRef = useRef(null);
   const suggestionListRef = useRef(null);
 
@@ -150,12 +217,12 @@ export const POSPage = ({ storeMode: propStoreMode }) => {
     return results;
   }, [medicines, searchQuery, isSearchFocused]);
 
-  // Auto-scroll dropdown when down/up arrow keys are pressed
+  // Keep highlighted index in view when navigating with arrow keys
   useEffect(() => {
-    if (searchResults.length > 0 && selectedHighlightIndex >= 0) {
-      const activeEl = document.getElementById(`search-result-item-${selectedHighlightIndex}`);
-      if (activeEl) {
-        activeEl.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    if (isSearchFocused && searchResults.length > 0) {
+      const itemEl = document.getElementById(`search-result-item-${selectedHighlightIndex}`);
+      if (itemEl && suggestionListRef.current) {
+        itemEl.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
       }
     }
   }, [selectedHighlightIndex, searchResults]);
@@ -204,19 +271,124 @@ export const POSPage = ({ storeMode: propStoreMode }) => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [searchResults, selectedHighlightIndex, isRetail, cart, isSearchFocused]);
 
-  const handleSelectMedicine = (medicine) => {
-    if (!isRetail) {
-      // Wholesale mode: check if earliest valid batch has expiry > 6 months
-      const earliestBatch = getEarliestValidBatch(medicine.id || medicine.itemCode, true);
-      if (!earliestBatch || (typeof isExpiryGreaterThan6Months === 'function' && !isExpiryGreaterThan6Months(earliestBatch.expiryDate))) {
-        alert(`⚠️ Wholesale Compliance Violation:\n\nCannot sell "${medicine.brandName || medicine.name}".\nBatch expiry (${earliestBatch?.expiryDate || medicine.expiryDate || 'N/A'}) is within 6 months.\n\nUnder Wholesale Pharmaceutical regulations (DRAP), medicines expiring within 6 months cannot be sold from stock and are transferred to Expiry & Vendor Returns (RTV).`);
-        return;
+  /**
+   * Distinguish between:
+   * 1. ACTIVE IN STOCK (tablets > 0, expiry valid)
+   * 2. OUT OF STOCK (stock is 0 - cannot sell, but CAN make PO to restock!)
+   * 3. QUARANTINED (explicit status 'Quarantined RTV' or DRAP recall - cannot sell & cannot PO)
+   * 4. SHORT EXPIRY (wholesale expiry <= 6 months - routed to RTV)
+   */
+  const getMedicineStockStatus = (medicine) => {
+    if (!medicine) return { status: 'OUT_OF_STOCK', reason: 'Item not found' };
+    const medId = medicine.id || medicine.itemCode;
+
+    // Batches linked to this medicine
+    const medBatches = batches.filter(
+      (b) => b.medicineId === medId || b.id === medId || (medicine.name && b.medicineId === medicine.name)
+    );
+
+    // Explicit quarantine flags
+    const hasQuarantinedBatch = medBatches.some(
+      (b) => b.status === 'Quarantined RTV' || (b.status && b.status.toLowerCase().includes('quarantine'))
+    );
+    const isExplicitlyQuarantined = Boolean(medicine.isQuarantined || medicine.status === 'Quarantined RTV');
+
+    // In-stock batches (totalTabletsAvailable > 0 or boxStock > 0)
+    const inStockBatches = medBatches.filter(
+      (b) => (b.totalTabletsAvailable !== undefined ? b.totalTabletsAvailable > 0 : (b.boxStock > 0))
+    );
+
+    const totalStockBoxes = medicine.boxStock !== undefined ? Number(medicine.boxStock) : inStockBatches.length;
+
+    // If stock is depleted (0 remaining)
+    if (inStockBatches.length === 0 && totalStockBoxes <= 0) {
+      if (hasQuarantinedBatch || isExplicitlyQuarantined) {
+        return { status: 'QUARANTINED', reason: 'Quarantined RTV / Regulatory Lock' };
       }
-      addToCart(medicine, earliestBatch, 'Box');
-    } else {
-      const earliestBatch = getEarliestValidBatch(medicine.id || medicine.itemCode, false);
-      addToCart(medicine, earliestBatch, 'Tablet');
+      return { status: 'OUT_OF_STOCK', reason: 'Stock Depleted (0 Boxes Available)' };
     }
+
+    // If all remaining in-stock batches are quarantined
+    const nonQuarantinedInStock = inStockBatches.filter((b) => b.status !== 'Quarantined RTV');
+    if (nonQuarantinedInStock.length === 0 && inStockBatches.length > 0) {
+      return { status: 'QUARANTINED', reason: 'Quarantined RTV / Regulatory Lock' };
+    }
+
+    // Wholesale mode: check 6-month DRAP rule
+    if (!isRetail) {
+      const validWholesaleBatch = getEarliestValidBatch(medId, true);
+      if (!validWholesaleBatch) {
+        if (inStockBatches.length > 0) {
+          const earliestCandidate = inStockBatches.sort(
+            (a, b) => new Date(a.expiryDate || '2028-01-01') - new Date(b.expiryDate || '2028-01-01')
+          )[0];
+          return { status: 'SHORT_EXPIRY', batch: earliestCandidate, reason: `Expiry (${earliestCandidate.expiryDate}) is within 6 Months` };
+        }
+        return { status: 'OUT_OF_STOCK', reason: 'Stock Depleted (0 Boxes Available)' };
+      }
+      return { status: 'AVAILABLE', batch: validWholesaleBatch };
+    }
+
+    // Retail mode
+    const retailBatch = getEarliestValidBatch(medId, false);
+    return { status: 'AVAILABLE', batch: retailBatch };
+  };
+
+  const handleSelectMedicine = (medicine) => {
+    const stockStatus = getMedicineStockStatus(medicine);
+
+    if (stockStatus.status === 'QUARANTINED') {
+      showAlert({
+        type: 'QUARANTINED',
+        title: 'Item Quarantined — Regulatory Restriction',
+        message: `You cannot add "${medicine.brandName || medicine.name}" to cart or make a PO on it. This pharmaceutical product is currently placed under Quarantine (DRAP / Vendor RTV) and is legally restricted from counter sales and purchasing until cleared by the Pharmacist.`,
+        itemDetails: {
+          name: medicine.brandName || medicine.name,
+          itemCode: medicine.itemCode || medicine.id,
+          status: 'Quarantined RTV',
+          expiryDate: medicine.expiryDate || 'N/A',
+        }
+      });
+      return;
+    }
+
+    if (stockStatus.status === 'OUT_OF_STOCK') {
+      showAlert({
+        type: 'OUT_OF_STOCK',
+        title: 'Stock Depleted (Zero Inventory)',
+        message: `"${medicine.brandName || medicine.name}" currently has 0 available boxes in active inventory. You cannot add this item to cart. You can generate an Inward Purchase Order (PO) to replenish stock from authorized suppliers.`,
+        itemDetails: {
+          name: medicine.brandName || medicine.name,
+          itemCode: medicine.itemCode || medicine.id,
+          status: 'Out of Stock (0 Units Available)',
+        }
+      });
+      return;
+    }
+
+    if (stockStatus.status === 'SHORT_EXPIRY') {
+      showAlert({
+        type: 'SHORT_EXPIRY',
+        title: 'DRAP Wholesale Expiry Lock (≤ 6 Months)',
+        message: `Cannot sell "${medicine.brandName || medicine.name}". The earliest available batch (${stockStatus.batch?.expiryDate || 'N/A'}) expires within 6 months. Under DRAP Wholesale Drug Rules (Form 20/21), near-expiry stock is locked from counter sales and routed to Vendor Returns (RTV).`,
+        itemDetails: {
+          name: medicine.brandName || medicine.name,
+          itemCode: medicine.itemCode || medicine.id,
+          batchNo: stockStatus.batch?.batchNo || stockStatus.batch?.batchNumber || 'N/A',
+          expiryDate: stockStatus.batch?.expiryDate || 'N/A',
+          status: '≤ 6M Near Expiry (RTV)',
+        }
+      });
+      return;
+    }
+
+    // Available: Add to cart
+    if (!isRetail) {
+      addToCart(medicine, stockStatus.batch, 'Box');
+    } else {
+      addToCart(medicine, stockStatus.batch, 'Tablet');
+    }
+
     setSearchQuery('');
     setSelectedHighlightIndex(0);
     setIsSearchFocused(false);
@@ -396,7 +568,11 @@ export const POSPage = ({ storeMode: propStoreMode }) => {
   // 1. Action: Print Receipt & Complete Cash Checkout
   const handleRetailCheckoutPrint = () => {
     if (cart.length === 0) {
-      alert('Cart is empty. Please scan or select medicines.');
+      showAlert({
+        type: 'WARNING',
+        title: 'Billing Cart Empty',
+        message: 'Your cart is empty. Please search and add medicines before printing receipt.',
+      });
       return;
     }
     if (isCheckingOut) return;
@@ -417,7 +593,11 @@ export const POSPage = ({ storeMode: propStoreMode }) => {
   // 2. Action: Save Order / Instant Cash Checkout
   const handleSaveOrderCash = () => {
     if (cart.length === 0) {
-      alert('Cart is empty. Please scan or select medicines.');
+      showAlert({
+        type: 'WARNING',
+        title: 'Billing Cart Empty',
+        message: 'Your cart is empty. Please search and add medicines to bill before saving order.',
+      });
       return;
     }
     if (isCheckingOut) return;
@@ -429,7 +609,11 @@ export const POSPage = ({ storeMode: propStoreMode }) => {
       recordSale(invoiceData);
       clearCart();
       setCashTendered('');
-      alert(`Order saved & stock updated! Invoice #${invoiceData.invoiceNo} for Rs. ${invoiceData.netTotal.toFixed(2)} completed.`);
+      showAlert({
+        type: 'INFO',
+        title: 'Order Saved & Stock Deducted',
+        message: `Invoice #${invoiceData.invoiceNo} for Rs. ${invoiceData.netTotal.toFixed(2)} completed successfully! Stock updated.`,
+      });
     } finally {
       setIsCheckingOut(false);
     }
@@ -438,7 +622,11 @@ export const POSPage = ({ storeMode: propStoreMode }) => {
   // 3. Action: Add to Customer Debt / Udhar (Khata)
   const handleInitiateDebtCheckout = () => {
     if (cart.length === 0) {
-      alert('Cart is empty. Please scan or add items to bill.');
+      showAlert({
+        type: 'WARNING',
+        title: 'Billing Cart Empty',
+        message: 'Your cart is empty. Please search and add medicines before initiating Khata (credit) sale.',
+      });
       return;
     }
     setIsPOSDebtModalOpen(true);
@@ -480,7 +668,11 @@ export const POSPage = ({ storeMode: propStoreMode }) => {
   // Wholesale Checkout -> A4 Commercial Dual-Page Invoice
   const handleWholesaleCheckout = (forcedTerms = null) => {
     if (cart.length === 0) {
-      alert('Cart is empty. Please add items to generate wholesale commercial invoice.');
+      showAlert({
+        type: 'WARNING',
+        title: 'Billing Cart Empty',
+        message: 'Please add medicines to cart to generate commercial wholesale invoice.',
+      });
       return;
     }
     if (isCheckingOut) return;
@@ -500,47 +692,207 @@ export const POSPage = ({ storeMode: propStoreMode }) => {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', fontFamily: 'var(--font-sans)' }}>
-      {/* TOP ACTION BANNER */}
-      <div className="card" style={{ padding: '0.65rem 1rem', backgroundColor: '#ffffff', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          {isRetail ? (
+      {/* TOP ACTION BANNER: CUSTOMER AUTO-SEARCH & DETAILS */}
+      <div 
+        className="card" 
+        style={{ 
+          padding: '0.75rem 1rem', 
+          backgroundColor: '#ffffff', 
+          border: '1px solid #e2e8f0', 
+          borderRadius: '12px',
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'space-between', 
+          flexWrap: 'wrap', 
+          gap: '0.75rem',
+          position: 'relative'
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap', flex: 1 }}>
+          {/* Active Customer Badge & Info */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', backgroundColor: '#f8fafc', padding: '0.35rem 0.65rem', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+            <UserCheck size={16} color="#0284c7" />
+            <div style={{ fontSize: '12px' }}>
+              <span style={{ color: '#64748b', fontSize: '11px' }}>Customer: </span>
+              <strong style={{ color: '#0f172a' }}>{rxPatient ? rxPatient.name : (customerData.customerName || 'Walk-in Customer')}</strong>
+              {customerData.region && !rxPatient && (
+                <span style={{ marginLeft: '0.4rem', backgroundColor: '#e0f2fe', color: '#0284c7', padding: '0.1rem 0.35rem', borderRadius: '4px', fontSize: '10px', fontWeight: 700 }}>
+                  📍 {customerData.region}
+                </span>
+              )}
+              {customerData.customerNtn && customerData.customerNtn !== '-' && !rxPatient && (
+                <span style={{ marginLeft: '0.35rem', backgroundColor: '#f1f5f9', color: '#334155', padding: '0.1rem 0.35rem', borderRadius: '4px', fontSize: '10px', fontFamily: 'var(--font-mono)' }}>
+                  NTN: {customerData.customerNtn}
+                </span>
+              )}
+            </div>
+
+            {((customerData.customerName && customerData.customerName !== 'Walk-in Retail Customer' && customerData.customerName !== 'Walk-in / Cash Customer') || rxPatient) && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (rxPatient) {
+                    setRxPatient(null);
+                    if (typeof clearActivePatientForPOS === 'function') clearActivePatientForPOS();
+                  } else {
+                    setCustomerData({
+                      customerName: isRetail ? 'Walk-in Retail Customer' : 'Walk-in / Cash Customer',
+                      shopName: '',
+                      region: currentShop?.city || 'Lahore',
+                      customerAddress: '',
+                      licenseNo: '',
+                      customerNtn: '',
+                      customerStrn: '',
+                      filerStatus: 'FILER',
+                      customerPhone: '',
+                      bookingMan: '',
+                      refNo: '',
+                      deliveryMan: 'Express Delivery / Rider',
+                    });
+                  }
+                }}
+                style={{ background: 'none', border: 'none', color: '#dc2626', cursor: 'pointer', fontSize: '11px', fontWeight: 700, padding: '0 0.25rem' }}
+                title="Reset to Walk-in Customer"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+
+          {/* Instant Customer Search & On-the-spot Add */}
+          <div style={{ position: 'relative', width: '280px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', position: 'relative' }}>
+              <Search size={14} style={{ position: 'absolute', left: '0.65rem', color: '#94a3b8' }} />
+              <input
+                type="text"
+                value={customerSearchInput}
+                onChange={(e) => {
+                  setCustomerSearchInput(e.target.value);
+                  setIsCustomerSearchOpen(true);
+                }}
+                onFocus={() => setIsCustomerSearchOpen(true)}
+                placeholder="Search customer by name / NTN / phone..."
+                style={{
+                  width: '100%',
+                  padding: '0.4rem 0.65rem 0.4rem 2rem',
+                  borderRadius: '8px',
+                  border: '1px solid #cbd5e1',
+                  fontSize: '11px',
+                  outline: 'none',
+                }}
+              />
+            </div>
+
+            {/* Dropdown for Customer Autocomplete */}
+            {isCustomerSearchOpen && (
+              <div
+                style={{
+                  position: 'absolute',
+                  left: 0,
+                  right: 0,
+                  top: '100%',
+                  marginTop: '0.25rem',
+                  backgroundColor: '#ffffff',
+                  border: '1px solid #cbd5e1',
+                  borderRadius: '10px',
+                  boxShadow: '0 10px 25px -5px rgba(0,0,0,0.15)',
+                  zIndex: 110,
+                  maxHeight: '260px',
+                  overflowY: 'auto',
+                }}
+              >
+                <div style={{ padding: '0.35rem 0.65rem', backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0', fontSize: '10px', color: '#64748b', fontWeight: 700, display: 'flex', justifyContent: 'space-between' }}>
+                  <span>Select Customer ({filteredCustomerOptions.length} Matches)</span>
+                  <span style={{ cursor: 'pointer' }} onClick={() => setIsCustomerSearchOpen(false)}>✕ Close</span>
+                </div>
+
+                {filteredCustomerOptions.map((c) => (
+                  <div
+                    key={c.id}
+                    onClick={() => handleSelectCustomerRecord(c)}
+                    style={{
+                      padding: '0.5rem 0.75rem',
+                      borderBottom: '1px solid #f1f5f9',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      fontSize: '11px',
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f0f9ff'}
+                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#ffffff'}
+                  >
+                    <div>
+                      <div style={{ fontWeight: 700, color: '#0f172a' }}>{c.name || c.customerName}</div>
+                      <div style={{ fontSize: '10px', color: '#64748b' }}>
+                        📍 {c.region || 'Gujrat'} • Ph: {c.phone || '-'} {c.ntn && c.ntn !== '-' ? `• NTN: ${c.ntn}` : ''}
+                      </div>
+                    </div>
+                    <span style={{ fontSize: '10px', color: '#0284c7', fontWeight: 700 }}>Select ↵</span>
+                  </div>
+                ))}
+
+                {/* On-the-spot Add Customer Action in Dropdown */}
+                <div
+                  onClick={() => {
+                    setIsCustomerSearchOpen(false);
+                    setIsCustomerFormModalOpen(true);
+                  }}
+                  style={{
+                    padding: '0.6rem 0.75rem',
+                    backgroundColor: '#e0f2fe',
+                    color: '#0284c7',
+                    fontWeight: 700,
+                    fontSize: '11px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.4rem',
+                  }}
+                >
+                  <UserPlus size={14} />
+                  <span>+ Add New Customer &quot;{customerSearchInput || 'on the spot'}&quot;</span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Dedicated "+ New Customer" button */}
+          <button
+            onClick={() => setIsCustomerFormModalOpen(true)}
+            className="btn btn-outline"
+            style={{ 
+              borderRadius: '8px', 
+              fontSize: '11px', 
+              borderColor: '#0284c7', 
+              color: '#0284c7', 
+              padding: '0.4rem 0.75rem', 
+              fontWeight: 700,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.35rem'
+            }}
+          >
+            <UserPlus size={13} /> + New Customer
+          </button>
+
+          {/* Retail Rx Drawer toggle button */}
+          {isRetail && (
             <button
               onClick={() => openModal('rx_drawer')}
               className="btn btn-outline"
-              style={{ borderRadius: '10px', fontSize: '12px', borderColor: '#0284c7', color: '#0284c7', padding: '0.45rem 0.85rem', fontWeight: 700 }}
+              style={{ borderRadius: '8px', fontSize: '11px', borderColor: '#d97706', color: '#d97706', padding: '0.4rem 0.75rem', fontWeight: 700 }}
             >
-              <HeartPulse size={14} /> {rxPatient ? `Rx: ${rxPatient.name} (Dr: ${rxPatient.doctorName})` : '+ Add / Search Patient & Rx Details'}
-            </button>
-          ) : (
-            <button
-              onClick={() => setIsCustomerModalOpen(true)}
-              className="btn btn-primary"
-              style={{ borderRadius: '10px', fontSize: '12px', backgroundColor: '#0284c7', padding: '0.45rem 0.85rem' }}
-            >
-              <UserPlus size={14} /> + Add / Select Customer Details
+              <HeartPulse size={13} /> {rxPatient ? `Rx: ${rxPatient.name}` : '+ Patient Rx'}
             </button>
           )}
-
-          <span style={{ fontSize: '12px', fontWeight: 700, color: '#334155', display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
-            <span>{isRetail ? 'Active Customer/Patient:' : 'Customer:'} <strong style={{ color: '#0284c7' }}>{rxPatient ? rxPatient.name : customerData.customerName}</strong></span>
-            {isRetail && rxPatient && (
-              <button
-                type="button"
-                onClick={() => { setRxPatient(null); if (typeof clearActivePatientForPOS === 'function') clearActivePatientForPOS(); }}
-                style={{ background: 'none', border: '1px solid #cbd5e1', borderRadius: '4px', padding: '0.1rem 0.35rem', color: '#dc2626', cursor: 'pointer', fontSize: '10px', fontWeight: 700 }}
-                title="Reset to Walk-in Patient"
-              >
-                ✕ Clear
-              </button>
-            )}
-          </span>
         </div>
 
         <div style={{ display: 'flex', gap: '0.5rem' }}>
           <button
             onClick={clearCart}
             className="btn btn-outline"
-            style={{ borderRadius: '10px', fontSize: '12px', padding: '0.45rem 0.75rem' }}
+            style={{ borderRadius: '8px', fontSize: '11px', padding: '0.4rem 0.65rem' }}
             title="Hotkey: F1"
           >
             Clear Cart (F1)
@@ -548,9 +900,9 @@ export const POSPage = ({ storeMode: propStoreMode }) => {
           <button
             onClick={() => (isRetail ? setIsRetailReturnModalOpen(true) : setIsSalesReturnModalOpen(true))}
             className="btn btn-outline"
-            style={{ borderRadius: '10px', fontSize: '12px', padding: '0.45rem 0.75rem', color: '#dc2626', borderColor: '#fca5a5' }}
+            style={{ borderRadius: '8px', fontSize: '11px', padding: '0.4rem 0.65rem', color: '#dc2626', borderColor: '#fca5a5' }}
           >
-            <RotateCcw size={14} /> {isRetail ? 'Counter Return' : 'Sales Return / Exchange'}
+            <RotateCcw size={13} /> {isRetail ? 'Counter Return' : 'Sales Return'}
           </button>
         </div>
       </div>
@@ -640,8 +992,13 @@ export const POSPage = ({ storeMode: propStoreMode }) => {
                   const isSelected = idx === selectedHighlightIndex;
                   const price = Number(m.boxSellingPrice || m.boxPrice || m.price || 600);
                   const tabPrice = Number(m.pricePerTablet || (price / 200) || 3.0);
-                  const wholesaleBatch = !isRetail ? getEarliestValidBatch(m.id || m.itemCode, true) : null;
-                  const isShortExpiryWholesale = !isRetail && (!wholesaleBatch || (typeof isExpiryGreaterThan6Months === 'function' && !isExpiryGreaterThan6Months(wholesaleBatch.expiryDate)));
+                  const stockInfo = getMedicineStockStatus(m);
+                  const isQuarantined = stockInfo.status === 'QUARANTINED';
+                  const isOutOfStock = stockInfo.status === 'OUT_OF_STOCK';
+                  const isShortExpiry = stockInfo.status === 'SHORT_EXPIRY';
+                  const wholesaleBatch = stockInfo.batch || (!isRetail ? getEarliestValidBatch(m.id || m.itemCode, false) : null);
+
+                  const highlightBg = isQuarantined ? '#dc2626' : (isShortExpiry ? '#ea580c' : (isOutOfStock ? '#d97706' : '#0284c7'));
 
                   return (
                     <div
@@ -653,7 +1010,7 @@ export const POSPage = ({ storeMode: propStoreMode }) => {
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'space-between',
-                        backgroundColor: isSelected ? (isShortExpiryWholesale ? '#dc2626' : '#0284c7') : '#ffffff',
+                        backgroundColor: isSelected ? highlightBg : '#ffffff',
                         color: isSelected ? '#ffffff' : '#0f172a',
                         cursor: 'pointer',
                         borderBottom: '1px solid #f1f5f9'
@@ -665,9 +1022,19 @@ export const POSPage = ({ storeMode: propStoreMode }) => {
                           <span>{m.name || m.brandName}</span>
                           {isRetail && m.controlledType === 'Narcotic' && <span style={{ fontSize: '9px', backgroundColor: '#dc2626', color: '#fff', padding: '0.1rem 0.35rem', borderRadius: '4px', fontWeight: 800 }}>NARCOTIC</span>}
                           {isRetail && m.requiresPrescription && m.controlledType !== 'Narcotic' && <span style={{ fontSize: '9px', backgroundColor: '#d97706', color: '#fff', padding: '0.1rem 0.35rem', borderRadius: '4px', fontWeight: 800 }}>Rx</span>}
-                          {isShortExpiryWholesale && (
+                          {isQuarantined && (
                             <span style={{ fontSize: '9px', backgroundColor: isSelected ? '#7f1d1d' : '#fee2e2', color: isSelected ? '#fecaca' : '#dc2626', border: '1px solid #f87171', padding: '0.1rem 0.35rem', borderRadius: '4px', fontWeight: 800 }}>
-                              ⛔ &le;6M EXPIRY (RTV)
+                              ⛔ QUARANTINED (RTV)
+                            </span>
+                          )}
+                          {isShortExpiry && (
+                            <span style={{ fontSize: '9px', backgroundColor: isSelected ? '#7c2d12' : '#ffedd5', color: isSelected ? '#ffedd5' : '#ea580c', border: '1px solid #fdba74', padding: '0.1rem 0.35rem', borderRadius: '4px', fontWeight: 800 }}>
+                              ⏳ ≤6M EXPIRY (RTV)
+                            </span>
+                          )}
+                          {isOutOfStock && (
+                            <span style={{ fontSize: '9px', backgroundColor: isSelected ? '#78350f' : '#fef3c7', color: isSelected ? '#fef3c7' : '#d97706', border: '1px solid #fde68a', padding: '0.1rem 0.35rem', borderRadius: '4px', fontWeight: 800 }}>
+                              ⚠️ OUT OF STOCK
                             </span>
                           )}
                         </div>
@@ -679,11 +1046,23 @@ export const POSPage = ({ storeMode: propStoreMode }) => {
                       </div>
 
                       <div style={{ textAlign: 'right' }}>
-                        <div style={{ fontSize: '13px', fontWeight: 800, color: isSelected ? '#ffffff' : (isShortExpiryWholesale ? '#dc2626' : '#16a34a') }}>
-                          {isShortExpiryWholesale ? '⛔ Quarantined' : (isRetail ? `Rs. ${tabPrice.toFixed(2)}/tab` : `Rs. ${price.toFixed(2)}/box`)}
+                        <div style={{ fontSize: '13px', fontWeight: 800, color: isSelected ? '#ffffff' : (isQuarantined ? '#dc2626' : isShortExpiry ? '#ea580c' : isOutOfStock ? '#d97706' : '#16a34a') }}>
+                          {isQuarantined 
+                            ? '⛔ Quarantined' 
+                            : isShortExpiry 
+                            ? '⏳ ≤6M Expiry' 
+                            : isOutOfStock 
+                            ? '⚠️ Out of Stock' 
+                            : (isRetail ? `Rs. ${tabPrice.toFixed(2)}/tab` : `Rs. ${price.toFixed(2)}/box`)}
                         </div>
                         <div style={{ fontSize: '10px', color: isSelected ? '#e0f2fe' : '#64748b' }}>
-                          {isShortExpiryWholesale ? 'RTV Return Only' : `Stock: ${m.boxStock !== undefined ? m.boxStock : 10} Boxes`}
+                          {isQuarantined 
+                            ? 'Regulatory Lock' 
+                            : isShortExpiry 
+                            ? 'RTV Return Only' 
+                            : isOutOfStock 
+                            ? '0 Boxes Available' 
+                            : `Stock: ${m.boxStock !== undefined ? m.boxStock : 10} Boxes`}
                         </div>
                       </div>
                     </div>
@@ -1177,6 +1556,30 @@ export const POSPage = ({ storeMode: propStoreMode }) => {
           onClose={() => setCompletedDebtSale(null)}
         />
       )}
+
+      {/* PRE-DEFINED DESIGNED ALERT MODAL */}
+      <AppAlertModal
+        isOpen={alertConfig.isOpen}
+        type={alertConfig.type}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        itemDetails={alertConfig.itemDetails}
+        actionLabel={alertConfig.actionLabel}
+        onAction={alertConfig.onAction}
+        onClose={closeAlert}
+      />
+
+      {/* ON-THE-SPOT CUSTOMER REGISTRATION MODAL */}
+      <CustomerFormModal
+        isOpen={isCustomerFormModalOpen}
+        initialQuery={customerSearchInput}
+        onClose={() => setIsCustomerFormModalOpen(false)}
+        onSave={(newCust) => {
+          addCustomer(newCust);
+          handleSelectCustomerRecord(newCust);
+          setIsCustomerFormModalOpen(false);
+        }}
+      />
 
       <PatientRxDrawer />
     </div>

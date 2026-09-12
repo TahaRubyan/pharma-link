@@ -396,6 +396,83 @@ export const dbSyncService = {
   },
 
   // -------------------------------------------------------------
+  // 3b. CUSTOMER DIRECTORY (B2B WHOLESALE & RETAIL)
+  // -------------------------------------------------------------
+  async fetchCustomers(tenantId = 'TEN-TESTING-SHOP') {
+    if (!isSupabaseConfigured || !supabase) return null;
+    try {
+      const { data, error } = await supabase
+        .from('customers')
+        .select('*')
+        .eq('tenant_id', tenantId);
+
+      if (error) {
+        console.warn('[dbSync] fetchCustomers error:', error.message);
+        return null;
+      }
+      if (data && data.length > 0) {
+        return data.map((c) => ({
+          id: c.id.startsWith(`${tenantId}_`) ? c.id.slice(tenantId.length + 1) : c.id,
+          name: c.name || '',
+          shopName: c.shop_name || c.name || '',
+          customerName: c.name || '',
+          region: c.region || 'Gujrat',
+          address: c.address || '',
+          customerAddress: c.address || '',
+          phone: c.phone || '',
+          customerPhone: c.phone || '',
+          ntn: c.ntn || '-',
+          customerNtn: c.ntn || '-',
+          gstn: c.gstn || '-',
+          customerStrn: c.gstn || '-',
+          strn: c.gstn || '-',
+          licenseNo: c.license_no || 'DL-20/21-PENDING',
+          filerStatus: c.filer_status || 'FILER',
+          creditLimit: Number(c.credit_limit || 500000),
+          currentBalance: Number(c.current_balance || 0),
+          createdAt: c.created_at || new Date().toISOString(),
+        }));
+      }
+      return [];
+    } catch (e) {
+      console.warn('[dbSync] fetchCustomers network error:', e.message);
+      return null;
+    }
+  },
+
+  async syncCustomersUpstream(tenantId, customers = []) {
+    if (!isSupabaseConfigured || !supabase || !customers.length) return;
+    try {
+      const rows = customers.map((c) => {
+        const rawId = c.id || `CUST-${Date.now().toString().slice(-6)}`;
+        const scopedId = rawId.startsWith(`${tenantId}_`) ? rawId : `${tenantId}_${rawId}`;
+        return {
+          id: scopedId,
+          tenant_id: tenantId,
+          name: c.name || c.customerName || 'Customer',
+          shop_name: c.shopName || c.name || '',
+          region: c.region || 'Gujrat',
+          address: c.address || c.customerAddress || '',
+          phone: c.phone || c.customerPhone || '',
+          ntn: c.ntn || c.customerNtn || '-',
+          gstn: c.gstn || c.customerStrn || c.strn || '-',
+          license_no: c.licenseNo || '',
+          filer_status: c.filerStatus || 'FILER',
+          credit_limit: Number(c.creditLimit || 500000),
+          current_balance: Number(c.currentBalance || 0),
+        };
+      });
+
+      const { error } = await supabase.from('customers').upsert(rows, { onConflict: 'id' });
+      if (error) {
+        console.warn('[dbSync] syncCustomersUpstream error:', error.message);
+      }
+    } catch (err) {
+      console.warn('[dbSync] syncCustomersUpstream error:', err.message);
+    }
+  },
+
+  // -------------------------------------------------------------
   // 4. STAFF ACCOUNTS
   // -------------------------------------------------------------
   async fetchStaffAccounts(tenantId = null) {
@@ -703,3 +780,6 @@ export const dbSyncService = {
     }
   },
 };
+
+export const fetchCustomers = dbSyncService.fetchCustomers.bind(dbSyncService);
+export const syncCustomersUpstream = dbSyncService.syncCustomersUpstream.bind(dbSyncService);

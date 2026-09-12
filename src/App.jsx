@@ -6,6 +6,7 @@ import { PatientProvider } from './context/PatientContext';
 import { SalesProvider } from './context/SalesContext';
 import { CartProvider } from './context/CartContext';
 import { CustomerDebtProvider } from './context/CustomerDebtContext';
+import { CustomerProvider } from './context/CustomerContext';
 import { PWAProvider } from './context/PWAContext';
 import Layout from './components/layout/Layout';
 import LoginPage from './pages/LoginPage';
@@ -14,6 +15,7 @@ import MasterAdminDashboard from './pages/MasterAdminDashboard';
 import DashboardPage from './pages/DashboardPage';
 import POSPage from './pages/POSPage';
 import InventoryPage from './pages/InventoryPage';
+import CustomersPage from './pages/CustomersPage';
 import ExpiryRadarPage from './pages/ExpiryRadarPage';
 import ControlledSubstancesPage from './pages/ControlledSubstancesPage';
 import SuppliersPage from './pages/SuppliersPage';
@@ -225,6 +227,8 @@ function AppContent() {
         return <POSPage storeMode={storeMode} />;
       case 'inventory':
         return <InventoryPage />;
+      case 'customers':
+        return <CustomersPage onNavigate={setCurrentScreen} />;
       case 'customer-debt':
         return <CustomerDebtPage />;
       case 'expiry':
@@ -236,11 +240,7 @@ function AppContent() {
       case 'region-ledger':
         return isCashier ? <POSPage storeMode={storeMode} /> : <RegionLedgerPage />;
       case 'customer-ledger':
-        return storeMode === 'WHOLESALE' ? (
-          <WholesaleDashboardPage onNavigate={setCurrentScreen} />
-        ) : (
-          <CustomerDebtPage />
-        );
+        return <CustomersPage onNavigate={setCurrentScreen} />;
       case 'patients':
         return <PatientsPage onNavigate={setCurrentScreen} />;
       case 'fbr':
@@ -280,19 +280,21 @@ function TenantDataProviders({ children }) {
   const activeTenantId = currentShop?.shopId || 'TEN-TESTING-SHOP';
 
   return (
-    <InventoryProvider key={`inv-${activeTenantId}`}>
-      <SupplierProvider key={`sup-${activeTenantId}`}>
-        <PatientProvider key={`pat-${activeTenantId}`}>
-          <SalesProvider key={`sales-${activeTenantId}`}>
-            <CartProvider key={`cart-${activeTenantId}`}>
-              <CustomerDebtProvider key={`debt-${activeTenantId}`}>
-                {children}
-              </CustomerDebtProvider>
-            </CartProvider>
-          </SalesProvider>
-        </PatientProvider>
-      </SupplierProvider>
-    </InventoryProvider>
+    <CustomerProvider key={`cust-${activeTenantId}`}>
+      <InventoryProvider key={`inv-${activeTenantId}`}>
+        <SupplierProvider key={`sup-${activeTenantId}`}>
+          <PatientProvider key={`pat-${activeTenantId}`}>
+            <SalesProvider key={`sales-${activeTenantId}`}>
+              <CartProvider key={`cart-${activeTenantId}`}>
+                <CustomerDebtProvider key={`debt-${activeTenantId}`}>
+                  {children}
+                </CustomerDebtProvider>
+              </CartProvider>
+            </SalesProvider>
+          </PatientProvider>
+        </SupplierProvider>
+      </InventoryProvider>
+    </CustomerProvider>
   );
 }
 
