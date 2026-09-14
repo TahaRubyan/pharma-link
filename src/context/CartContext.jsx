@@ -49,6 +49,7 @@ export const CartProvider = ({ children }) => {
     setCart((prev) => {
       const medId = medicine.id || medicine.medicineId;
       const bNo = batch ? (batch.batchNo || batch.batchNumber) : 'B-9481';
+      const existingIdx = prev.findIndex((i) => (i.medicineId === medId || i.id === medId) && (i.batchNo === bNo || i.batchNumber === bNo));
       const itemCost = Number(medicine.purchaseCost !== undefined ? medicine.purchaseCost : (medicine.purchasePriceBox !== undefined ? medicine.purchasePriceBox : (medicine.boxCost || (batch ? (batch.purchasePriceBox || batch.purchaseRate || batch.purchaseCost) : 0))));
       const itemSelling = Number(medicine.boxSellingPrice !== undefined ? medicine.boxSellingPrice : (medicine.boxPrice !== undefined ? medicine.boxPrice : (batch ? (batch.boxPrice || batch.boxSellingPrice) : itemCost)));
       const boxPrice = round2(itemSelling > 0 ? itemSelling : (itemCost > 0 ? itemCost : (medicine.price || 0)));
