@@ -49,8 +49,9 @@ export const CartProvider = ({ children }) => {
     setCart((prev) => {
       const medId = medicine.id || medicine.medicineId;
       const bNo = batch ? (batch.batchNo || batch.batchNumber) : 'B-9481';
-      const existingIdx = prev.findIndex((i) => (i.medicineId === medId || i.id === medId) && (i.batchNo === bNo || i.batchNumber === bNo));
-      const boxPrice = round2(medicine.boxSellingPrice || medicine.price || (batch ? batch.boxPrice : 150));
+      const itemCost = Number(medicine.purchaseCost !== undefined ? medicine.purchaseCost : (medicine.purchasePriceBox !== undefined ? medicine.purchasePriceBox : (medicine.boxCost || (batch ? (batch.purchasePriceBox || batch.purchaseRate || batch.purchaseCost) : 0))));
+      const itemSelling = Number(medicine.boxSellingPrice !== undefined ? medicine.boxSellingPrice : (medicine.boxPrice !== undefined ? medicine.boxPrice : (batch ? (batch.boxPrice || batch.boxSellingPrice) : itemCost)));
+      const boxPrice = round2(itemSelling > 0 ? itemSelling : (itemCost > 0 ? itemCost : (medicine.price || 0)));
       const saleTaxRate = Number(medicine.saleTaxPercent !== undefined ? medicine.saleTaxPercent : (medicine.salesTaxRate !== undefined ? medicine.salesTaxRate : 18));
       const advTaxRate = Number(medicine.advTaxPercent !== undefined ? medicine.advTaxPercent : 0.5);
 
@@ -58,7 +59,7 @@ export const CartProvider = ({ children }) => {
         return prev.map((item, idx) => {
           if (idx === existingIdx) {
             const newQty = item.qty + 1;
-            const rate = Number(item.boxPrice || item.price || boxPrice);
+            const rate = Number(item.boxPrice !== undefined ? item.boxPrice : (item.price !== undefined ? item.price : boxPrice));
             const gross = round2(newQty * rate);
             const discPercent = Number(item.discountPercent || 0);
             const discAmount = round2((gross * discPercent) / 100);
@@ -73,6 +74,8 @@ export const CartProvider = ({ children }) => {
               ...item,
               qty: newQty,
               quantity: newQty,
+              boxPrice: rate,
+              price: rate,
               gross,
               discount: discAmount,
               saleTaxPercent: tr,
@@ -107,8 +110,13 @@ export const CartProvider = ({ children }) => {
             expiryDate: batch ? (batch.expiryDate || '12/2027') : '12/2027',
             unitSelection,
             unitType: unitSelection,
+            costPrice: itemCost,
+            purchaseCost: itemCost,
+            purchasePriceBox: itemCost,
+            boxCost: itemCost,
             price: boxPrice,
             boxPrice: boxPrice,
+            boxSellingPrice: boxPrice,
             unitPrice: boxPrice,
             qty: 1,
             quantity: 1,

@@ -299,14 +299,15 @@ export const InventoryProvider = ({ children }) => {
     let totalInwardCost = 0;
 
     inwardItems.forEach((item) => {
-      const boxCost = Number(item.boxCost || item.purchasePriceBox || 400);
-      const boxMrp = Number(item.boxMrp || item.boxSellingPrice || item.boxPrice || Math.round(boxCost * 1.15) || 500);
+      const boxCost = Number(item.purchaseCost !== undefined ? item.purchaseCost : (item.boxCost !== undefined ? item.boxCost : (item.purchasePriceBox || 0)));
+      // In Wholesale mode (or when no MRP/selling price is specified), selling rate equals cost price (no fabricated 15% markup!)
+      const boxMrp = Number(item.boxMrp || item.boxSellingPrice || (isRetail ? (item.boxPrice || boxCost) : boxCost));
       const boxesCount = Number(item.inwardBoxes || item.quantity || 1);
       const stripsPerBox = Number(item.stripsPerBox || 10);
       const tabletsPerStrip = Number(item.tabletsPerStrip || 10);
       const totalTabs = boxesCount * stripsPerBox * tabletsPerStrip;
-      const tabPrice = boxMrp / (stripsPerBox * tabletsPerStrip);
-      const stripPrice = boxMrp / stripsPerBox;
+      const tabPrice = (stripsPerBox * tabletsPerStrip) > 0 ? (boxMrp / (stripsPerBox * tabletsPerStrip)) : 0;
+      const stripPrice = stripsPerBox > 0 ? (boxMrp / stripsPerBox) : 0;
       const cleanShelf = item.shelfLocation?.trim() || '';
 
       totalInwardCost += boxCost * boxesCount;
@@ -339,6 +340,8 @@ export const InventoryProvider = ({ children }) => {
                 boxPrice: boxMrp,
                 purchaseCost: boxCost,
                 purchasePriceBox: boxCost,
+                costPrice: boxCost,
+                boxCost: boxCost,
                 pricePerTablet: Number(tabPrice.toFixed(2)),
                 stripPrice: Number(stripPrice.toFixed(2)),
                 boxStock: isShortExpiry ? (m.boxStock || 0) : ((m.boxStock || 0) + boxesCount),
@@ -364,6 +367,8 @@ export const InventoryProvider = ({ children }) => {
             boxPrice: boxMrp,
             purchaseCost: boxCost,
             purchasePriceBox: boxCost,
+            costPrice: boxCost,
+            boxCost: boxCost,
             pricePerTablet: Number(tabPrice.toFixed(2)),
             stripPrice: Number(stripPrice.toFixed(2)),
             boxStock: isShortExpiry ? 0 : boxesCount,
@@ -389,7 +394,10 @@ export const InventoryProvider = ({ children }) => {
             return {
               ...b,
               boxPrice: boxMrp,
+              boxSellingPrice: boxMrp,
               purchasePriceBox: boxCost,
+              purchaseRate: boxCost,
+              purchaseCost: boxCost,
               pricePerTablet: Number(tabPrice.toFixed(2)),
             };
           }
@@ -406,7 +414,10 @@ export const InventoryProvider = ({ children }) => {
           expiryDate: item.expiryDate || '2028-12-31',
           totalTabletsAvailable: isShortExpiry ? 0 : totalTabs,
           boxPrice: boxMrp,
+          boxSellingPrice: boxMrp,
           purchasePriceBox: boxCost,
+          purchaseRate: boxCost,
+          purchaseCost: boxCost,
           pricePerTablet: Number(tabPrice.toFixed(2)),
           status: isShortExpiry ? 'Quarantined RTV' : 'Active Stock',
           rackLocation: cleanShelf,
@@ -610,6 +621,9 @@ export const InventoryProvider = ({ children }) => {
         return null; // Short expiry under DRAP wholesale rule
       }
 
+      const boxCost = Number(med?.purchaseCost !== undefined ? med.purchaseCost : (med?.purchasePriceBox !== undefined ? med.purchasePriceBox : (med?.boxCost || 0)));
+      const sellingRate = Number(med?.boxSellingPrice !== undefined ? med.boxSellingPrice : (med?.boxPrice !== undefined ? med.boxPrice : (med?.price || boxCost)));
+
       return {
         id: `BATCH-${med?.id || 'STOCK'}-ACTIVE`,
         batchNo: med?.batchNo || `B26-${med?.itemCode || 'STOCK'}`,
@@ -618,21 +632,27 @@ export const InventoryProvider = ({ children }) => {
         distributorName: med?.manufacturer || 'Authorized Distributor',
         expiryDate: expiry,
         totalTabletsAvailable: catalogStock * tabsPerBox,
-        boxPrice: Number(med?.boxSellingPrice || med?.boxPrice || med?.price || 600),
-        purchasePriceBox: Number(med?.purchaseCost || med?.purchasePriceBox || 480),
-        pricePerTablet: Number(med?.pricePerTablet || 3.0),
+        boxPrice: sellingRate,
+        boxSellingPrice: sellingRate,
+        purchasePriceBox: boxCost,
+        purchaseRate: boxCost,
+        purchaseCost: boxCost,
+        pricePerTablet: Number(med?.pricePerTablet || (tabsPerBox > 0 ? (sellingRate / tabsPerBox) : 0)),
         status: 'Active Stock',
         rackLocation: med?.rackLocation || '',
       };
     }
 
     if (isWholesale) return null;
+    const fallbackCost = Number(med?.purchaseCost || med?.purchasePriceBox || 0);
+    const fallbackRate = Number(med?.boxSellingPrice || med?.boxPrice || fallbackCost);
     return {
       batchNo: 'B-9481',
       batchNumber: 'B-9481',
       expiryDate: '2028-10-31',
-      boxPrice: 600,
-      pricePerTablet: 3.0,
+      boxPrice: fallbackRate,
+      purchasePriceBox: fallbackCost,
+      pricePerTablet: Number(med?.pricePerTablet || 0),
       totalTabletsAvailable: 1000
     };
   };

@@ -27,29 +27,37 @@ export const dbSyncService = {
       }
       if (data && data.length > 0) {
         // Map database snake_case to app camelCase
-        return data.map((m) => ({
-          id: m.id.startsWith(`${tenantId}_`) ? m.id.slice(tenantId.length + 1) : m.id,
-          tenantId: m.tenant_id,
-          itemCode: m.item_code,
-          barcode: m.barcode,
-          name: m.name,
-          brandName: m.brand_name || m.name,
-          formula: m.generic_formula,
-          genericFormula: m.generic_formula,
-          category: m.category,
-          rackLocation: m.rack_location,
-          boxStock: m.box_stock,
-          looseUnitsStock: m.loose_units_stock,
-          tabletsPerBox: m.tablets_per_box,
-          stripsPerBox: m.strips_per_box,
-          boxSellingPrice: Number(m.box_price || 0),
-          boxPrice: Number(m.box_price || 0),
-          price: Number(m.box_price || 0),
-          stripPrice: Number(m.strip_price || 0),
-          pricePerTablet: Number(m.price_per_tablet || 0),
-          requiresPrescription: m.requires_prescription,
-          controlledType: m.controlled_type,
-        }));
+        return data.map((m) => {
+          const cost = Number(m.cost_price !== undefined && m.cost_price !== null ? m.cost_price : (m.purchase_cost !== undefined && m.purchase_cost !== null ? m.purchase_cost : (m.box_price || 0)));
+          const selling = Number(m.box_price !== undefined && m.box_price !== null ? m.box_price : cost);
+          return {
+            id: m.id.startsWith(`${tenantId}_`) ? m.id.slice(tenantId.length + 1) : m.id,
+            tenantId: m.tenant_id,
+            itemCode: m.item_code,
+            barcode: m.barcode,
+            name: m.name,
+            brandName: m.brand_name || m.name,
+            formula: m.generic_formula,
+            genericFormula: m.generic_formula,
+            category: m.category,
+            rackLocation: m.rack_location,
+            boxStock: m.box_stock,
+            looseUnitsStock: m.loose_units_stock,
+            tabletsPerBox: m.tablets_per_box,
+            stripsPerBox: m.strips_per_box,
+            purchaseCost: cost,
+            purchasePriceBox: cost,
+            boxCost: cost,
+            costPrice: cost,
+            boxSellingPrice: selling,
+            boxPrice: selling,
+            price: selling,
+            stripPrice: Number(m.strip_price || 0),
+            pricePerTablet: Number(m.price_per_tablet || 0),
+            requiresPrescription: m.requires_prescription,
+            controlledType: m.controlled_type,
+          };
+        });
       }
       return [];
     } catch (err) {
@@ -64,6 +72,8 @@ export const dbSyncService = {
       const rows = medicines.map((m) => {
         const rawId = m.id || `MED-${m.itemCode || Math.floor(1000 + Math.random() * 9000)}`;
         const scopedId = rawId.startsWith(`${tenantId}_`) ? rawId : `${tenantId}_${rawId}`;
+        const cost = Number(m.purchaseCost !== undefined ? m.purchaseCost : (m.purchasePriceBox !== undefined ? m.purchasePriceBox : (m.boxCost !== undefined ? m.boxCost : (m.costPrice || 0))));
+        const selling = Number(m.boxSellingPrice !== undefined ? m.boxSellingPrice : (m.boxPrice !== undefined ? m.boxPrice : (m.price || cost)));
         return {
           id: scopedId,
           tenant_id: tenantId,
@@ -78,7 +88,9 @@ export const dbSyncService = {
           loose_units_stock: Number(m.looseUnitsStock || 0),
           tablets_per_box: Number(m.tabletsPerBox || 100),
           strips_per_box: Number(m.stripsPerBox || 10),
-          box_price: Number(m.boxSellingPrice || m.boxPrice || m.price || 0),
+          cost_price: cost,
+          purchase_cost: cost,
+          box_price: selling,
           strip_price: Number(m.stripPrice || 0),
           price_per_tablet: Number(m.pricePerTablet || 0),
           requires_prescription: Boolean(m.requiresPrescription),
@@ -112,21 +124,30 @@ export const dbSyncService = {
         return null;
       }
       if (data && data.length > 0) {
-        return data.map((b) => ({
-          id: b.id.startsWith(`${tenantId}_`) ? b.id.slice(tenantId.length + 1) : b.id,
-          tenantId: b.tenant_id,
-          medicineId: b.medicine_id ? (b.medicine_id.startsWith(`${tenantId}_`) ? b.medicine_id.slice(tenantId.length + 1) : b.medicine_id) : '',
-          batchNo: b.batch_no,
-          batchNumber: b.batch_no,
-          expiryDate: b.expiry_date,
-          boxStock: Number(b.box_stock || 0),
-          totalTabletsAvailable: Number(b.total_tablets_available || 0),
-          boxPrice: Number(b.box_price || 0),
-          purchasePriceBox: Number(b.purchase_price_box || 0),
-          pricePerTablet: Number(b.price_per_tablet || 0),
-          status: b.status || 'Active Stock',
-          rackLocation: b.rack_location || '',
-        }));
+        return data.map((b) => {
+          const cost = Number(b.purchase_price_box !== undefined && b.purchase_price_box !== null ? b.purchase_price_box : (b.purchase_rate !== undefined && b.purchase_rate !== null ? b.purchase_rate : (b.box_price || 0)));
+          const selling = Number(b.box_price !== undefined && b.box_price !== null ? b.box_price : (b.box_selling_price !== undefined && b.box_selling_price !== null ? b.box_selling_price : cost));
+          const boxes = Number(b.box_stock !== undefined && b.box_stock !== null ? b.box_stock : (b.stock_boxes || 0));
+          const tablets = Number(b.total_tablets_available !== undefined && b.total_tablets_available !== null ? b.total_tablets_available : (b.stock_units || 0));
+          return {
+            id: b.id.startsWith(`${tenantId}_`) ? b.id.slice(tenantId.length + 1) : b.id,
+            tenantId: b.tenant_id,
+            medicineId: b.medicine_id ? (b.medicine_id.startsWith(`${tenantId}_`) ? b.medicine_id.slice(tenantId.length + 1) : b.medicine_id) : '',
+            batchNo: b.batch_no,
+            batchNumber: b.batch_no,
+            expiryDate: b.expiry_date,
+            boxStock: boxes,
+            totalTabletsAvailable: tablets,
+            boxPrice: selling,
+            boxSellingPrice: selling,
+            purchasePriceBox: cost,
+            purchaseRate: cost,
+            purchaseCost: cost,
+            pricePerTablet: Number(b.price_per_tablet || 0),
+            status: b.status || 'Active Stock',
+            rackLocation: b.rack_location || '',
+          };
+        });
       }
       return [];
     } catch (err) {
@@ -150,16 +171,25 @@ export const dbSyncService = {
           validExpiry = `${parts[1]}-${parts[0]}-01`;
         }
 
+        const cost = Number(b.purchasePriceBox !== undefined ? b.purchasePriceBox : (b.purchaseRate !== undefined ? b.purchaseRate : (b.purchaseCost || b.boxPrice || 0)));
+        const selling = Number(b.boxSellingPrice !== undefined ? b.boxSellingPrice : (b.boxPrice || cost));
+        const boxes = Number(b.boxStock || 0);
+        const tabs = Number(b.totalTabletsAvailable || b.totalTablets || 0);
+
         return {
           id: scopedId,
           tenant_id: tenantId,
           medicine_id: scopedMedId,
           batch_no: b.batchNo || b.batchNumber || 'BN-101',
           expiry_date: validExpiry,
-          box_stock: Number(b.boxStock || 0),
-          total_tablets_available: Number(b.totalTabletsAvailable || b.totalTablets || 0),
-          box_price: Number(b.boxPrice || 0),
-          purchase_price_box: Number(b.purchasePriceBox || 0),
+          box_stock: boxes,
+          stock_boxes: boxes,
+          total_tablets_available: tabs,
+          stock_units: tabs,
+          box_price: selling,
+          box_selling_price: selling,
+          purchase_price_box: cost,
+          purchase_rate: cost,
           price_per_tablet: Number(b.pricePerTablet || 0),
           status: b.status || 'Active Stock',
           rack_location: b.rackLocation || '',

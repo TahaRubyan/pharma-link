@@ -121,9 +121,9 @@ const ReceiptView = React.forwardRef(({
             let itemPrice = Number(item.boxPrice || item.price || item.unitPrice || 0);
 
             if (item.unitSelection === 'Tablet') {
-              itemPrice = Number(item.pricePerTablet || (item.boxPrice / (item.tabletsPerBox || 200)) || 3.0);
+              itemPrice = Number(item.pricePerTablet || (itemPrice / (item.tabletsPerBox || 200)) || 0);
             } else if (item.unitSelection === 'Strip') {
-              itemPrice = Number(item.stripPrice || ((item.boxPrice || 600) / (item.stripsPerBox || 10)) || 30.0);
+              itemPrice = Number(item.stripPrice || (itemPrice / (item.stripsPerBox || 10)) || 0);
             }
 
             const itemTotal = itemPrice * itemQty;

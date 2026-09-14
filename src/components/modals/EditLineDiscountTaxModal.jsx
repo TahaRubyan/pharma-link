@@ -2,8 +2,18 @@ import React, { useState, useEffect } from 'react';
 import { X, Edit3, Percent, DollarSign, CheckCircle } from 'lucide-react';
 
 export const EditLineDiscountTaxModal = ({ isOpen, item, onClose, onSave }) => {
+  const getItemDefaultRate = (it) => {
+    if (!it) return 0;
+    if (it.boxPrice !== undefined && it.boxPrice !== null && !isNaN(Number(it.boxPrice))) return Number(it.boxPrice);
+    if (it.price !== undefined && it.price !== null && !isNaN(Number(it.price))) return Number(it.price);
+    if (it.unitPrice !== undefined && it.unitPrice !== null && !isNaN(Number(it.unitPrice))) return Number(it.unitPrice);
+    if (it.purchaseCost !== undefined && it.purchaseCost !== null && !isNaN(Number(it.purchaseCost))) return Number(it.purchaseCost);
+    if (it.purchasePriceBox !== undefined && it.purchasePriceBox !== null && !isNaN(Number(it.purchasePriceBox))) return Number(it.purchasePriceBox);
+    return 0;
+  };
+
   const [qty, setQty] = useState(item?.qty || item?.quantity || 1);
-  const [rate, setRate] = useState(item?.boxPrice || item?.price || item?.unitPrice || 600);
+  const [rate, setRate] = useState(getItemDefaultRate(item));
   const [discPercent, setDiscPercent] = useState(item?.discountPercent || 0);
   const [saleTaxPercent, setSaleTaxPercent] = useState(item?.saleTaxPercent !== undefined ? item.saleTaxPercent : 18);
   const [advTaxPercent, setAdvTaxPercent] = useState(item?.advTaxPercent !== undefined ? item.advTaxPercent : 0.5);
@@ -11,7 +21,7 @@ export const EditLineDiscountTaxModal = ({ isOpen, item, onClose, onSave }) => {
   useEffect(() => {
     if (item) {
       setQty(item.qty || item.quantity || 1);
-      setRate(item.boxPrice || item.price || item.unitPrice || 600);
+      setRate(getItemDefaultRate(item));
       setDiscPercent(item.discountPercent || 0);
       setSaleTaxPercent(item.saleTaxPercent !== undefined ? item.saleTaxPercent : 18);
       setAdvTaxPercent(item.advTaxPercent !== undefined ? item.advTaxPercent : 0.5);

@@ -249,8 +249,8 @@ export const InventoryPage = () => {
                 <th>Physical Shelf Location</th>
                 <th style={{ textAlign: 'center' }}>Box Stock</th>
                 {isRetail && <th style={{ textAlign: 'center' }}>Loose Pool</th>}
-                <th style={{ textAlign: 'right' }}>Cost Price</th>
-                <th style={{ textAlign: 'right' }}>{isRetail ? 'Retail MRP' : 'Selling Box Price'}</th>
+                <th style={{ textAlign: 'right' }}>Cost Price (PO Rate)</th>
+                <th style={{ textAlign: 'right' }}>{isRetail ? 'Retail MRP' : 'Trade Base Rate'}</th>
                 <th style={{ textAlign: 'center' }}>Actions</th>
               </tr>
             </thead>
@@ -280,8 +280,10 @@ export const InventoryPage = () => {
                 </tr>
               ) : (
                 paginatedMedicines.map((med, idx) => {
-                  const price = Number(med.boxSellingPrice || med.boxPrice || med.price || 600);
-                  const tabPrice = Number(med.pricePerTablet || (price / (med.tabletsPerBox || 200)) || 3.0);
+                  const cost = Number(med.purchaseCost !== undefined ? med.purchaseCost : (med.purchasePriceBox !== undefined ? med.purchasePriceBox : (med.boxCost || 0)));
+                  const price = Number(med.boxSellingPrice !== undefined ? med.boxSellingPrice : (med.boxPrice !== undefined ? med.boxPrice : (med.price || cost)));
+                  const tabs = Number(med.tabletsPerBox || 200);
+                  const tabPrice = Number(med.pricePerTablet || (tabs > 0 ? (price / tabs) : 0));
                   const isNarcotic = med.controlledType === 'Narcotic';
 
                   return (
@@ -321,7 +323,7 @@ export const InventoryPage = () => {
                         </td>
                       )}
 
-                      <td style={{ textAlign: 'right' }}>Rs. {Number(med.purchaseCost || med.purchasePriceBox || 480).toFixed(2)}</td>
+                      <td style={{ textAlign: 'right', fontWeight: 600 }}>Rs. {cost.toFixed(2)}</td>
                       <td style={{ textAlign: 'right', fontWeight: 700, color: '#16a34a' }}>
                         {isRetail ? `Rs. ${tabPrice.toFixed(2)}/tab` : `Rs. ${price.toFixed(2)}`}
                         {isRetail && <div style={{ fontSize: '9px', color: '#64748b' }}>Rs. {price.toFixed(2)}/box</div>}

@@ -348,6 +348,8 @@ export const POSPage = ({ storeMode: propStoreMode }) => {
 
       // If positive box stock exists, provision an active batch so sale is NEVER blocked
       if (totalAvailableBoxes > 0) {
+        const boxCost = Number(medicine.purchaseCost !== undefined ? medicine.purchaseCost : (medicine.purchasePriceBox !== undefined ? medicine.purchasePriceBox : (medicine.boxCost || 0)));
+        const sellingRate = Number(medicine.boxSellingPrice !== undefined ? medicine.boxSellingPrice : (medicine.boxPrice !== undefined ? medicine.boxPrice : (medicine.price || boxCost)));
         const activeProvisionedBatch = {
           id: `BATCH-${medicine.id || 'STOCK'}-ACTIVE`,
           batchNo: medicine.batchNo || `B26-${medicine.itemCode || 'STOCK'}`,
@@ -356,9 +358,12 @@ export const POSPage = ({ storeMode: propStoreMode }) => {
           distributorName: medicine.manufacturer || 'Authorized Distributor',
           expiryDate: medicine.expiryDate || '2028-12-31',
           totalTabletsAvailable: totalAvailableBoxes * tabsPerBox,
-          boxPrice: Number(medicine.boxSellingPrice || medicine.boxPrice || medicine.price || 600),
-          purchasePriceBox: Number(medicine.purchaseCost || medicine.purchasePriceBox || 480),
-          pricePerTablet: Number(medicine.pricePerTablet || 3.0),
+          boxPrice: sellingRate,
+          boxSellingPrice: sellingRate,
+          purchasePriceBox: boxCost,
+          purchaseRate: boxCost,
+          purchaseCost: boxCost,
+          pricePerTablet: Number(medicine.pricePerTablet || (tabsPerBox > 0 ? (sellingRate / tabsPerBox) : 0)),
           status: 'Active Stock',
           rackLocation: medicine.rackLocation || '',
         };
@@ -439,15 +444,25 @@ export const POSPage = ({ storeMode: propStoreMode }) => {
 
   const round2 = (num) => Math.round((Number(num || 0) + Number.EPSILON) * 100) / 100;
 
+  const getItemRate = (item) => {
+    if (item.boxPrice !== undefined && item.boxPrice !== null && !isNaN(Number(item.boxPrice))) return Number(item.boxPrice);
+    if (item.price !== undefined && item.price !== null && !isNaN(Number(item.price))) return Number(item.price);
+    if (item.unitPrice !== undefined && item.unitPrice !== null && !isNaN(Number(item.unitPrice))) return Number(item.unitPrice);
+    if (item.boxSellingPrice !== undefined && item.boxSellingPrice !== null && !isNaN(Number(item.boxSellingPrice))) return Number(item.boxSellingPrice);
+    if (item.purchaseCost !== undefined && item.purchaseCost !== null && !isNaN(Number(item.purchaseCost))) return Number(item.purchaseCost);
+    if (item.purchasePriceBox !== undefined && item.purchasePriceBox !== null && !isNaN(Number(item.purchasePriceBox))) return Number(item.purchasePriceBox);
+    return 0;
+  };
+
   const grossSubtotal = round2(cart.reduce((sum, item) => {
     const q = Number(item.qty || item.quantity || 1);
-    let unitPrice = Number(item.boxSellingPrice || item.boxPrice || item.price || 600);
+    let unitPrice = getItemRate(item);
 
     if (isRetail) {
       if (item.unitSelection === 'Tablet') {
-        unitPrice = Number(item.pricePerTablet || (unitPrice / (item.tabletsPerBox || 200)) || 3.0);
+        unitPrice = Number(item.pricePerTablet || (unitPrice / (item.tabletsPerBox || 200)) || 0);
       } else if (item.unitSelection === 'Strip') {
-        unitPrice = Number(item.stripPrice || (unitPrice / (item.stripsPerBox || 10)) || 30.0);
+        unitPrice = Number(item.stripPrice || (unitPrice / (item.stripsPerBox || 10)) || 0);
       }
     }
 
@@ -456,7 +471,7 @@ export const POSPage = ({ storeMode: propStoreMode }) => {
 
   const totalLineDiscounts = round2(cart.reduce((sum, item) => {
     const q = Number(item.qty || item.quantity || 1);
-    const rate = Number(item.boxSellingPrice || item.boxPrice || item.price || 600);
+    const rate = getItemRate(item);
     const gross = rate * q;
     const disc = item.discount !== undefined ? Number(item.discount) : (gross * (Number(item.discountPercent || 0) / 100));
     return sum + disc;
@@ -464,7 +479,7 @@ export const POSPage = ({ storeMode: propStoreMode }) => {
 
   const totalSalesTax18 = round2(cart.reduce((sum, item) => {
     const q = Number(item.qty || item.quantity || 1);
-    const rate = Number(item.boxSellingPrice || item.boxPrice || item.price || 600);
+    const rate = getItemRate(item);
     const gross = rate * q;
     const disc = item.discount !== undefined ? Number(item.discount) : (gross * (Number(item.discountPercent || 0) / 100));
     const taxable = Math.max(0, gross - disc);
@@ -477,7 +492,7 @@ export const POSPage = ({ storeMode: propStoreMode }) => {
 
   const totalSalesTax19 = round2(cart.reduce((sum, item) => {
     const q = Number(item.qty || item.quantity || 1);
-    const rate = Number(item.boxSellingPrice || item.boxPrice || item.price || 600);
+    const rate = getItemRate(item);
     const gross = rate * q;
     const disc = item.discount !== undefined ? Number(item.discount) : (gross * (Number(item.discountPercent || 0) / 100));
     const taxable = Math.max(0, gross - disc);
@@ -490,7 +505,7 @@ export const POSPage = ({ storeMode: propStoreMode }) => {
 
   const totalOtherSalesTax = round2(cart.reduce((sum, item) => {
     const q = Number(item.qty || item.quantity || 1);
-    const rate = Number(item.boxSellingPrice || item.boxPrice || item.price || 600);
+    const rate = getItemRate(item);
     const gross = rate * q;
     const disc = item.discount !== undefined ? Number(item.discount) : (gross * (Number(item.discountPercent || 0) / 100));
     const taxable = Math.max(0, gross - disc);
@@ -505,7 +520,7 @@ export const POSPage = ({ storeMode: propStoreMode }) => {
 
   const totalAdvTax05 = round2(cart.reduce((sum, item) => {
     const q = Number(item.qty || item.quantity || 1);
-    const rate = Number(item.boxSellingPrice || item.boxPrice || item.price || 600);
+    const rate = getItemRate(item);
     const gross = rate * q;
     const disc = item.discount !== undefined ? Number(item.discount) : (gross * (Number(item.discountPercent || 0) / 100));
     const taxable = Math.max(0, gross - disc);
@@ -1027,8 +1042,10 @@ export const POSPage = ({ storeMode: propStoreMode }) => {
 
                 {searchResults.map((m, idx) => {
                   const isSelected = idx === selectedHighlightIndex;
-                  const price = Number(m.boxSellingPrice || m.boxPrice || m.price || 600);
-                  const tabPrice = Number(m.pricePerTablet || (price / 200) || 3.0);
+                  const cost = Number(m.purchaseCost !== undefined ? m.purchaseCost : (m.purchasePriceBox !== undefined ? m.purchasePriceBox : (m.boxCost || 0)));
+                  const price = Number(m.boxSellingPrice !== undefined ? m.boxSellingPrice : (m.boxPrice !== undefined ? m.boxPrice : (m.price || cost)));
+                  const tabs = Number(m.tabletsPerBox || 200);
+                  const tabPrice = Number(m.pricePerTablet || (tabs > 0 ? (price / tabs) : 0));
                   const stockInfo = getMedicineStockStatus(m);
                   const isQuarantined = stockInfo.status === 'QUARANTINED';
                   const isOutOfStock = stockInfo.status === 'OUT_OF_STOCK';
@@ -1090,7 +1107,7 @@ export const POSPage = ({ storeMode: propStoreMode }) => {
                             ? '⏳ ≤6M Expiry' 
                             : isOutOfStock 
                             ? '⚠️ Out of Stock' 
-                            : (isRetail ? `Rs. ${tabPrice.toFixed(2)}/tab` : `Rs. ${price.toFixed(2)}/box`)}
+                            : (isRetail ? `Rs. ${tabPrice.toFixed(2)}/tab` : `Rs. ${price.toFixed(2)}/box (+ Taxes)`)}
                         </div>
                         <div style={{ fontSize: '10px', color: isSelected ? '#e0f2fe' : '#64748b' }}>
                           {isQuarantined 
@@ -1149,13 +1166,13 @@ export const POSPage = ({ storeMode: propStoreMode }) => {
                     ) : (
                       cart.map((item, idx) => {
                         const itemQty = Number(item.qty || item.quantity || 1);
-                        let itemRate = Number(item.boxSellingPrice || item.boxPrice || item.price || 600);
+                        let itemRate = getItemRate(item);
 
                         if (isRetail) {
                           if (item.unitSelection === 'Tablet') {
-                            itemRate = Number(item.pricePerTablet || (itemRate / (item.tabletsPerBox || 200)) || 3.0);
+                            itemRate = Number(item.pricePerTablet || (itemRate / (item.tabletsPerBox || 200)) || 0);
                           } else if (item.unitSelection === 'Strip') {
-                            itemRate = Number(item.stripPrice || (itemRate / (item.stripsPerBox || 10)) || 30.0);
+                            itemRate = Number(item.stripPrice || (itemRate / (item.stripsPerBox || 10)) || 0);
                           }
                         }
 

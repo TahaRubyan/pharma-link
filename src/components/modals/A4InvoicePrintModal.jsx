@@ -188,7 +188,7 @@ export const A4InvoicePrintModal = ({ invoice, onClose }) => {
                   </thead>
                   <tbody>
                     {chunkItems.map((item, idx) => {
-                      const itemRate = Number(item.boxSellingPrice || item.boxPrice || item.price || 600);
+                      const itemRate = Number(item.boxPrice !== undefined ? item.boxPrice : (item.price !== undefined ? item.price : (item.unitPrice !== undefined ? item.unitPrice : (item.boxSellingPrice !== undefined ? item.boxSellingPrice : (item.purchaseCost || item.purchasePriceBox || 0)))));
                       const itemQty = Number(item.qty || item.quantity || 1);
                       const itemGross = itemRate * itemQty;
                       const itemDisc = Number(item.discount || 0);
