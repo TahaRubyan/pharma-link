@@ -54,6 +54,66 @@ export const POSPage = ({ storeMode: propStoreMode }) => {
 
   const isRetail = (propStoreMode || currentShop?.mode) === 'RETAIL';
 
+  // Read Global Wholesale & Retail Tax Settings
+  const taxSettings = useMemo(() => {
+    try {
+      const saved = localStorage.getItem(`pharmalink_${currentShop?.shopId || 'TEN-TESTING-SHOP'}_tax_settings`);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && typeof parsed === 'object') return parsed;
+      }
+      if (currentShop?.taxSettings) return currentShop.taxSettings;
+    } catch (e) {}
+    return {
+      enableSalesTax18: true,
+      salesTaxRate: 18,
+      enableAdvTax05: true,
+      advTaxRate: 0.5,
+    };
+  }, [currentShop]);
+
+  const isSalesTaxEnabled = taxSettings?.enableSalesTax18 !== false;
+  const isAdvTaxEnabled = taxSettings?.enableAdvTax05 !== false;
+  const salesTaxRateConfig = Number(taxSettings?.salesTaxRate) || 18;
+  const advTaxRateConfig = Number(taxSettings?.advTaxRate) || 0.5;
+
+  // Real-time live stock resolver across master catalog & batch registry
+  const getLiveItemStock = (itemOrMed) => {
+    if (!itemOrMed) return 0;
+    const targetId = itemOrMed.medicineId || itemOrMed.id;
+    const targetCode = itemOrMed.itemCode;
+    const targetName = itemOrMed.name || itemOrMed.brandName;
+
+    const med = medicines.find(
+      (m) => (targetId && m.id === targetId) || (targetCode && m.itemCode === targetCode) || (targetName && (m.name === targetName || m.brandName === targetName))
+    );
+
+    if (!med) {
+      return itemOrMed.availableStock !== undefined ? Number(itemOrMed.availableStock) : (Number(itemOrMed.boxStock) || 0);
+    }
+
+    const medBatches = batches.filter((b) => {
+      const bMedId = String(b.medicineId || b.id || '').trim();
+      const bCode = String(b.itemCode || '').trim().toLowerCase();
+      const bName = String(b.medicineName || b.name || '').trim().toLowerCase();
+
+      return (
+        (med.id && bMedId === med.id) ||
+        (med.itemCode && (bMedId.toLowerCase() === med.itemCode.toLowerCase() || bCode === med.itemCode.toLowerCase())) ||
+        (med.name && (bMedId.toLowerCase() === med.name.toLowerCase() || bName === med.name.toLowerCase()))
+      );
+    });
+
+    const inStockBatches = medBatches.filter(
+      (b) => (b.totalTabletsAvailable !== undefined ? Number(b.totalTabletsAvailable) > 0 : Number(b.boxStock) > 0)
+    );
+
+    const boxStockNumber = Number(med.boxStock);
+    const tabsPerBox = Number(med.tabletsPerBox || 200);
+    const batchBoxes = inStockBatches.reduce((acc, b) => acc + ((Number(b.totalTabletsAvailable) || 0) / tabsPerBox), 0);
+    return Math.max(!isNaN(boxStockNumber) ? boxStockNumber : 0, batchBoxes);
+  };
+
   useEffect(() => {
     if (activePatientForPOS) {
       setRxPatient({
@@ -431,11 +491,32 @@ export const POSPage = ({ storeMode: propStoreMode }) => {
       return;
     }
 
-    // Available: Add to cart
+    // Available: Add to cart with live stock check
+    const availableBoxes = stockStatus.availableBoxes !== undefined ? Number(stockStatus.availableBoxes) : getLiveItemStock(medicine);
+    const medId = medicine.id || medicine.medicineId || medicine.itemCode;
+    const existingCartItem = cart.find(
+      (i) => (i.medicineId === medId || i.id === medId || (medicine.itemCode && i.itemCode === medicine.itemCode))
+    );
+    const currentInCart = existingCartItem ? Number(existingCartItem.qty || existingCartItem.quantity || 0) : 0;
+
+    if (currentInCart >= availableBoxes) {
+      showAlert({
+        type: 'WARNING',
+        title: 'Stock Limit Reached',
+        message: `Cannot add more "${medicine.brandName || medicine.name}". You already have ${currentInCart} box(es) in the cart, which equals all available stock (${availableBoxes} boxes). Overselling is strictly blocked.`,
+        itemDetails: {
+          name: medicine.brandName || medicine.name,
+          itemCode: medicine.itemCode || medicine.id,
+          status: `${availableBoxes} Total in Stock (${currentInCart} in Cart)`,
+        }
+      });
+      return;
+    }
+
     if (!isRetail) {
-      addToCart(medicine, stockStatus.batch, 'Box');
+      addToCart(medicine, stockStatus.batch, 'Box', availableBoxes);
     } else {
-      addToCart(medicine, stockStatus.batch, 'Tablet');
+      addToCart(medicine, stockStatus.batch, 'Tablet', availableBoxes);
     }
 
     setSearchQuery('');
@@ -484,20 +565,20 @@ export const POSPage = ({ storeMode: propStoreMode }) => {
     return sum + disc;
   }, 0));
 
-  const totalSalesTax18 = round2(cart.reduce((sum, item) => {
+  const totalSalesTax18 = !isSalesTaxEnabled ? 0 : round2(cart.reduce((sum, item) => {
     const q = Number(item.qty || item.quantity || 1);
     const rate = getItemRate(item);
     const gross = rate * q;
     const disc = item.discount !== undefined ? Number(item.discount) : (gross * (Number(item.discountPercent || 0) / 100));
     const taxable = Math.max(0, gross - disc);
-    const tr = Number(item.saleTaxPercent !== undefined ? item.saleTaxPercent : 18);
-    if (tr === 18) {
-      return sum + (item.salesTax18 !== undefined && item.salesTax18 !== null ? Number(item.salesTax18) : (taxable * 0.18));
+    const tr = Number(item.saleTaxPercent !== undefined ? item.saleTaxPercent : salesTaxRateConfig);
+    if (tr === 18 || tr === salesTaxRateConfig) {
+      return sum + (item.salesTax18 !== undefined && item.salesTax18 !== null ? Number(item.salesTax18) : (taxable * (salesTaxRateConfig / 100)));
     }
     return sum;
   }, 0));
 
-  const totalSalesTax19 = round2(cart.reduce((sum, item) => {
+  const totalSalesTax19 = !isSalesTaxEnabled ? 0 : round2(cart.reduce((sum, item) => {
     const q = Number(item.qty || item.quantity || 1);
     const rate = getItemRate(item);
     const gross = rate * q;
@@ -510,14 +591,14 @@ export const POSPage = ({ storeMode: propStoreMode }) => {
     return sum;
   }, 0));
 
-  const totalOtherSalesTax = round2(cart.reduce((sum, item) => {
+  const totalOtherSalesTax = !isSalesTaxEnabled ? 0 : round2(cart.reduce((sum, item) => {
     const q = Number(item.qty || item.quantity || 1);
     const rate = getItemRate(item);
     const gross = rate * q;
     const disc = item.discount !== undefined ? Number(item.discount) : (gross * (Number(item.discountPercent || 0) / 100));
     const taxable = Math.max(0, gross - disc);
-    const tr = Number(item.saleTaxPercent !== undefined ? item.saleTaxPercent : 18);
-    if (tr !== 18 && tr !== 19 && tr > 0) {
+    const tr = Number(item.saleTaxPercent !== undefined ? item.saleTaxPercent : salesTaxRateConfig);
+    if (tr !== 18 && tr !== 19 && tr !== salesTaxRateConfig && tr > 0) {
       return sum + (item.salesTax18 !== undefined && item.salesTax18 !== null ? Number(item.salesTax18) : (taxable * (tr / 100)));
     }
     return sum;
@@ -525,13 +606,13 @@ export const POSPage = ({ storeMode: propStoreMode }) => {
 
   const totalSalesTaxAll = round2(totalSalesTax18 + totalSalesTax19 + totalOtherSalesTax);
 
-  const totalAdvTax05 = round2(cart.reduce((sum, item) => {
+  const totalAdvTax05 = !isAdvTaxEnabled ? 0 : round2(cart.reduce((sum, item) => {
     const q = Number(item.qty || item.quantity || 1);
     const rate = getItemRate(item);
     const gross = rate * q;
     const disc = item.discount !== undefined ? Number(item.discount) : (gross * (Number(item.discountPercent || 0) / 100));
     const taxable = Math.max(0, gross - disc);
-    return sum + (item.advTax05 !== undefined && item.advTax05 !== null ? Number(item.advTax05) : (taxable * 0.005));
+    return sum + (item.advTax05 !== undefined && item.advTax05 !== null ? Number(item.advTax05) : (taxable * (advTaxRateConfig / 100)));
   }, 0));
 
   const totalTaxes = isRetail ? 0 : round2(totalSalesTaxAll + totalAdvTax05);
@@ -543,7 +624,8 @@ export const POSPage = ({ storeMode: propStoreMode }) => {
 
   const handleRowDoubleClick = (item) => {
     if (!isRetail) {
-      setEditingItem(item);
+      const liveStock = getLiveItemStock(item);
+      setEditingItem({ ...item, availableStock: liveStock });
       setIsEditModalOpen(true);
     }
   };
@@ -560,6 +642,43 @@ export const POSPage = ({ storeMode: propStoreMode }) => {
     } else {
       updateQty(updatedItem.medicineId || updatedItem.id, updatedItem.batchNo || updatedItem.batchNumber, updatedItem.qty);
     }
+  };
+
+  // Safe Increment Action respecting stock bounds
+  const handleIncrementQty = (item) => {
+    const available = getLiveItemStock(item);
+    const currentQty = Number(item.qty || item.quantity || 1);
+    if (currentQty >= available) {
+      showAlert({
+        type: 'WARNING',
+        title: 'Stock Limit Reached',
+        message: `Cannot increase quantity. "${item.name || item.brandName}" only has ${available} box(es) in available inventory. Overselling is strictly blocked.`,
+        itemDetails: {
+          name: item.name || item.brandName,
+          itemCode: item.itemCode || item.medicineId || item.id,
+          status: `Max ${available} Available in Stock`,
+        }
+      });
+      return;
+    }
+    updateQty(item.medicineId || item.id, item.batchNo, currentQty + 1, available);
+  };
+
+  // Strict Pre-Checkout Stock Audit Guard
+  const validateCartStock = () => {
+    const violations = [];
+    cart.forEach((item) => {
+      const available = getLiveItemStock(item);
+      const ordered = Number(item.qty || item.quantity || 1);
+      if (ordered > available) {
+        violations.push({
+          name: item.name || item.brandName || 'Medicine',
+          ordered,
+          available,
+        });
+      }
+    });
+    return violations;
   };
 
   // Build Invoice Data Object
@@ -629,6 +748,12 @@ export const POSPage = ({ storeMode: propStoreMode }) => {
       paymentStatus,
       remainingDebt,
       paymentLogs: initialLogs,
+      taxSettings: {
+        enableSalesTax18: isSalesTaxEnabled,
+        salesTaxRate: salesTaxRateConfig,
+        enableAdvTax05: isAdvTaxEnabled,
+        advTaxRate: advTaxRateConfig,
+      },
     };
   };
 
@@ -639,6 +764,15 @@ export const POSPage = ({ storeMode: propStoreMode }) => {
         type: 'WARNING',
         title: 'Billing Cart Empty',
         message: 'Your cart is empty. Please search and add medicines before printing receipt.',
+      });
+      return;
+    }
+    const stockViolations = validateCartStock();
+    if (stockViolations.length > 0) {
+      showAlert({
+        type: 'WARNING',
+        title: 'Cannot Complete Sale — Stock Exceeded',
+        message: `The following item(s) exceed available inventory:\n\n${stockViolations.map((v) => `• ${v.name}: In Stock = ${v.available}, In Cart = ${v.ordered}`).join('\n')}\n\nPlease adjust the quantities to match available inventory before billing.`,
       });
       return;
     }
@@ -664,6 +798,15 @@ export const POSPage = ({ storeMode: propStoreMode }) => {
         type: 'WARNING',
         title: 'Billing Cart Empty',
         message: 'Your cart is empty. Please search and add medicines to bill before saving order.',
+      });
+      return;
+    }
+    const stockViolations = validateCartStock();
+    if (stockViolations.length > 0) {
+      showAlert({
+        type: 'WARNING',
+        title: 'Cannot Complete Sale — Stock Exceeded',
+        message: `The following item(s) exceed available inventory:\n\n${stockViolations.map((v) => `• ${v.name}: In Stock = ${v.available}, In Cart = ${v.ordered}`).join('\n')}\n\nPlease adjust the quantities to match available inventory before billing.`,
       });
       return;
     }
@@ -696,10 +839,28 @@ export const POSPage = ({ storeMode: propStoreMode }) => {
       });
       return;
     }
+    const stockViolations = validateCartStock();
+    if (stockViolations.length > 0) {
+      showAlert({
+        type: 'WARNING',
+        title: 'Cannot Initiate Debt Sale — Stock Exceeded',
+        message: `The following item(s) exceed available inventory:\n\n${stockViolations.map((v) => `• ${v.name}: In Stock = ${v.available}, In Cart = ${v.ordered}`).join('\n')}\n\nPlease adjust the quantities to match available inventory before initiating credit sale.`,
+      });
+      return;
+    }
     setIsPOSDebtModalOpen(true);
   };
 
   const handleConfirmCreditSale = (debtCustomer) => {
+    const stockViolations = validateCartStock();
+    if (stockViolations.length > 0) {
+      showAlert({
+        type: 'WARNING',
+        title: 'Cannot Complete Sale — Stock Exceeded',
+        message: `The following item(s) exceed available inventory:\n\n${stockViolations.map((v) => `• ${v.name}: In Stock = ${v.available}, In Cart = ${v.ordered}`).join('\n')}\n\nPlease adjust the quantities to match available inventory before billing.`,
+      });
+      return;
+    }
     if (isCheckingOut) return;
     setIsCheckingOut(true);
 
@@ -739,6 +900,15 @@ export const POSPage = ({ storeMode: propStoreMode }) => {
         type: 'WARNING',
         title: 'Billing Cart Empty',
         message: 'Please add medicines to cart to generate commercial wholesale invoice.',
+      });
+      return;
+    }
+    const stockViolations = validateCartStock();
+    if (stockViolations.length > 0) {
+      showAlert({
+        type: 'WARNING',
+        title: 'Cannot Complete Sale — Stock Exceeded',
+        message: `The following item(s) exceed available inventory:\n\n${stockViolations.map((v) => `• ${v.name}: In Stock = ${v.available}, In Cart = ${v.ordered}`).join('\n')}\n\nPlease adjust the quantities to match available inventory before billing.`,
       });
       return;
     }
@@ -1241,8 +1411,8 @@ export const POSPage = ({ storeMode: propStoreMode }) => {
                       <th style={{ textAlign: 'right' }}>Rate</th>
                       <th style={{ textAlign: 'right' }}>Gross</th>
                       {!isRetail && <th style={{ textAlign: 'center' }}>Disc %</th>}
-                      {!isRetail && <th style={{ textAlign: 'right' }}>Sale Tax 18%</th>}
-                      {!isRetail && <th style={{ textAlign: 'right' }}>Adv Tax 0.5%</th>}
+                      {!isRetail && <th style={{ textAlign: 'right' }}>Sale Tax {isSalesTaxEnabled ? `${salesTaxRateConfig}%` : '(0%)'}</th>}
+                      {!isRetail && <th style={{ textAlign: 'right' }}>Adv Tax {isAdvTaxEnabled ? `${advTaxRateConfig}%` : '(0%)'}</th>}
                       <th style={{ textAlign: 'right' }}>Net Amount</th>
                       <th style={{ textAlign: 'center' }}>Del</th>
                     </tr>
@@ -1269,8 +1439,8 @@ export const POSPage = ({ storeMode: propStoreMode }) => {
 
                         const itemGross = itemRate * itemQty;
                         const itemDisc = Number(item.discount || 0);
-                        const itemST = item.salesTax18 !== undefined ? Number(item.salesTax18) : itemGross * 0.18;
-                        const itemAdv = item.advTax05 !== undefined ? Number(item.advTax05) : itemGross * 0.005;
+                        const itemST = !isSalesTaxEnabled ? 0 : (item.salesTax18 !== undefined ? Number(item.salesTax18) : itemGross * (salesTaxRateConfig / 100));
+                        const itemAdv = !isAdvTaxEnabled ? 0 : (item.advTax05 !== undefined ? Number(item.advTax05) : itemGross * (advTaxRateConfig / 100));
                         const itemNet = isRetail ? itemGross : (itemGross - itemDisc + itemST + itemAdv);
 
                         return (
@@ -1363,8 +1533,9 @@ export const POSPage = ({ storeMode: propStoreMode }) => {
                                 >-</button>
                                 <span>{itemQty}</span>
                                 <button
-                                  onClick={(e) => { e.stopPropagation(); updateQty(item.medicineId || item.id, item.batchNo, itemQty + 1); }}
+                                  onClick={(e) => { e.stopPropagation(); handleIncrementQty(item); }}
                                   style={{ width: '18px', height: '18px', borderRadius: '4px', border: '1px solid #cbd5e1', backgroundColor: '#ffffff', cursor: 'pointer' }}
+                                  title="Increase Quantity"
                                 >+</button>
                               </div>
                             </td>
@@ -1374,22 +1545,22 @@ export const POSPage = ({ storeMode: propStoreMode }) => {
 
                             {!isRetail && <td style={{ textAlign: 'center', color: '#dc2626' }}>{itemDisc > 0 ? `${item.discountPercent || 0}%` : '-'}</td>}
                             {!isRetail && (
-                              <td style={{ textAlign: 'right', color: '#0284c7', whiteSpace: 'nowrap' }}>
+                              <td style={{ textAlign: 'right', color: isSalesTaxEnabled ? '#0284c7' : '#64748b', whiteSpace: 'nowrap' }}>
                                 <span style={{
                                   fontSize: '9.5px',
                                   fontWeight: 800,
-                                  backgroundColor: (Number(item.saleTaxPercent) === 19) ? '#fef3c7' : '#e0f2fe',
-                                  color: (Number(item.saleTaxPercent) === 19) ? '#b45309' : '#0284c7',
+                                  backgroundColor: !isSalesTaxEnabled ? '#f1f5f9' : ((Number(item.saleTaxPercent) === 19) ? '#fef3c7' : '#e0f2fe'),
+                                  color: !isSalesTaxEnabled ? '#64748b' : ((Number(item.saleTaxPercent) === 19) ? '#b45309' : '#0284c7'),
                                   padding: '0.1rem 0.3rem',
                                   borderRadius: '4px',
                                   marginRight: '4px'
                                 }}>
-                                  {item.saleTaxPercent !== undefined ? item.saleTaxPercent : 18}%
+                                  {!isSalesTaxEnabled ? '0%' : `${item.saleTaxPercent !== undefined ? item.saleTaxPercent : salesTaxRateConfig}%`}
                                 </span>
                                 {itemST.toFixed(2)}
                               </td>
                             )}
-                            {!isRetail && <td style={{ textAlign: 'right', color: '#16a34a' }}>{itemAdv.toFixed(2)}</td>}
+                            {!isRetail && <td style={{ textAlign: 'right', color: isAdvTaxEnabled ? '#16a34a' : '#64748b' }}>{itemAdv.toFixed(2)}</td>}
 
                             <td style={{ textAlign: 'right', fontWeight: 800 }}>{itemNet.toFixed(2)}</td>
                             <td style={{ textAlign: 'center' }}>
@@ -1427,33 +1598,33 @@ export const POSPage = ({ storeMode: propStoreMode }) => {
 
               {!isRetail && (
                 <>
-                  <div className="flex-between" style={{ color: '#0284c7' }}>
-                    <span className="subtext">Sales Tax (18% Standard):</span>
+                  <div className="flex-between" style={{ color: isSalesTaxEnabled ? '#0284c7' : '#64748b' }}>
+                    <span className="subtext">Sales Tax ({isSalesTaxEnabled ? `${salesTaxRateConfig}% Standard` : 'Disabled / 0%'}):</span>
                     <span style={{ fontWeight: 700 }}>+ Rs. {totalSalesTax18.toFixed(2)}</span>
                   </div>
 
-                  {totalSalesTax19 > 0 && (
+                  {totalSalesTax19 > 0 && isSalesTaxEnabled && (
                     <div className="flex-between" style={{ color: '#b45309' }}>
                       <span className="subtext">Sales Tax (19% Special):</span>
                       <span style={{ fontWeight: 700 }}>+ Rs. {totalSalesTax19.toFixed(2)}</span>
                     </div>
                   )}
 
-                  {totalOtherSalesTax > 0 && (
+                  {totalOtherSalesTax > 0 && isSalesTaxEnabled && (
                     <div className="flex-between" style={{ color: '#0284c7' }}>
                       <span className="subtext">Other Sales Tax:</span>
                       <span style={{ fontWeight: 700 }}>+ Rs. {totalOtherSalesTax.toFixed(2)}</span>
                     </div>
                   )}
 
-                  <div className="flex-between" style={{ color: '#16a34a' }}>
-                    <span className="subtext">Adv Tax 0.5% (Sec 236G):</span>
+                  <div className="flex-between" style={{ color: isAdvTaxEnabled ? '#16a34a' : '#64748b' }}>
+                    <span className="subtext">Adv Tax ({isAdvTaxEnabled ? `${advTaxRateConfig}% (Sec 236G)` : 'Disabled / 0%'}):</span>
                     <span style={{ fontWeight: 700 }}>+ Rs. {totalAdvTax05.toFixed(2)}</span>
                   </div>
 
                   <div className="flex-between" style={{ borderTop: '1px dashed #cbd5e1', paddingTop: '0.35rem', fontWeight: 800 }}>
                     <span style={{ color: '#0f172a' }}>Total Taxes Added:</span>
-                    <span style={{ color: '#0284c7' }}>+ Rs. {totalTaxes.toFixed(2)}</span>
+                    <span style={{ color: isSalesTaxEnabled || isAdvTaxEnabled ? '#0284c7' : '#64748b' }}>+ Rs. {totalTaxes.toFixed(2)}</span>
                   </div>
                 </>
               )}
@@ -1659,6 +1830,7 @@ export const POSPage = ({ storeMode: propStoreMode }) => {
         <EditLineDiscountTaxModal
           isOpen={isEditModalOpen}
           item={editingItem}
+          availableStock={editingItem.availableStock}
           onClose={() => { setIsEditModalOpen(false); setEditingItem(null); }}
           onSave={handleSaveItemUpdates}
         />

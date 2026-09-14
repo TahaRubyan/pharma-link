@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Edit3, Percent, DollarSign, CheckCircle } from 'lucide-react';
 
-export const EditLineDiscountTaxModal = ({ isOpen, item, onClose, onSave }) => {
+export const EditLineDiscountTaxModal = ({ isOpen, item, availableStock, onClose, onSave }) => {
   const getItemDefaultRate = (it) => {
     if (!it) return 0;
     if (it.boxPrice !== undefined && it.boxPrice !== null && !isNaN(Number(it.boxPrice))) return Number(it.boxPrice);
@@ -12,19 +12,23 @@ export const EditLineDiscountTaxModal = ({ isOpen, item, onClose, onSave }) => {
     return 0;
   };
 
+  const stockLimit = availableStock !== undefined 
+    ? Number(availableStock) 
+    : (item?.availableStock !== undefined ? Number(item.availableStock) : 999999);
+
   const [qty, setQty] = useState(item?.qty || item?.quantity || 1);
   const [rate, setRate] = useState(getItemDefaultRate(item));
   const [discPercent, setDiscPercent] = useState(item?.discountPercent || 0);
-  const [saleTaxPercent, setSaleTaxPercent] = useState(item?.saleTaxPercent !== undefined ? item.saleTaxPercent : 18);
-  const [advTaxPercent, setAdvTaxPercent] = useState(item?.advTaxPercent !== undefined ? item.advTaxPercent : 0.5);
+  const [saleTaxPercent, setSaleTaxPercent] = useState(item?.saleTaxPercent !== undefined ? item.saleTaxPercent : 0);
+  const [advTaxPercent, setAdvTaxPercent] = useState(item?.advTaxPercent !== undefined ? item.advTaxPercent : 0);
 
   useEffect(() => {
     if (item) {
       setQty(item.qty || item.quantity || 1);
       setRate(getItemDefaultRate(item));
       setDiscPercent(item.discountPercent || 0);
-      setSaleTaxPercent(item.saleTaxPercent !== undefined ? item.saleTaxPercent : 18);
-      setAdvTaxPercent(item.advTaxPercent !== undefined ? item.advTaxPercent : 0.5);
+      setSaleTaxPercent(item.saleTaxPercent !== undefined ? item.saleTaxPercent : 0);
+      setAdvTaxPercent(item.advTaxPercent !== undefined ? item.advTaxPercent : 0);
     }
   }, [item, isOpen]);
 
@@ -40,10 +44,16 @@ export const EditLineDiscountTaxModal = ({ isOpen, item, onClose, onSave }) => {
 
   const handleSave = (e) => {
     e.preventDefault();
+    if (stockLimit < 999999 && parsedQty > stockLimit) {
+      alert(`Cannot enter quantity ${parsedQty}. Only ${stockLimit} box(es) available in active stock. Overselling is blocked.`);
+      return;
+    }
+
     onSave({
       ...item,
       qty: parsedQty,
       quantity: parsedQty,
+      availableStock: stockLimit,
       boxPrice: parsedRate,
       price: parsedRate,
       discountPercent: Number(discPercent) || 0,
@@ -79,12 +89,16 @@ export const EditLineDiscountTaxModal = ({ isOpen, item, onClose, onSave }) => {
         <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.85rem' }}>
             <div>
-              <label className="subtext" style={{ fontWeight: 600, display: 'block', marginBottom: '0.25rem', color: '#334155' }}>
-                Box Quantity:
+              <label className="subtext" style={{ fontWeight: 600, display: 'flex', justifyContent: 'space-between', marginBottom: '0.25rem', color: '#334155' }}>
+                <span>Box Quantity:</span>
+                {stockLimit < 999999 && (
+                  <span style={{ color: '#0284c7', fontWeight: 700 }}>In Stock: {stockLimit}</span>
+                )}
               </label>
               <input
                 type="number"
                 min="1"
+                max={stockLimit < 999999 ? stockLimit : undefined}
                 value={qty}
                 onChange={(e) => setQty(e.target.value)}
                 style={{ width: '100%', padding: '0.55rem 0.75rem', borderRadius: '10px', border: '1px solid #cbd5e1', fontSize: '13px', fontWeight: 700, outline: 'none' }}

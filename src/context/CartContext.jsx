@@ -45,7 +45,24 @@ export const CartProvider = ({ children }) => {
 
   const round2 = (num) => Math.round((Number(num || 0) + Number.EPSILON) * 100) / 100;
 
-  const addToCart = (medicine, batch, unitSelection = 'Box') => {
+  const getTaxSettings = useCallback(() => {
+    try {
+      const saved = storageManager.safeGetItem(`pharmalink_${activeTenantId}_tax_settings`);
+      if (saved) {
+        const parsed = typeof saved === 'string' ? JSON.parse(saved) : saved;
+        if (parsed && typeof parsed === 'object') return parsed;
+      }
+      if (auth?.currentShop?.taxSettings) return auth.currentShop.taxSettings;
+    } catch (e) {}
+    return {
+      enableSalesTax18: true,
+      salesTaxRate: 18,
+      enableAdvTax05: true,
+      advTaxRate: 0.5,
+    };
+  }, [activeTenantId, auth?.currentShop?.taxSettings]);
+
+  const addToCart = (medicine, batch, unitSelection = 'Box', maxAvailable) => {
     setCart((prev) => {
       const medId = medicine.id || medicine.medicineId;
       const bNo = (batch ? (batch.batchNo || batch.batchNumber) : '') || medicine.batchNo || medicine.batchNumber || 'PO-BATCH';
@@ -53,20 +70,42 @@ export const CartProvider = ({ children }) => {
       const itemCost = Number(medicine.purchaseCost !== undefined ? medicine.purchaseCost : (medicine.purchasePriceBox !== undefined ? medicine.purchasePriceBox : (medicine.boxCost || (batch ? (batch.purchasePriceBox || batch.purchaseRate || batch.purchaseCost) : 0))));
       const itemSelling = Number(medicine.boxSellingPrice !== undefined ? medicine.boxSellingPrice : (medicine.boxPrice !== undefined ? medicine.boxPrice : (batch ? (batch.boxPrice || batch.boxSellingPrice) : itemCost)));
       const boxPrice = round2(itemSelling > 0 ? itemSelling : (itemCost > 0 ? itemCost : (medicine.price || 0)));
-      const saleTaxRate = Number(medicine.saleTaxPercent !== undefined ? medicine.saleTaxPercent : (medicine.salesTaxRate !== undefined ? medicine.salesTaxRate : 18));
-      const advTaxRate = Number(medicine.advTaxPercent !== undefined ? medicine.advTaxPercent : 0.5);
+
+      // Resolve global tax settings
+      const taxSettings = getTaxSettings();
+      const isSalesTaxEnabled = taxSettings?.enableSalesTax18 !== false;
+      const isAdvTaxEnabled = taxSettings?.enableAdvTax05 !== false;
+      const configuredSalesTaxRate = Number(taxSettings?.salesTaxRate) || 18;
+      const configuredAdvTaxRate = Number(taxSettings?.advTaxRate) || 0.5;
+
+      const saleTaxRate = isSalesTaxEnabled
+        ? Number(medicine.saleTaxPercent !== undefined ? medicine.saleTaxPercent : (medicine.salesTaxRate !== undefined ? medicine.salesTaxRate : configuredSalesTaxRate))
+        : 0;
+      const advTaxRate = isAdvTaxEnabled
+        ? Number(medicine.advTaxPercent !== undefined ? medicine.advTaxPercent : configuredAdvTaxRate)
+        : 0;
+
+      // Determine available stock limit
+      const availableLimit = maxAvailable !== undefined 
+        ? Number(maxAvailable) 
+        : Number(batch?.boxStock !== undefined ? batch.boxStock : (medicine.boxStock !== undefined ? medicine.boxStock : 999999));
 
       if (existingIdx >= 0) {
         return prev.map((item, idx) => {
           if (idx === existingIdx) {
-            const newQty = item.qty + 1;
+            const currentItemQty = Number(item.qty || item.quantity || 1);
+            if (currentItemQty >= availableLimit) {
+              // Stock cap reached: do not increment beyond available stock
+              return item;
+            }
+            const newQty = Math.min(availableLimit, currentItemQty + 1);
             const rate = Number(item.boxPrice !== undefined ? item.boxPrice : (item.price !== undefined ? item.price : boxPrice));
             const gross = round2(newQty * rate);
             const discPercent = Number(item.discountPercent || 0);
             const discAmount = round2((gross * discPercent) / 100);
             const taxable = Math.max(0, round2(gross - discAmount));
-            const tr = Number(item.saleTaxPercent !== undefined ? item.saleTaxPercent : saleTaxRate);
-            const ar = Number(item.advTaxPercent !== undefined ? item.advTaxPercent : advTaxRate);
+            const tr = isSalesTaxEnabled ? Number(item.saleTaxPercent !== undefined ? item.saleTaxPercent : saleTaxRate) : 0;
+            const ar = isAdvTaxEnabled ? Number(item.advTaxPercent !== undefined ? item.advTaxPercent : advTaxRate) : 0;
             const st = round2((taxable * tr) / 100);
             const adv = round2((taxable * ar) / 100);
             const net = round2(taxable + st + adv);
@@ -75,6 +114,7 @@ export const CartProvider = ({ children }) => {
               ...item,
               qty: newQty,
               quantity: newQty,
+              availableStock: availableLimit,
               boxPrice: rate,
               price: rate,
               gross,
@@ -90,7 +130,8 @@ export const CartProvider = ({ children }) => {
           return item;
         });
       } else {
-        const gross = boxPrice;
+        const initialQty = Math.max(1, Math.min(availableLimit, 1));
+        const gross = round2(initialQty * boxPrice);
         const st = round2((gross * saleTaxRate) / 100);
         const adv = round2((gross * advTaxRate) / 100);
         const net = round2(gross + st + adv);
@@ -111,6 +152,7 @@ export const CartProvider = ({ children }) => {
             expiryDate: (batch && batch.expiryDate) ? batch.expiryDate : (medicine.expiryDate || '12-2028'),
             unitSelection,
             unitType: unitSelection,
+            availableStock: availableLimit,
             costPrice: itemCost,
             purchaseCost: itemCost,
             purchasePriceBox: itemCost,
@@ -119,8 +161,8 @@ export const CartProvider = ({ children }) => {
             boxPrice: boxPrice,
             boxSellingPrice: boxPrice,
             unitPrice: boxPrice,
-            qty: 1,
-            quantity: 1,
+            qty: initialQty,
+            quantity: initialQty,
             discountPercent: 0,
             discount: 0,
             gross,
@@ -137,17 +179,24 @@ export const CartProvider = ({ children }) => {
   };
 
   const updateCartQuantity = (index, qty) => {
-    const q = Math.max(1, Number(qty) || 1);
+    const taxSettings = getTaxSettings();
+    const isSalesTaxEnabled = taxSettings?.enableSalesTax18 !== false;
+    const isAdvTaxEnabled = taxSettings?.enableAdvTax05 !== false;
+
     setCart((prev) =>
       prev.map((item, i) => {
         if (i === index) {
+          const limit = item.availableStock !== undefined ? Number(item.availableStock) : 999999;
+          const rawQ = Math.max(1, Number(qty) || 1);
+          const q = Math.min(limit, rawQ);
+
           const rate = Number(item.boxPrice || item.price || item.unitPrice || 0);
           const gross = round2(q * rate);
           const discPercent = Number(item.discountPercent || 0);
           const discAmount = round2((gross * discPercent) / 100);
           const taxable = Math.max(0, round2(gross - discAmount));
-          const tr = Number(item.saleTaxPercent !== undefined ? item.saleTaxPercent : 18);
-          const ar = Number(item.advTaxPercent !== undefined ? item.advTaxPercent : 0.5);
+          const tr = isSalesTaxEnabled ? Number(item.saleTaxPercent !== undefined ? item.saleTaxPercent : (taxSettings?.salesTaxRate || 18)) : 0;
+          const ar = isAdvTaxEnabled ? Number(item.advTaxPercent !== undefined ? item.advTaxPercent : (taxSettings?.advTaxRate || 0.5)) : 0;
           const st = round2((taxable * tr) / 100);
           const adv = round2((taxable * ar) / 100);
           const net = round2(taxable + st + adv);
@@ -158,7 +207,9 @@ export const CartProvider = ({ children }) => {
             quantity: q,
             gross,
             discount: discAmount,
+            saleTaxPercent: tr,
             salesTax18: st,
+            advTaxPercent: ar,
             advTax05: adv,
             netTotal: net,
             total: net
@@ -169,18 +220,25 @@ export const CartProvider = ({ children }) => {
     );
   };
 
-  const updateQty = (medicineId, batchNo, newQty) => {
-    const q = Math.max(1, Number(newQty) || 1);
+  const updateQty = (medicineId, batchNo, newQty, maxAvailable) => {
+    const taxSettings = getTaxSettings();
+    const isSalesTaxEnabled = taxSettings?.enableSalesTax18 !== false;
+    const isAdvTaxEnabled = taxSettings?.enableAdvTax05 !== false;
+
     setCart((prev) =>
       prev.map((item) => {
         if ((item.medicineId === medicineId || item.id === medicineId) && (item.batchNo === batchNo || item.batchNumber === batchNo)) {
+          const limit = maxAvailable !== undefined ? Number(maxAvailable) : (item.availableStock !== undefined ? Number(item.availableStock) : 999999);
+          const rawQ = Math.max(1, Number(newQty) || 1);
+          const q = Math.min(limit, rawQ);
+
           const rate = Number(item.boxPrice || item.price || item.unitPrice || 0);
           const gross = round2(q * rate);
           const discPercent = Number(item.discountPercent || 0);
           const discAmount = round2((gross * discPercent) / 100);
           const taxable = Math.max(0, round2(gross - discAmount));
-          const tr = Number(item.saleTaxPercent !== undefined ? item.saleTaxPercent : 18);
-          const ar = Number(item.advTaxPercent !== undefined ? item.advTaxPercent : 0.5);
+          const tr = isSalesTaxEnabled ? Number(item.saleTaxPercent !== undefined ? item.saleTaxPercent : (taxSettings?.salesTaxRate || 18)) : 0;
+          const ar = isAdvTaxEnabled ? Number(item.advTaxPercent !== undefined ? item.advTaxPercent : (taxSettings?.advTaxRate || 0.5)) : 0;
           const st = round2((taxable * tr) / 100);
           const adv = round2((taxable * ar) / 100);
           const net = round2(taxable + st + adv);
@@ -191,7 +249,9 @@ export const CartProvider = ({ children }) => {
             quantity: q,
             gross,
             discount: discAmount,
+            saleTaxPercent: tr,
             salesTax18: st,
+            advTaxPercent: ar,
             advTax05: adv,
             netTotal: net,
             total: net
@@ -203,20 +263,27 @@ export const CartProvider = ({ children }) => {
   };
 
   const updateCartItem = (updatedItem) => {
+    const taxSettings = getTaxSettings();
+    const isSalesTaxEnabled = taxSettings?.enableSalesTax18 !== false;
+    const isAdvTaxEnabled = taxSettings?.enableAdvTax05 !== false;
+
     setCart((prev) =>
       prev.map((item) => {
         if ((item.medicineId === updatedItem.medicineId || item.id === updatedItem.id) &&
             (item.batchNo === updatedItem.batchNo || item.batchNumber === updatedItem.batchNumber)) {
-          const q = Number(updatedItem.qty || updatedItem.quantity || 1);
+          const limit = updatedItem.availableStock !== undefined ? Number(updatedItem.availableStock) : (item.availableStock !== undefined ? Number(item.availableStock) : 999999);
+          const rawQ = Number(updatedItem.qty || updatedItem.quantity || 1);
+          const q = Math.max(1, Math.min(limit, rawQ));
+
           const rate = Number(updatedItem.boxPrice || updatedItem.price || item.boxPrice || 0);
           const gross = round2(q * rate);
           const discPercent = Number(updatedItem.discountPercent !== undefined ? updatedItem.discountPercent : (item.discountPercent || 0));
           const discAmount = updatedItem.discount !== undefined ? round2(updatedItem.discount) : round2((gross * discPercent) / 100);
           const taxable = Math.max(0, round2(gross - discAmount));
-          const tr = Number(updatedItem.saleTaxPercent !== undefined ? updatedItem.saleTaxPercent : (item.saleTaxPercent !== undefined ? item.saleTaxPercent : 18));
-          const ar = Number(updatedItem.advTaxPercent !== undefined ? updatedItem.advTaxPercent : (item.advTaxPercent !== undefined ? item.advTaxPercent : 0.5));
-          const st = updatedItem.salesTax18 !== undefined ? round2(updatedItem.salesTax18) : round2((taxable * tr) / 100);
-          const adv = updatedItem.advTax05 !== undefined ? round2(updatedItem.advTax05) : round2((taxable * ar) / 100);
+          const tr = isSalesTaxEnabled ? Number(updatedItem.saleTaxPercent !== undefined ? updatedItem.saleTaxPercent : (item.saleTaxPercent !== undefined ? item.saleTaxPercent : (taxSettings?.salesTaxRate || 18))) : 0;
+          const ar = isAdvTaxEnabled ? Number(updatedItem.advTaxPercent !== undefined ? updatedItem.advTaxPercent : (item.advTaxPercent !== undefined ? item.advTaxPercent : (taxSettings?.advTaxRate || 0.5))) : 0;
+          const st = updatedItem.salesTax18 !== undefined && isSalesTaxEnabled ? round2(updatedItem.salesTax18) : round2((taxable * tr) / 100);
+          const adv = updatedItem.advTax05 !== undefined && isAdvTaxEnabled ? round2(updatedItem.advTax05) : round2((taxable * ar) / 100);
           const net = round2(taxable + st + adv);
 
           return {

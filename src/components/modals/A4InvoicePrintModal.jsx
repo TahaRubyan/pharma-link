@@ -72,8 +72,26 @@ export const A4InvoicePrintModal = ({ invoice, onClose }) => {
   const sigRole = localStorage.getItem('pharmalink_sig_role') || currentShop?.signatoryRole || 'Authorized Signatory | Owner';
 
   const grossTotal = Number(invoice.grossTotal || invoice.subtotal || 0);
-  const totalTax = Number(invoice.totalTax || (invoice.salesTax18 || 0) + (invoice.advTax05 || 0) || 0);
-  const grandNetTotal = Number(invoice.netTotal || invoice.grandTotal || grossTotal + totalTax);
+
+  // Dynamic store & invoice tax settings
+  const isSalesTaxEnabled = invoice.taxSettings?.enableSalesTax18 !== undefined
+    ? Boolean(invoice.taxSettings.enableSalesTax18)
+    : (invoice.totalSalesTax18 > 0 || (currentShop?.taxSettings?.enableSalesTax18 !== false));
+
+  const isAdvTaxEnabled = invoice.taxSettings?.enableAdvTax05 !== undefined
+    ? Boolean(invoice.taxSettings.enableAdvTax05)
+    : (invoice.totalAdvTax05 > 0 || (currentShop?.taxSettings?.enableAdvTax05 !== false));
+
+  const configuredSTRate = invoice.taxSettings?.salesTaxRate !== undefined
+    ? Number(invoice.taxSettings.salesTaxRate)
+    : (Number(currentShop?.taxSettings?.salesTaxRate) || 18);
+
+  const configuredAdvRate = invoice.taxSettings?.advTaxRate !== undefined
+    ? Number(invoice.taxSettings.advTaxRate)
+    : (Number(currentShop?.taxSettings?.advTaxRate) || 0.5);
+
+  const totalTax = Number(invoice.totalTax !== undefined ? invoice.totalTax : ((isSalesTaxEnabled ? (invoice.salesTax18 || 0) : 0) + (isAdvTaxEnabled ? (invoice.advTax05 || 0) : 0)));
+  const grandNetTotal = Number(invoice.netTotal || invoice.grandTotal || (grossTotal + totalTax));
 
   const distributorName = currentShop?.shopName || 'TESTING SHOP';
   const ownerNtn = currentShop?.ntn || '4442705-7';
@@ -194,8 +212,8 @@ export const A4InvoicePrintModal = ({ invoice, onClose }) => {
                       <th style={{ borderRight: '1px solid #000000', padding: '0.3rem 0.25rem', textAlign: 'right', width: '55px' }}>Rate</th>
                       <th style={{ borderRight: '1px solid #000000', padding: '0.3rem 0.25rem', textAlign: 'right', width: '60px' }}>Gross</th>
                       <th style={{ borderRight: '1px solid #000000', padding: '0.3rem 0.25rem', textAlign: 'center', width: '40px' }}>Disc %</th>
-                      <th style={{ borderRight: '1px solid #000000', padding: '0.3rem 0.25rem', textAlign: 'right', width: '70px' }}>Sale Tax 18%</th>
-                      <th style={{ borderRight: '1px solid #000000', padding: '0.3rem 0.25rem', textAlign: 'right', width: '50px' }}>Adv Tax 0.5%</th>
+                      <th style={{ borderRight: '1px solid #000000', padding: '0.3rem 0.25rem', textAlign: 'right', width: '70px' }}>Sale Tax {isSalesTaxEnabled ? `${configuredSTRate}%` : '(0%)'}</th>
+                      <th style={{ borderRight: '1px solid #000000', padding: '0.3rem 0.25rem', textAlign: 'right', width: '50px' }}>Adv Tax {isAdvTaxEnabled ? `${configuredAdvRate}%` : '(0%)'}</th>
                       <th style={{ padding: '0.3rem 0.35rem', textAlign: 'right', width: '65px' }}>Net Amount</th>
                     </tr>
                   </thead>
@@ -206,9 +224,9 @@ export const A4InvoicePrintModal = ({ invoice, onClose }) => {
                       const itemGross = itemRate * itemQty;
                       const itemDisc = Number(item.discount || 0);
                       const taxableAmount = Math.max(0, itemGross - itemDisc);
-                      const itemTaxRate = item.saleTaxPercent !== undefined ? Number(item.saleTaxPercent) : 18;
-                      const itemST = Number(item.salesTax18 !== undefined ? item.salesTax18 : (taxableAmount * (itemTaxRate / 100)));
-                      const itemAdv = Number(item.advTax05 !== undefined ? item.advTax05 : (taxableAmount * 0.005));
+                      const itemTaxRate = isSalesTaxEnabled ? (item.saleTaxPercent !== undefined ? Number(item.saleTaxPercent) : configuredSTRate) : 0;
+                      const itemST = !isSalesTaxEnabled ? 0 : Number(item.salesTax18 !== undefined ? item.salesTax18 : (taxableAmount * (itemTaxRate / 100)));
+                      const itemAdv = !isAdvTaxEnabled ? 0 : Number(item.advTax05 !== undefined ? item.advTax05 : (taxableAmount * (configuredAdvRate / 100)));
                       const itemNet = taxableAmount + itemST + itemAdv;
 
                       return (
@@ -282,17 +300,19 @@ export const A4InvoicePrintModal = ({ invoice, onClose }) => {
                       let tother = 0;
                       items.forEach(it => {
                         const q = Number(it.qty || it.quantity || 1);
-                        const r = Number(it.boxSellingPrice || it.boxPrice || it.price || 600);
+                        const r = Number(it.boxSellingPrice || it.boxPrice || it.price || 0);
                         const gross = q * r - Number(it.discount || 0);
-                        const tr = it.saleTaxPercent !== undefined ? Number(it.saleTaxPercent) : 18;
-                        const st = Number(it.salesTax18 !== undefined ? it.salesTax18 : (gross * (tr / 100)));
-                        if (tr === 18) t18 += st;
+                        const tr = isSalesTaxEnabled ? (it.saleTaxPercent !== undefined ? Number(it.saleTaxPercent) : configuredSTRate) : 0;
+                        const st = !isSalesTaxEnabled ? 0 : Number(it.salesTax18 !== undefined ? it.salesTax18 : (gross * (tr / 100)));
+                        if (tr === 18 || tr === configuredSTRate) t18 += st;
                         else if (tr === 19) t19 += st;
-                        else tother += st;
+                        else if (tr > 0) tother += st;
                       });
+                      const totalST = t18 + t19 + tother;
+                      const advTaxVal = isAdvTaxEnabled ? Number(invoice.totalAdvTax05 || invoice.advTax05 || (grossTotal * (configuredAdvRate / 100))) : 0;
                       return (
                         <div style={{ marginTop: '0.25rem', fontSize: '9.5px', color: '#334155', borderTop: '1px dashed #cbd5e1', paddingTop: '0.2rem' }}>
-                          <strong>FBR Tax Breakdown:</strong> 18% ST: Rs. {t18.toFixed(2)} | 19% ST: Rs. {t19.toFixed(2)} {tother > 0 ? `| Other ST: Rs. ${tother.toFixed(2)}` : ''} | 0.5% Adv Tax: Rs. {Number(invoice.advTax05 || (grossTotal * 0.005)).toFixed(2)}
+                          <strong>FBR Tax Breakdown:</strong> {totalST > 0 ? `${configuredSTRate}% ST: Rs. ${t18.toFixed(2)} | 19% ST: Rs. ${t19.toFixed(2)} ${tother > 0 ? `| Other ST: Rs. ${tother.toFixed(2)}` : ''}` : 'Sales Tax: Exempt / Disabled (Rs. 0.00)'} | {advTaxVal > 0 ? `${configuredAdvRate}% Adv Tax: Rs. ${advTaxVal.toFixed(2)}` : 'Adv Tax: Exempt (Rs. 0.00)'}
                         </div>
                       );
                     })()}
