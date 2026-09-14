@@ -147,18 +147,31 @@ export const A4InvoicePrintModal = ({ invoice, onClose }) => {
                   <div>
                     <div style={{ fontWeight: 800, textDecoration: 'underline', marginBottom: '0.2rem' }}>CUSTOMER DETAILS</div>
                     <div><strong>Customer Code:</strong> {invoice.customerCode || 'WALK-IN'}</div>
-                    <div><strong>Customer Name:</strong> {invoice.customerName || invoice.shopName || 'Taha Rubyan'}</div>
+                    <div><strong>Customer Name:</strong> {invoice.customerName || invoice.shopName || 'Walk-in Customer'}</div>
                     <div><strong>Customer Address:</strong> {invoice.customerAddress || 'Local Market, Commercial Zone'}</div>
-                    <div><strong>Customer NTN/CNIC:</strong> {invoice.customerNtn || '0792320-1'}</div>
+                    <div><strong>Customer NTN/CNIC:</strong> {invoice.customerNtn || '-'}</div>
                     <div><strong>Customer STRN:</strong> {invoice.customerStrn || '-'}</div>
-                    <div><strong>Delivered By:</strong> {invoice.deliveryMan || 'Ayan'} &nbsp;&nbsp; <strong>Delivery Date:</strong> {formatDateDDMMYYYY(invoice.date || new Date())}</div>
+                    <div><strong>Region / Territory:</strong> {invoice.region || '-'}</div>
                   </div>
 
                   <div>
-                    <div style={{ fontWeight: 800, textDecoration: 'underline', marginBottom: '0.2rem' }}>INVOICE DETAILS</div>
+                    <div style={{ fontWeight: 800, textDecoration: 'underline', marginBottom: '0.2rem' }}>INVOICE & PERSONNEL DETAILS</div>
                     <div><strong>Invoice Number:</strong> {invoice.invoiceNo}</div>
                     <div><strong>Invoice Date:</strong> {formatDateDDMMYYYY(invoice.date || new Date())}</div>
-                    <div><strong>Booked By:</strong> {invoice.bookedBy || invoice.cashierName || 'Store Admin'}</div>
+                    <div>
+                      <strong>Booked By:</strong> {invoice.bookingPerson || invoice.bookingMan || 'Direct Counter'}
+                      {invoice.bookingPersonPhone ? ` (Ph: ${invoice.bookingPersonPhone})` : ''}
+                      {invoice.refNo ? ` [Ref: ${invoice.refNo}]` : ''}
+                    </div>
+                    <div>
+                      <strong>Sale Made By:</strong> {invoice.salesPerson || invoice.cashierName || 'Counter Cashier'}
+                      {invoice.salesPersonRole ? ` (${invoice.salesPersonRole})` : ''}
+                    </div>
+                    <div>
+                      <strong>Delivered By:</strong> {invoice.deliveryBoy || invoice.deliveryMan || 'Counter Handover'}
+                      {invoice.deliveryBoyPhone ? ` (Ph: ${invoice.deliveryBoyPhone})` : ''}
+                      {invoice.deliveryBoyVehicle ? ` [${invoice.deliveryBoyVehicle}]` : ''}
+                    </div>
                     <div><strong>Payment Due Date:</strong> {formatDateDDMMYYYY(invoice.date || new Date())}</div>
                   </div>
                 </div>
@@ -210,7 +223,7 @@ export const A4InvoicePrintModal = ({ invoice, onClose }) => {
                             </div>
                           </td>
                           <td style={{ borderRight: '1px solid #000000', padding: '0.25rem 0.2rem', fontFamily: 'var(--font-mono)' }}>
-                            {item.batchNo || item.batchNumber || 'PND-8821'}
+                            {item.batchNo || item.batchNumber || 'PO-BATCH'}
                           </td>
                           <td style={{ borderRight: '1px solid #000000', padding: '0.25rem 0.2rem', fontFamily: 'var(--font-mono)' }}>
                             {item.expiryDate || '12-2028'}

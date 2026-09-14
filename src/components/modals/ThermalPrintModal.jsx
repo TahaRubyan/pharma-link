@@ -65,8 +65,14 @@ const ReceiptView = React.forwardRef(({
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '3px' }}>
           <span>Counter: <strong>Main</strong></span>
-          <span>Cashier: <strong>{activeCashier}</strong></span>
+          <span>Biller: <strong>{invoice?.salesPerson || activeCashier}</strong></span>
         </div>
+        {(invoice?.bookingPerson || invoice?.deliveryBoy) && (
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '2px', fontSize: '10px' }}>
+            {invoice?.bookingPerson ? <span>Booker: <strong>{invoice.bookingPerson}</strong></span> : <span></span>}
+            {invoice?.deliveryBoy && <span>Rider: <strong>{invoice.deliveryBoy}</strong></span>}
+          </div>
+        )}
       </div>
 
       {/* CUSTOMER COPY BADGE */}
@@ -135,6 +141,11 @@ const ReceiptView = React.forwardRef(({
                 </td>
                 <td style={{ border: '1px solid #000000', padding: '3px 4px', textAlign: 'left', fontWeight: 700, wordBreak: 'break-word' }}>
                   {item.name || item.brandName}
+                  {(item.batchNo || item.batchNumber) && (
+                    <div style={{ fontSize: '9px', fontWeight: 400, color: '#333333' }}>
+                      B: {item.batchNo || item.batchNumber}
+                    </div>
+                  )}
                 </td>
                 <td style={{ border: '1px solid #000000', padding: '3px 2px', textAlign: 'center', fontWeight: 700 }}>
                   {itemQty.toFixed(2)}

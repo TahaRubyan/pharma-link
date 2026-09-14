@@ -17,11 +17,12 @@ import { useInventory } from '../context/InventoryContext';
 import { useAuth } from '../context/AuthContext';
 import { loadRetailMockData, clearRetailMockData } from '../services/mockDataManager';
 import EditPriceModal from '../components/modals/EditPriceModal';
+import EditBatchModal from '../components/modals/EditBatchModal';
 import RetailNewPOModal from '../components/modals/RetailNewPOModal';
 import NewPOModal from '../components/modals/NewPOModal';
 
 export const InventoryPage = () => {
-  const { medicines = [], batches = [], setMedicines, updateMedicineDetails, bulkImportMedicines } = useInventory();
+  const { medicines = [], batches = [], setMedicines, updateMedicineDetails, updateBatchDetails, bulkImportMedicines } = useInventory();
   const { currentShop } = useAuth();
   const isRetail = currentShop?.mode === 'RETAIL';
 
@@ -33,6 +34,8 @@ export const InventoryPage = () => {
   // Modals state
   const [editingMedicine, setEditingMedicine] = useState(null);
   const [isEditPriceOpen, setIsEditPriceOpen] = useState(false);
+  const [editingBatchMedicine, setEditingBatchMedicine] = useState(null);
+  const [isEditBatchOpen, setIsEditBatchOpen] = useState(false);
   const [isNewPOOpen, setIsNewPOOpen] = useState(false);
 
   const handleExportCSV = () => {
@@ -99,6 +102,12 @@ export const InventoryPage = () => {
       setMedicines((prev) =>
         prev.map((m) => (m.id === id ? { ...m, ...updatedData } : m))
       );
+    }
+  };
+
+  const handleSaveBatch = (id, updatedData) => {
+    if (typeof updateBatchDetails === 'function') {
+      updateBatchDetails(id, updatedData);
     }
   };
 
@@ -244,6 +253,7 @@ export const InventoryPage = () => {
                 <th>Item Code</th>
                 <th>Medicine Trade Name</th>
                 <th>Generic Formula</th>
+                <th>Batch Lot #</th>
                 {isRetail && <th>Drug Type</th>}
                 <th>Category</th>
                 <th>Physical Shelf Location</th>
@@ -257,7 +267,7 @@ export const InventoryPage = () => {
             <tbody>
               {filteredMedicines.length === 0 ? (
                 <tr>
-                  <td colSpan={isRetail ? 11 : 9} style={{ textAlign: 'center', padding: '3.5rem 1.5rem', color: '#64748b' }}>
+                  <td colSpan={isRetail ? 12 : 10} style={{ textAlign: 'center', padding: '3.5rem 1.5rem', color: '#64748b' }}>
                     {medicines.length === 0 && isRetail ? (
                       <div style={{ maxWidth: '400px', margin: '0 auto', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.65rem' }}>
                         <Package size={36} color="#0284c7" />
@@ -286,6 +296,9 @@ export const InventoryPage = () => {
                   const tabPrice = Number(med.pricePerTablet || (tabs > 0 ? (price / tabs) : 0));
                   const isNarcotic = med.controlledType === 'Narcotic';
 
+                  const medBatch = batches.find((b) => b.medicineId === med.id || (med.itemCode && b.itemCode === med.itemCode) || (b.medicineId && b.medicineId.toLowerCase() === (med.name || '').toLowerCase())) || {};
+                  const displayBatchNo = med.batchNo || med.batchNumber || medBatch.batchNo || medBatch.batchNumber || '-';
+
                   return (
                     <tr key={med.id || idx}>
                       <td style={{ fontWeight: 700, fontFamily: 'var(--font-mono)' }}>{med.itemCode || med.id}</td>
@@ -294,6 +307,16 @@ export const InventoryPage = () => {
                         <div style={{ fontSize: '10px', color: '#64748b', fontWeight: 400 }}>{med.manufacturer}</div>
                       </td>
                       <td style={{ color: '#475569' }}>{med.formula || med.genericFormula}</td>
+
+                      <td style={{ fontFamily: 'var(--font-mono)', fontWeight: 700 }}>
+                        {displayBatchNo !== '-' ? (
+                          <span style={{ backgroundColor: '#f0f9ff', color: '#0369a1', padding: '0.15rem 0.45rem', borderRadius: '6px', border: '1px solid #bae6fd', fontSize: '10.5px' }}>
+                            {displayBatchNo}
+                          </span>
+                        ) : (
+                          <span style={{ color: '#94a3b8', fontStyle: 'italic', fontSize: '10.5px' }}>Unassigned</span>
+                        )}
+                      </td>
 
                       {isRetail && (
                         <td>
@@ -331,15 +354,25 @@ export const InventoryPage = () => {
                       <td style={{ textAlign: 'center' }}>
                         <div style={{ display: 'flex', gap: '0.35rem', justifyContent: 'center' }}>
                           <button
+                            onClick={() => { setEditingBatchMedicine({ medicine: med, batch: medBatch }); setIsEditBatchOpen(true); }}
+                            className="btn btn-outline"
+                            style={{ fontSize: '11px', padding: '0.2rem 0.5rem', borderColor: '#0284c7', color: '#0284c7', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}
+                            title="Edit Batch Lot #, Expiry, Cost & Stock"
+                          >
+                            <Layers size={11} /> Batch
+                          </button>
+                          <button
                             onClick={() => { setEditingMedicine(med); setIsEditPriceOpen(true); }}
                             className="btn btn-outline"
                             style={{ fontSize: '11px', padding: '0.2rem 0.5rem' }}
+                            title="Edit Price & Shelf"
                           >
                             <Edit size={11} /> Edit
                           </button>
                           <button
                             onClick={() => handleDeleteMedicine(med.id)}
                             style={{ background: 'none', border: 'none', color: '#dc2626', cursor: 'pointer', padding: '0.2rem' }}
+                            title="Delete Medicine"
                           >
                             <Trash2 size={13} />
                           </button>
@@ -391,6 +424,17 @@ export const InventoryPage = () => {
           medicine={editingMedicine}
           onClose={() => { setIsEditPriceOpen(false); setEditingMedicine(null); }}
           onSave={handleSavePrice}
+        />
+      )}
+
+      {/* EDIT BATCH MODAL */}
+      {isEditBatchOpen && editingBatchMedicine && (
+        <EditBatchModal
+          isOpen={isEditBatchOpen}
+          medicine={editingBatchMedicine.medicine}
+          batch={editingBatchMedicine.batch}
+          onClose={() => { setIsEditBatchOpen(false); setEditingBatchMedicine(null); }}
+          onSave={handleSaveBatch}
         />
       )}
 

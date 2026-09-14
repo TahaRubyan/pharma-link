@@ -334,11 +334,21 @@ export const NewPOModal = ({ isOpen, onClose }) => {
   );
 
   const canProceedFromStep2 = items.length > 0 && !hasShortExpiryItems && items.every(it => 
-    it.tradeName.trim() && Number(it.inwardBoxes) > 0 && Number(it.purchaseCost) >= 0
+    it.tradeName.trim() && it.batchNo?.trim() && Number(it.inwardBoxes) > 0 && Number(it.purchaseCost) >= 0
   );
 
   const handleSubmit = (e) => {
     e.preventDefault();
+
+    const missingBatchItem = items.find(it => !it.batchNo?.trim());
+    if (missingBatchItem) {
+      showAlert({
+        type: 'WARNING',
+        title: 'Batch Number Required',
+        message: `Batch Number is compulsory for all inward items. Please provide a valid batch number for "${missingBatchItem.tradeName || 'unnamed item'}" before completing the Purchase Order.`,
+      });
+      return;
+    }
 
     const poRecord = {
       id: `PO-${Date.now()}`,

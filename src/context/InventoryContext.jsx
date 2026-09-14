@@ -333,9 +333,12 @@ export const InventoryProvider = ({ children }) => {
 
             if (isMatch) {
               matchedMedId = m.id;
+              const cleanBatch = (item.batchNo || item.batchNumber || '').trim();
               return {
                 ...m,
                 itemCode: item.itemCode ? item.itemCode.toString().trim() : m.itemCode,
+                batchNo: cleanBatch || m.batchNo,
+                batchNumber: cleanBatch || m.batchNumber,
                 boxSellingPrice: boxMrp,
                 boxPrice: boxMrp,
                 purchaseCost: boxCost,
@@ -355,11 +358,14 @@ export const InventoryProvider = ({ children }) => {
           // If brand-new medicine being inwarded directly
           const newMedId = `MED-${Date.now().toString().slice(-4)}`;
           matchedMedId = newMedId;
+          const cleanBatch = (item.batchNo || item.batchNumber || '').trim();
           const newMed = {
             id: newMedId,
             itemCode: item.itemCode ? item.itemCode.toString().trim() : (1000 + prevMeds.length + 1).toString(),
             name: item.tradeName || 'New Medicine',
             brandName: item.tradeName || 'New Medicine',
+            batchNo: cleanBatch || 'PO-BATCH',
+            batchNumber: cleanBatch || 'PO-BATCH',
             formula: item.genericFormula || 'Standard Formula',
             genericFormula: item.genericFormula || 'Standard Formula',
             category: 'Tablet',
@@ -404,15 +410,17 @@ export const InventoryProvider = ({ children }) => {
           return b;
         });
 
-        // 3. Create new batch for this inward shipment with the new price
+        // 3. Create new batch for this inward shipment with the exact PO batch number
+        const cleanBatch = (item.batchNo || item.batchNumber || '').trim();
         const newBatch = {
           id: `BATCH-${Date.now().toString().slice(-4)}-${Math.floor(Math.random() * 100)}`,
-          batchNo: item.batchNo || `B26-${Math.floor(100 + Math.random() * 900)}`,
-          batchNumber: item.batchNo || `B26-${Math.floor(100 + Math.random() * 900)}`,
+          batchNo: cleanBatch || 'PO-BATCH',
+          batchNumber: cleanBatch || 'PO-BATCH',
           medicineId: matchedMedId || item.medicineId || item.tradeName,
           distributorName: poRecord.supplierName || 'Pharma Distributor',
           expiryDate: item.expiryDate || '2028-12-31',
           totalTabletsAvailable: isShortExpiry ? 0 : totalTabs,
+          boxStock: boxesCount,
           boxPrice: boxMrp,
           boxSellingPrice: boxMrp,
           purchasePriceBox: boxCost,
@@ -624,14 +632,19 @@ export const InventoryProvider = ({ children }) => {
       const boxCost = Number(med?.purchaseCost !== undefined ? med.purchaseCost : (med?.purchasePriceBox !== undefined ? med.purchasePriceBox : (med?.boxCost || 0)));
       const sellingRate = Number(med?.boxSellingPrice !== undefined ? med.boxSellingPrice : (med?.boxPrice !== undefined ? med.boxPrice : (med?.price || boxCost)));
 
+      // Find if any historical batch for this medicine exists to reuse the exact batch number
+      const existingBatch = batches.find((b) => b.medicineId === med?.id || (med?.itemCode && b.itemCode === med.itemCode) || b.medicineId === medId);
+      const resolvedBatchNo = (med?.batchNo || med?.batchNumber || existingBatch?.batchNo || existingBatch?.batchNumber || 'PO-BATCH').trim();
+
       return {
-        id: `BATCH-${med?.id || 'STOCK'}-ACTIVE`,
-        batchNo: med?.batchNo || `B26-${med?.itemCode || 'STOCK'}`,
-        batchNumber: med?.batchNo || `B26-${med?.itemCode || 'STOCK'}`,
+        id: existingBatch?.id || `BATCH-${med?.id || 'STOCK'}-ACTIVE`,
+        batchNo: resolvedBatchNo,
+        batchNumber: resolvedBatchNo,
         medicineId: med?.id || medId,
         distributorName: med?.manufacturer || 'Authorized Distributor',
         expiryDate: expiry,
         totalTabletsAvailable: catalogStock * tabsPerBox,
+        boxStock: catalogStock,
         boxPrice: sellingRate,
         boxSellingPrice: sellingRate,
         purchasePriceBox: boxCost,
@@ -646,10 +659,11 @@ export const InventoryProvider = ({ children }) => {
     if (isWholesale) return null;
     const fallbackCost = Number(med?.purchaseCost || med?.purchasePriceBox || 0);
     const fallbackRate = Number(med?.boxSellingPrice || med?.boxPrice || fallbackCost);
+    const resolvedBatchNo = (med?.batchNo || med?.batchNumber || 'PO-BATCH').trim();
     return {
-      batchNo: 'B-9481',
-      batchNumber: 'B-9481',
-      expiryDate: '2028-10-31',
+      batchNo: resolvedBatchNo,
+      batchNumber: resolvedBatchNo,
+      expiryDate: med?.expiryDate || '2028-10-31',
       boxPrice: fallbackRate,
       purchasePriceBox: fallbackCost,
       pricePerTablet: Number(med?.pricePerTablet || 0),
@@ -798,6 +812,100 @@ export const InventoryProvider = ({ children }) => {
     }
   };
 
+  const updateBatchDetails = (batchIdOrMedicineId, updatedData) => {
+    const cleanBatch = (updatedData.batchNo || updatedData.batchNumber || '').trim();
+    let affectedMedId = updatedData.medicineId || null;
+
+    setBatches((prevBatches) => {
+      let matched = false;
+      const updated = prevBatches.map((b) => {
+        const isMatch = b.id === batchIdOrMedicineId ||
+          b.batchNo === batchIdOrMedicineId ||
+          b.batchNumber === batchIdOrMedicineId ||
+          (b.medicineId && b.medicineId === batchIdOrMedicineId);
+
+        if (isMatch) {
+          matched = true;
+          if (b.medicineId) affectedMedId = b.medicineId;
+          const cost = updatedData.purchaseCost !== undefined ? Number(updatedData.purchaseCost) : (b.purchaseCost || b.purchasePriceBox || 0);
+          const selling = updatedData.boxPrice !== undefined ? Number(updatedData.boxPrice) : (updatedData.boxSellingPrice !== undefined ? Number(updatedData.boxSellingPrice) : (b.boxPrice || cost));
+          const boxes = updatedData.boxStock !== undefined ? Number(updatedData.boxStock) : Number(b.boxStock || 0);
+          const tabs = updatedData.totalTabletsAvailable !== undefined 
+            ? Number(updatedData.totalTabletsAvailable) 
+            : (boxes * Number(updatedData.tabletsPerBox || 200));
+
+          return {
+            ...b,
+            batchNo: cleanBatch || b.batchNo,
+            batchNumber: cleanBatch || b.batchNumber,
+            expiryDate: updatedData.expiryDate || b.expiryDate,
+            boxStock: boxes,
+            totalTabletsAvailable: tabs,
+            purchasePriceBox: cost,
+            purchaseCost: cost,
+            purchaseRate: cost,
+            boxPrice: selling,
+            boxSellingPrice: selling,
+            rackLocation: updatedData.rackLocation !== undefined ? updatedData.rackLocation.trim() : b.rackLocation,
+          };
+        }
+        return b;
+      });
+
+      if (!matched && updatedData.medicineId) {
+        const cost = Number(updatedData.purchaseCost || 0);
+        const selling = Number(updatedData.boxPrice || updatedData.boxSellingPrice || cost);
+        const boxes = Number(updatedData.boxStock || 1);
+        const tabs = Number(updatedData.totalTabletsAvailable || (boxes * 200));
+        const newBatch = {
+          id: `BATCH-${Date.now().toString().slice(-4)}`,
+          medicineId: updatedData.medicineId,
+          batchNo: cleanBatch || 'PO-BATCH',
+          batchNumber: cleanBatch || 'PO-BATCH',
+          expiryDate: updatedData.expiryDate || '2028-12-31',
+          totalTabletsAvailable: tabs,
+          boxStock: boxes,
+          purchasePriceBox: cost,
+          purchaseCost: cost,
+          purchaseRate: cost,
+          boxPrice: selling,
+          boxSellingPrice: selling,
+          status: 'Active Stock',
+          rackLocation: updatedData.rackLocation || '',
+        };
+        return [newBatch, ...updated];
+      }
+      return updated;
+    });
+
+    setMedicines((prevMeds) => {
+      return prevMeds.map((m) => {
+        const isMatch = m.id === batchIdOrMedicineId ||
+          (affectedMedId && m.id === affectedMedId) ||
+          m.id === updatedData.medicineId ||
+          (m.batchNo && m.batchNo === batchIdOrMedicineId);
+
+        if (isMatch) {
+          const cost = updatedData.purchaseCost !== undefined ? Number(updatedData.purchaseCost) : (m.purchaseCost || m.purchasePriceBox || 0);
+          const selling = updatedData.boxPrice !== undefined ? Number(updatedData.boxPrice) : (updatedData.boxSellingPrice !== undefined ? Number(updatedData.boxSellingPrice) : (m.boxPrice || cost));
+          return {
+            ...m,
+            batchNo: cleanBatch || m.batchNo,
+            batchNumber: cleanBatch || m.batchNumber,
+            expiryDate: updatedData.expiryDate || m.expiryDate,
+            boxStock: updatedData.boxStock !== undefined ? Number(updatedData.boxStock) : m.boxStock,
+            purchaseCost: cost,
+            purchasePriceBox: cost,
+            boxPrice: selling,
+            boxSellingPrice: selling,
+            rackLocation: updatedData.rackLocation !== undefined ? updatedData.rackLocation.trim() : m.rackLocation,
+          };
+        }
+        return m;
+      });
+    });
+  };
+
   const bulkImportMedicines = (importedMedicines, importedBatches) => {
     if (!Array.isArray(importedMedicines) || importedMedicines.length === 0) return;
     setMedicines((prev) => [...importedMedicines, ...prev]);
@@ -818,6 +926,7 @@ export const InventoryProvider = ({ children }) => {
         poTaxLogs,
         inwardPOStock,
         updateMedicineDetails,
+        updateBatchDetails,
         bulkImportMedicines,
         deductStock,
         restoreStock,

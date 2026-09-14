@@ -48,7 +48,7 @@ export const CartProvider = ({ children }) => {
   const addToCart = (medicine, batch, unitSelection = 'Box') => {
     setCart((prev) => {
       const medId = medicine.id || medicine.medicineId;
-      const bNo = batch ? (batch.batchNo || batch.batchNumber) : 'B-9481';
+      const bNo = (batch ? (batch.batchNo || batch.batchNumber) : '') || medicine.batchNo || medicine.batchNumber || 'PO-BATCH';
       const existingIdx = prev.findIndex((i) => (i.medicineId === medId || i.id === medId) && (i.batchNo === bNo || i.batchNumber === bNo));
       const itemCost = Number(medicine.purchaseCost !== undefined ? medicine.purchaseCost : (medicine.purchasePriceBox !== undefined ? medicine.purchasePriceBox : (medicine.boxCost || (batch ? (batch.purchasePriceBox || batch.purchaseRate || batch.purchaseCost) : 0))));
       const itemSelling = Number(medicine.boxSellingPrice !== undefined ? medicine.boxSellingPrice : (medicine.boxPrice !== undefined ? medicine.boxPrice : (batch ? (batch.boxPrice || batch.boxSellingPrice) : itemCost)));
@@ -108,7 +108,7 @@ export const CartProvider = ({ children }) => {
             tabletsPerBox: medicine.tabletsPerBox || 100,
             batchNo: bNo,
             batchNumber: bNo,
-            expiryDate: batch ? (batch.expiryDate || '12/2027') : '12/2027',
+            expiryDate: (batch && batch.expiryDate) ? batch.expiryDate : (medicine.expiryDate || '12-2028'),
             unitSelection,
             unitType: unitSelection,
             costPrice: itemCost,

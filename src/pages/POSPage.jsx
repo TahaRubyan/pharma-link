@@ -74,7 +74,7 @@ export const POSPage = ({ storeMode: propStoreMode }) => {
   // Retail Tendered Cash State
   const [cashTendered, setCashTendered] = useState('');
 
-  // Wholesale Customer State (Clean Slate - No Mock Data)
+  // Wholesale Customer & Logistics Personnel State
   const [customerData, setCustomerData] = useState({
     customerName: isRetail ? 'Walk-in Retail Customer' : 'Walk-in / Cash Customer',
     shopName: isRetail ? '' : (currentShop?.shopName || 'Testing Shop'),
@@ -85,9 +85,16 @@ export const POSPage = ({ storeMode: propStoreMode }) => {
     customerStrn: '',
     filerStatus: 'FILER',
     customerPhone: '',
+    bookingPerson: '',
     bookingMan: '',
+    bookingPersonPhone: '',
     refNo: '',
-    deliveryMan: 'Express Delivery / Rider',
+    salesPerson: user ? (user.name || user.username) : 'Testing Shop Admin',
+    salesPersonRole: 'Counter Cashier',
+    deliveryBoy: isRetail ? 'Counter Handover' : 'Express Delivery / Rider',
+    deliveryMan: isRetail ? 'Counter Handover' : 'Express Delivery / Rider',
+    deliveryBoyPhone: '',
+    deliveryBoyVehicle: '',
   });
 
   // Wholesale Payment Terms: 'DUE' (Territory Delivery Due) | 'CASH' (Immediate Cash)
@@ -585,14 +592,22 @@ export const POSPage = ({ storeMode: propStoreMode }) => {
       customerPhone: rxPatient ? rxPatient.phone : (customerData.customerPhone || ''),
       customerAddress: rxPatient ? rxPatient.address : (customerData.customerAddress || ''),
       region: isRetail ? (rxPatient?.city || currentShop?.city || '') : (customerData.region || currentShop?.city || ''),
-      deliveryMan: customerData.deliveryMan || (isRetail ? 'Counter Handover' : 'Express Delivery / Rider'),
-      bookingMan: customerData.bookingMan || '',
+      deliveryBoy: customerData.deliveryBoy || customerData.deliveryMan || (isRetail ? 'Counter Handover' : 'Express Delivery / Rider'),
+      deliveryMan: customerData.deliveryBoy || customerData.deliveryMan || (isRetail ? 'Counter Handover' : 'Express Delivery / Rider'),
+      deliveryBoyPhone: customerData.deliveryBoyPhone || '',
+      deliveryBoyVehicle: customerData.deliveryBoyVehicle || '',
+      bookingPerson: customerData.bookingPerson || customerData.bookingMan || '',
+      bookingMan: customerData.bookingPerson || customerData.bookingMan || '',
+      bookingPersonPhone: customerData.bookingPersonPhone || '',
+      refNo: customerData.refNo || '',
+      salesPerson: customerData.salesPerson || (user ? (user.name || user.username) : 'Testing Shop Admin'),
+      cashierName: customerData.salesPerson || (user ? (user.name || user.username) : 'Testing Shop Admin'),
+      salesPersonRole: customerData.salesPersonRole || 'Counter Cashier',
       licenseNo: customerData.licenseNo || '',
       customerNtn: customerData.customerNtn || '',
       customerStrn: customerData.customerStrn || '',
       filerStatus: customerData.filerStatus || 'FILER',
       doctorName: rxPatient ? rxPatient.doctorName : (hasControlledOrRx ? 'Dr. Tariq Parvez (PMC-88120)' : '-'),
-      cashierName: user ? user.name : 'Testing Shop Admin',
       items: [...cart],
       subtotal: grossSubtotal,
       grossTotal: grossSubtotal,
@@ -928,6 +943,27 @@ export const POSPage = ({ storeMode: propStoreMode }) => {
             <UserPlus size={13} /> + New Customer
           </button>
 
+          {/* Personnel & Logistics Drawer Modal Button */}
+          <button
+            type="button"
+            onClick={() => setIsCustomerModalOpen(true)}
+            className="btn btn-outline"
+            style={{ 
+              borderRadius: '8px', 
+              fontSize: '11px', 
+              borderColor: '#0284c7', 
+              color: '#0284c7', 
+              padding: '0.4rem 0.75rem', 
+              fontWeight: 700,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.35rem'
+            }}
+            title="Configure Order Booker, Sale Person, and Delivery Boy details"
+          >
+            <Truck size={13} /> Personnel & Logistics
+          </button>
+
           {/* Retail Rx Drawer toggle button */}
           {isRetail && (
             <button
@@ -957,6 +993,57 @@ export const POSPage = ({ storeMode: propStoreMode }) => {
             <RotateCcw size={13} /> {isRetail ? 'Counter Return' : 'Sales Return'}
           </button>
         </div>
+      </div>
+
+      {/* ORDER PERSONNEL & LOGISTICS METADATA SUMMARY BAR */}
+      <div 
+        style={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'space-between', 
+          flexWrap: 'wrap', 
+          gap: '0.5rem', 
+          padding: '0.45rem 0.85rem', 
+          backgroundColor: '#f8fafc', 
+          border: '1px solid #e2e8f0', 
+          borderRadius: '10px', 
+          fontSize: '11px' 
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem', flexWrap: 'wrap' }}>
+          <div>
+            <span style={{ color: '#64748b' }}>Booked By: </span>
+            <strong style={{ color: '#0f172a' }}>{customerData.bookingPerson || customerData.bookingMan || 'Direct Counter'}</strong>
+            {customerData.bookingPersonPhone && <span style={{ color: '#64748b', marginLeft: '3px' }}>({customerData.bookingPersonPhone})</span>}
+          </div>
+          <div>
+            <span style={{ color: '#64748b' }}>Sale Made By: </span>
+            <strong style={{ color: '#0284c7' }}>{customerData.salesPerson || (user ? (user.name || user.username) : 'Testing Shop Admin')}</strong>
+            <span style={{ color: '#64748b', marginLeft: '3px' }}>({customerData.salesPersonRole || 'Cashier'})</span>
+          </div>
+          <div>
+            <span style={{ color: '#64748b' }}>Delivery Boy / Rider: </span>
+            <strong style={{ color: '#16a34a' }}>{customerData.deliveryBoy || customerData.deliveryMan || (isRetail ? 'Counter Handover' : 'Express Delivery')}</strong>
+            {customerData.deliveryBoyPhone && <span style={{ color: '#64748b', marginLeft: '3px' }}>({customerData.deliveryBoyPhone})</span>}
+            {customerData.deliveryBoyVehicle && <span style={{ color: '#475569', marginLeft: '3px' }}>[{customerData.deliveryBoyVehicle}]</span>}
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => setIsCustomerModalOpen(true)}
+          style={{
+            background: 'none',
+            border: 'none',
+            color: '#0284c7',
+            cursor: 'pointer',
+            fontSize: '11px',
+            fontWeight: 700,
+            textDecoration: 'underline'
+          }}
+        >
+          Edit Personnel Details ✎
+        </button>
       </div>
 
       {/* RETAIL PRESCRIPTION WARNING NOTICE */}
@@ -1095,7 +1182,11 @@ export const POSPage = ({ storeMode: propStoreMode }) => {
                         <div style={{ fontSize: '11px', color: isSelected ? '#e0f2fe' : '#64748b', marginTop: '0.15rem' }}>
                           Code: {m.itemCode || m.id} • Formula: {m.formula || m.genericFormula} • 📍 Shelf: {m.rackLocation || 'Rack A-01'}
                           {isRetail && <span style={{ marginLeft: '0.5rem', color: '#16a34a', fontWeight: 700 }}>• Exp: {m.expiryDate || '10/2026'}</span>}
-                          {!isRetail && wholesaleBatch && <span style={{ marginLeft: '0.5rem', color: isSelected ? '#ffffff' : '#0284c7', fontWeight: 700 }}>• Batch: {wholesaleBatch.batchNumber || wholesaleBatch.batchNo} ({wholesaleBatch.expiryDate})</span>}
+                          {((wholesaleBatch && (wholesaleBatch.batchNo || wholesaleBatch.batchNumber)) || m.batchNo || m.batchNumber) && (
+                            <span style={{ marginLeft: '0.5rem', color: isSelected ? '#ffffff' : '#0284c7', fontWeight: 700 }}>
+                              • Batch: {(wholesaleBatch?.batchNumber || wholesaleBatch?.batchNo || m.batchNo || m.batchNumber)} ({wholesaleBatch?.expiryDate || m.expiryDate || '12-2028'})
+                            </span>
+                          )}
                         </div>
                       </div>
 
@@ -1194,7 +1285,18 @@ export const POSPage = ({ storeMode: propStoreMode }) => {
                               <div style={{ fontSize: '10px', color: '#64748b', fontWeight: 400 }}>{item.formula || item.genericFormula}</div>
                             </td>
                             <td style={{ fontFamily: 'var(--font-mono)', color: isRetail ? '#16a34a' : '#0f172a', fontWeight: isRetail ? 700 : 400 }}>
-                              {isRetail ? (item.expiryDate ? `Exp: ${item.expiryDate}` : 'Exp: 10/2026') : (item.batchNo || item.batchNumber || 'PND-8821')}
+                              {isRetail ? (
+                                item.expiryDate ? `Exp: ${item.expiryDate}` : 'Exp: 10/2026'
+                              ) : (
+                                <div>
+                                  <div style={{ fontWeight: 700, color: '#0284c7' }}>
+                                    {item.batchNo || item.batchNumber || 'PO-BATCH'}
+                                  </div>
+                                  <div style={{ fontSize: '9.5px', color: '#64748b' }}>
+                                    Exp: {item.expiryDate || '12-2028'}
+                                  </div>
+                                </div>
+                              )}
                             </td>
 
                             {/* RETAIL UNIT DISPENSING TOGGLE PILLS */}
