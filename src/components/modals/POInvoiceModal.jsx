@@ -24,8 +24,9 @@ export const POInvoiceModal = ({ isOpen, po, onClose }) => {
   const billDiscount = Number(po.billDiscount || 0);
   const totalDiscount = Number(po.totalDiscount || po.discount || (itemDiscounts + billDiscount) || 0);
   const netGoods = Number(po.netGoodsValue || Math.max(0, grossCost - totalDiscount));
-  const stRate = Number(po.salesTaxRate !== undefined ? po.salesTaxRate : 18);
-  const stAmount = Number(po.salesTaxAmount || 0);
+  const isSalesTaxGloballyEnabled = currentShop?.taxSettings?.enableSalesTax18 !== false;
+  const stRate = Number(po.salesTaxRate !== undefined ? po.salesTaxRate : (po.salesTaxAmount > 0 ? 18 : 0));
+  const stAmount = Number(po.salesTaxAmount || (stRate > 0 ? (netGoods * stRate / 100) : 0));
   const advRate = Number(po.advTaxRate !== undefined ? po.advTaxRate : 0.5);
   const advAmount = Number(po.advTaxAmount || 0);
   const totalAmount = Number(po.totalAmount || po.totalCost || (netGoods + stAmount + advAmount));
@@ -278,7 +279,9 @@ export const POInvoiceModal = ({ isOpen, po, onClose }) => {
 
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11.5px', marginBottom: '0.35rem' }}>
                 <span style={{ color: '#64748b' }}>Distributor Sales Tax ({stRate}%):</span>
-                <span style={{ fontWeight: 700, color: '#0284c7', fontFamily: 'var(--font-mono)' }}>+ PKR {stAmount.toLocaleString('en-PK', { minimumFractionDigits: 2 })}</span>
+                <span style={{ fontWeight: 700, color: stAmount > 0 ? '#0284c7' : '#64748b', fontFamily: 'var(--font-mono)' }}>
+                  {stAmount > 0 ? `+ PKR ${stAmount.toLocaleString('en-PK', { minimumFractionDigits: 2 })}` : 'PKR 0.00 (Tax-Exempt / Disabled)'}
+                </span>
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11.5px', marginBottom: '0.45rem' }}>

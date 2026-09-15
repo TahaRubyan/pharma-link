@@ -20,9 +20,11 @@ import {
 } from 'lucide-react';
 import { useSupplier } from '../../context/SupplierContext';
 import { useInventory } from '../../context/InventoryContext';
+import { useAuth } from '../../context/AuthContext';
 import AppAlertModal from './AppAlertModal';
 
 export const NewPOModal = ({ isOpen, onClose }) => {
+  const { currentShop } = useAuth();
   const { suppliers = [], addSupplier, createPurchaseOrder, generatePONumber } = useSupplier();
   const { medicines = [], inwardPOStock, isExpiryWithin6Months } = useInventory();
 
@@ -81,11 +83,54 @@ export const NewPOModal = ({ isOpen, onClose }) => {
   const [billDiscountType, setBillDiscountType] = useState('FIXED'); // 'FIXED' | 'PERCENT'
   const [billDiscount, setBillDiscount] = useState('');
 
+  const activeTenantId = currentShop?.tenantId || currentShop?.shopId || 'TEN-IDREES-PHARMA';
+  const isSalesTaxGloballyEnabled = useMemo(() => {
+    try {
+      const saved = localStorage.getItem(`pharmalink_${activeTenantId}_tax_settings`);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed?.enableSalesTax18 !== undefined) return Boolean(parsed.enableSalesTax18);
+      }
+    } catch (e) {}
+    if (currentShop?.taxSettings?.enableSalesTax18 !== undefined) {
+      return Boolean(currentShop.taxSettings.enableSalesTax18);
+    }
+    return true;
+  }, [activeTenantId, currentShop?.taxSettings]);
+
+  const isAdvTaxGloballyEnabled = useMemo(() => {
+    try {
+      const saved = localStorage.getItem(`pharmalink_${activeTenantId}_tax_settings`);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed?.enableAdvTax05 !== undefined) return Boolean(parsed.enableAdvTax05);
+      }
+    } catch (e) {}
+    if (currentShop?.taxSettings?.enableAdvTax05 !== undefined) {
+      return Boolean(currentShop.taxSettings.enableAdvTax05);
+    }
+    return true;
+  }, [activeTenantId, currentShop?.taxSettings]);
+
   // Dedicated Distributor Tax Input States (As Billed by Seller on Invoice)
-  const [distributorSalesTaxType, setDistributorSalesTaxType] = useState('18'); // '0' | '18' | '19' | 'CUSTOM'
+  const [distributorSalesTaxType, setDistributorSalesTaxType] = useState(() => {
+    return isSalesTaxGloballyEnabled ? '18' : '0';
+  });
   const [customSalesTaxRate, setCustomSalesTaxRate] = useState('');
-  const [distributorAdvTaxType, setDistributorAdvTaxType] = useState('0.5'); // '0' | '0.5' | '1.0' | 'CUSTOM'
+  const [distributorAdvTaxType, setDistributorAdvTaxType] = useState(() => {
+    return isAdvTaxGloballyEnabled ? '0.5' : '0';
+  });
   const [customAdvTaxRate, setCustomAdvTaxRate] = useState('');
+
+  // Keep tax types aligned if store tax settings change
+  useEffect(() => {
+    if (!isSalesTaxGloballyEnabled) {
+      setDistributorSalesTaxType('0');
+    }
+    if (!isAdvTaxGloballyEnabled) {
+      setDistributorAdvTaxType('0');
+    }
+  }, [isSalesTaxGloballyEnabled, isAdvTaxGloballyEnabled]);
 
   // Step 3: Payment Settlement
   const [paymentMode, setPaymentMode] = useState('Cash'); // 'Cash' | 'Bank Transfer' | 'Credit'
@@ -240,20 +285,22 @@ export const NewPOModal = ({ isOpen, onClose }) => {
 
   // Resolved distributor tax rates
   const activeSalesTaxRate = useMemo(() => {
+    if (!isSalesTaxGloballyEnabled) return 0;
     if (distributorSalesTaxType === '0') return 0;
     if (distributorSalesTaxType === '18') return 18;
     if (distributorSalesTaxType === '19') return 19;
     if (distributorSalesTaxType === 'CUSTOM') return Math.max(0, Number(customSalesTaxRate) || 0);
     return 18;
-  }, [distributorSalesTaxType, customSalesTaxRate]);
+  }, [distributorSalesTaxType, customSalesTaxRate, isSalesTaxGloballyEnabled]);
 
   const activeAdvTaxRate = useMemo(() => {
+    if (!isAdvTaxGloballyEnabled) return 0;
     if (distributorAdvTaxType === '0') return 0;
     if (distributorAdvTaxType === '0.5') return 0.5;
     if (distributorAdvTaxType === '1.0') return 1.0;
     if (distributorAdvTaxType === 'CUSTOM') return Math.max(0, Number(customAdvTaxRate) || 0);
     return 0.5;
-  }, [distributorAdvTaxType, customAdvTaxRate]);
+  }, [distributorAdvTaxType, customAdvTaxRate, isAdvTaxGloballyEnabled]);
 
   // Base Goods Value (Sum of boxes * purchase cost before discount)
   const grossBaseCost = useMemo(() => {
@@ -1030,10 +1077,10 @@ export const NewPOModal = ({ isOpen, onClose }) => {
                 <div style={{ backgroundColor: '#ffffff', padding: '0.85rem', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
                     <label style={{ fontSize: '11.5px', fontWeight: 700, color: '#334155' }}>
-                      Distributor Sales Tax (ST):
+                      Distributor Sales Tax (ST){!isSalesTaxGloballyEnabled ? ' (Disabled in Store Settings)' : ''}:
                     </label>
-                    <span style={{ fontSize: '11px', fontWeight: 800, color: '#0284c7', fontFamily: 'var(--font-mono)' }}>
-                      + PKR {salesTaxAmount.toLocaleString('en-PK', { minimumFractionDigits: 2 })}
+                    <span style={{ fontSize: '11px', fontWeight: 800, color: !isSalesTaxGloballyEnabled ? '#64748b' : '#0284c7', fontFamily: 'var(--font-mono)' }}>
+                      {!isSalesTaxGloballyEnabled ? '0% Exempt (PKR 0.00)' : `+ PKR ${salesTaxAmount.toLocaleString('en-PK', { minimumFractionDigits: 2 })}`}
                     </span>
                   </div>
 

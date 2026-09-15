@@ -20,6 +20,7 @@ import EditPriceModal from '../components/modals/EditPriceModal';
 import EditBatchModal from '../components/modals/EditBatchModal';
 import RetailNewPOModal from '../components/modals/RetailNewPOModal';
 import NewPOModal from '../components/modals/NewPOModal';
+import StockInventoryPrintModal from '../components/modals/StockInventoryPrintModal';
 
 export const InventoryPage = () => {
   const { medicines = [], batches = [], setMedicines, updateMedicineDetails, updateBatchDetails, bulkImportMedicines } = useInventory();
@@ -37,6 +38,7 @@ export const InventoryPage = () => {
   const [editingBatchMedicine, setEditingBatchMedicine] = useState(null);
   const [isEditBatchOpen, setIsEditBatchOpen] = useState(false);
   const [isNewPOOpen, setIsNewPOOpen] = useState(false);
+  const [isPrintStockOpen, setIsPrintStockOpen] = useState(false);
 
   const handleExportCSV = () => {
     if (medicines.length === 0) {
@@ -199,6 +201,15 @@ export const InventoryPage = () => {
             title="Export catalog to Excel CSV"
           >
             <Download size={13} /> Export CSV
+          </button>
+
+          <button
+            onClick={() => setIsPrintStockOpen(true)}
+            className="btn btn-primary"
+            style={{ backgroundColor: '#0284c7', color: '#ffffff', border: 'none', borderRadius: '8px', fontSize: '11px', padding: '0.35rem 0.75rem', display: 'flex', alignItems: 'center', gap: '0.35rem', cursor: 'pointer', fontWeight: 700 }}
+            title="Export / Print stock inventory catalog to A4 PDF"
+          >
+            <Printer size={13} /> Export Stock PDF
           </button>
         </div>
       </div>
@@ -451,6 +462,17 @@ export const InventoryPage = () => {
             onClose={() => setIsNewPOOpen(false)}
           />
         )
+      )}
+
+      {/* STOCK INVENTORY PRINT / PDF EXPORT MODAL */}
+      {isPrintStockOpen && (
+        <StockInventoryPrintModal
+          isOpen={isPrintStockOpen}
+          onClose={() => setIsPrintStockOpen(false)}
+          medicines={filteredMedicines}
+          batches={batches}
+          isRetail={isRetail}
+        />
       )}
     </div>
   );

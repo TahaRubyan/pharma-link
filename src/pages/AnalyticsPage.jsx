@@ -27,6 +27,8 @@ import { useInventory } from '../context/InventoryContext';
 import { useAuth, formatDateDDMMYYYY } from '../context/AuthContext';
 import AnalyticsReportModal from '../components/modals/AnalyticsReportModal';
 import A4InvoicePrintModal from '../components/modals/A4InvoicePrintModal';
+import TraceabilityLedgerPrintModal from '../components/modals/TraceabilityLedgerPrintModal';
+import CatalogVelocityPrintModal from '../components/modals/CatalogVelocityPrintModal';
 
 export const AnalyticsPage = () => {
   const { invoices = [] } = useSales();
@@ -45,6 +47,7 @@ export const AnalyticsPage = () => {
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
   const sevenDaysAgoStr = sevenDaysAgo.toISOString().split('T')[0];
 
+  // Movement & Traceability view modes
   const [activeTab, setActiveTab] = useState('SALES_LOGS'); // 'SALES_LOGS' | 'MEDICINE_MOVEMENT'
   const [movementViewMode, setMovementViewMode] = useState('TRACEABILITY'); // 'TRACEABILITY' | 'VELOCITY'
   const [selectedPeriod, setSelectedPeriod] = useState('30_DAYS'); // 'TODAY' | '7_DAYS' | '30_DAYS' | 'CUSTOM'
@@ -56,6 +59,8 @@ export const AnalyticsPage = () => {
   // Modals state
   const [isAnalyticsReportOpen, setIsAnalyticsReportOpen] = useState(false);
   const [viewInvoice, setViewInvoice] = useState(null);
+  const [isTraceabilityPrintOpen, setIsTraceabilityPrintOpen] = useState(false);
+  const [isVelocityPrintOpen, setIsVelocityPrintOpen] = useState(false);
 
   const round2 = (num) => Math.round((Number(num || 0) + Number.EPSILON) * 100) / 100;
 
@@ -597,7 +602,30 @@ export const AnalyticsPage = () => {
                     DRAP-compliant batch tracking: identifies exact shop/person, date, batch number, quantity, and unit price for every sold medicine
                   </div>
                 </div>
-                <span className="badge badge-success">{itemizedMovementLogs.length} Line Items Traced</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                  <span className="badge badge-success">{itemizedMovementLogs.length} Line Items Traced</span>
+                  <button
+                    type="button"
+                    onClick={() => setIsTraceabilityPrintOpen(true)}
+                    className="btn btn-primary"
+                    style={{
+                      backgroundColor: '#0284c7',
+                      color: '#ffffff',
+                      border: 'none',
+                      borderRadius: '8px',
+                      fontSize: '11px',
+                      padding: '0.35rem 0.75rem',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.35rem',
+                      fontWeight: 700,
+                      cursor: 'pointer'
+                    }}
+                    title="Export / Print itemized sales traceability ledger to A4 PDF"
+                  >
+                    <Printer size={13} /> Export Traceability PDF
+                  </button>
+                </div>
               </div>
 
               <div className="table-container">
@@ -674,7 +702,30 @@ export const AnalyticsPage = () => {
                     Aggregated consumption velocity, channel distribution (Counter vs Credit), and warehouse shelf location
                   </div>
                 </div>
-                <span className="badge badge-otc">{medicineMovementData.length} Catalog Items</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                  <span className="badge badge-otc">{medicineMovementData.length} Catalog Items</span>
+                  <button
+                    type="button"
+                    onClick={() => setIsVelocityPrintOpen(true)}
+                    className="btn btn-primary"
+                    style={{
+                      backgroundColor: '#0284c7',
+                      color: '#ffffff',
+                      border: 'none',
+                      borderRadius: '8px',
+                      fontSize: '11px',
+                      padding: '0.35rem 0.75rem',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.35rem',
+                      fontWeight: 700,
+                      cursor: 'pointer'
+                    }}
+                    title="Export / Print catalog velocity & stock aggregates to A4 PDF"
+                  >
+                    <Printer size={13} /> Export Velocity PDF
+                  </button>
+                </div>
               </div>
 
               <div className="table-container">
@@ -744,6 +795,24 @@ export const AnalyticsPage = () => {
         <A4InvoicePrintModal
           invoice={viewInvoice}
           onClose={() => setViewInvoice(null)}
+        />
+      )}
+
+      {/* TRACEABILITY LEDGER PRINT / PDF MODAL */}
+      {isTraceabilityPrintOpen && (
+        <TraceabilityLedgerPrintModal
+          isOpen={isTraceabilityPrintOpen}
+          onClose={() => setIsTraceabilityPrintOpen(false)}
+          logs={itemizedMovementLogs}
+        />
+      )}
+
+      {/* CATALOG VELOCITY PRINT / PDF MODAL */}
+      {isVelocityPrintOpen && (
+        <CatalogVelocityPrintModal
+          isOpen={isVelocityPrintOpen}
+          onClose={() => setIsVelocityPrintOpen(false)}
+          items={medicineMovementData}
         />
       )}
     </div>

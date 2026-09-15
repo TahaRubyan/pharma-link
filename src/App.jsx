@@ -183,6 +183,10 @@ function AppContent() {
 
   const handleLoginSuccess = (accountType, tenantId, mode, userRole = 'Admin', targetScreen = null) => {
     setIsAuthenticated(true);
+    try {
+      sessionStorage.setItem('pharmalink_session_auth', 'true');
+      localStorage.removeItem('pharmalink_is_auth');
+    } catch (e) {}
 
     if (accountType === 'SUPER_ADMIN') {
       // Handled by isSuperAdmin state

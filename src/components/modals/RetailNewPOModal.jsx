@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { X, Package, Plus, Trash2, CheckCircle, Truck, Calculator, Layers, Thermometer, UserPlus, FileText } from 'lucide-react';
 import { useSupplier } from '../../context/SupplierContext';
 import { useInventory } from '../../context/InventoryContext';
+import { useAuth } from '../../context/AuthContext';
 
 export const RetailNewPOModal = ({ isOpen, onClose }) => {
+  const { currentShop } = useAuth();
   const { suppliers = [], createPurchaseOrder, addSupplier } = useSupplier();
   const { medicines = [], inwardPOStock } = useInventory();
 
@@ -20,7 +22,20 @@ export const RetailNewPOModal = ({ isOpen, onClose }) => {
   const [newDistNtn, setNewDistNtn] = useState('');
 
   // Default Tax Settings & Dynamic Tax Engine
-  const [defaultStRate, setDefaultStRate] = useState(18);
+  const activeTenantId = currentShop?.tenantId || currentShop?.shopId || 'TEN-TESTING-SHOP';
+  const isSalesTaxEnabled = useMemo(() => {
+    try {
+      const saved = localStorage.getItem(`pharmalink_${activeTenantId}_tax_settings`);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed?.enableSalesTax18 !== undefined) return Boolean(parsed.enableSalesTax18);
+      }
+    } catch (e) {}
+    return currentShop?.taxSettings?.enableSalesTax18 !== false;
+  }, [activeTenantId, currentShop?.taxSettings]);
+
+  const initialSt = isSalesTaxEnabled ? 18 : 0;
+  const [defaultStRate, setDefaultStRate] = useState(initialSt);
   const [defaultAdvRate, setDefaultAdvRate] = useState(4);
   const [defaultAwhRate, setDefaultAwhRate] = useState(0);
   const [customTaxName, setCustomTaxName] = useState('');
@@ -39,7 +54,7 @@ export const RetailNewPOModal = ({ isOpen, onClose }) => {
       tabletsPerStrip: 10,
       boxCost: '',
       boxMrp: '',
-      salesTaxRate: 18,
+      salesTaxRate: initialSt,
       advTaxRate: 4,
       awhTaxRate: 0,
       customTaxRate: 0,

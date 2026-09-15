@@ -340,7 +340,15 @@ export const AuthProvider = ({ children }) => {
   }, [staffAccounts]);
 
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
-    return localStorage.getItem('pharmalink_is_auth') === 'true';
+    // Purge legacy persistent localStorage auth token for enhanced security
+    try {
+      localStorage.removeItem('pharmalink_is_auth');
+    } catch (e) {}
+    try {
+      return sessionStorage.getItem('pharmalink_session_auth') === 'true';
+    } catch (e) {
+      return false;
+    }
   });
 
   const logout = () => {
@@ -350,13 +358,16 @@ export const AuthProvider = ({ children }) => {
     setSessionLoginRole('Admin');
     setInspectingTenantId(null);
     setCurrentUserProfile(null);
-    localStorage.removeItem('pharmalink_is_auth');
-    localStorage.removeItem('medistore_account_type');
-    localStorage.removeItem('pharmalink_user_role');
-    localStorage.removeItem('pharmalink_session_login_role');
-    localStorage.removeItem('pharmalink_current_screen');
-    localStorage.removeItem('pharmalink_user_profile');
-    localStorage.removeItem('pharmalink_active_shop');
+    try {
+      sessionStorage.removeItem('pharmalink_session_auth');
+      localStorage.removeItem('pharmalink_is_auth');
+      localStorage.removeItem('medistore_account_type');
+      localStorage.removeItem('pharmalink_user_role');
+      localStorage.removeItem('pharmalink_session_login_role');
+      localStorage.removeItem('pharmalink_current_screen');
+      localStorage.removeItem('pharmalink_user_profile');
+      localStorage.removeItem('pharmalink_active_shop');
+    } catch (e) {}
     setCurrentShopState(MULTI_TENANT_SHOPS[0]);
   };
 
@@ -366,9 +377,12 @@ export const AuthProvider = ({ children }) => {
     setRoleState('Admin');
     setSessionLoginRole('Admin');
     setInspectingTenantId(null);
-    localStorage.setItem('pharmalink_is_auth', 'true');
-    localStorage.setItem('medistore_account_type', 'SUPER_ADMIN');
-    localStorage.setItem('pharmalink_session_login_role', 'Admin');
+    try {
+      sessionStorage.setItem('pharmalink_session_auth', 'true');
+      localStorage.removeItem('pharmalink_is_auth');
+      localStorage.setItem('medistore_account_type', 'SUPER_ADMIN');
+      localStorage.setItem('pharmalink_session_login_role', 'Admin');
+    } catch (e) {}
   };
 
   const loginAsClientUser = (tenantId = 'TEN-TESTING-SHOP', roleType = 'Admin', mode = null, tenantDetails = null, userDetails = null) => {
@@ -377,10 +391,13 @@ export const AuthProvider = ({ children }) => {
     setRoleState(roleType);
     setSessionLoginRole(roleType);
     setInspectingTenantId(null);
-    localStorage.setItem('pharmalink_is_auth', 'true');
-    localStorage.setItem('medistore_account_type', 'CLIENT_USER');
-    localStorage.setItem('pharmalink_user_role', roleType);
-    localStorage.setItem('pharmalink_session_login_role', roleType);
+    try {
+      sessionStorage.setItem('pharmalink_session_auth', 'true');
+      localStorage.removeItem('pharmalink_is_auth');
+      localStorage.setItem('medistore_account_type', 'CLIENT_USER');
+      localStorage.setItem('pharmalink_user_role', roleType);
+      localStorage.setItem('pharmalink_session_login_role', roleType);
+    } catch (e) {}
 
     // 1. Resolve Active Tenant
     let activeTenant = tenantDetails || (tenantsList || []).find((t) => t.tenantId === tenantId);
